@@ -33,7 +33,7 @@ static inline String binary_operator_kind_string(Binary_Operator_Kind kind) {
 
 static inline void indent(FILE *fp, uint32_t depth) { fprintf(fp, "%*s", depth * 3, ""); }
 
-void print(Syntax_Node *root, FILE *fp, int child_indent) {
+void print_syntax(Syntax_Node *root, FILE *fp, int child_indent) {
 	indent(fp, child_indent);
 	child_indent += 1;
 
@@ -52,38 +52,63 @@ void print(Syntax_Node *root, FILE *fp, int child_indent) {
 	case SYNTAX_NODE_UNARY_OPERATOR:
 	{
 		auto node = (Syntax_Node_Unary_Operator *)root;
-		printf("Unary Operator(%s)\n", token_kind_string(node->op).data);
-		print(node->child, fp, child_indent);
+		fprintf(fp, "Unary Operator(%s)\n", token_kind_string(node->op).data);
+		print_syntax(node->child, fp, child_indent);
 	} break;
 
 	case SYNTAX_NODE_BINARY_OPERATOR:
 	{
 		auto node = (Syntax_Node_Binary_Operator *)root;
-		printf("Binary Operator(%s)\n", token_kind_string(node->op).data);
-		print(node->left, fp, child_indent);
-		print(node->right, fp, child_indent);
+		fprintf(fp, "Binary Operator(%s)\n", token_kind_string(node->op).data);
+		print_syntax(node->left, fp, child_indent);
+		print_syntax(node->right, fp, child_indent);
+	} break;
+
+	case SYNTAX_NODE_TYPE:
+	{
+		auto node = (Syntax_Node_Type *)root;
+
+		const char *type_name = nullptr;
+		switch (node->syntax_type) {
+			case SYNTAX_TYPE_FLOAT: type_name = "float"; break;
+			NoDefaultCase();
+		}
+
+		fprintf(fp, "Type(%s)\n", type_name);
 	} break;
 
 	case SYNTAX_NODE_EXPRESSION:
 	{
 		auto node = (Syntax_Node_Expression *)root;
-		printf("Expression()\n");
-		print(node->child, fp, child_indent);
+		fprintf(fp, "Expression()\n");
+		print_syntax(node->child, fp, child_indent);
+	} break;
+
+	case SYNTAX_NODE_DECLARATION:
+	{
+		auto node = (Syntax_Node_Declaration *)root;
+		if (node->flags & DECLARATION_IS_CONSTANT) {
+			fprintf(fp, "Constant Declaration(%s)\n", node->identifier.data);
+		}
+		else {
+			fprintf(fp, "Variable Declaration(%s)\n", node->identifier.data);
+		}
+		print_syntax(node->type, fp, child_indent);
 	} break;
 
 	case SYNTAX_NODE_STATEMENT:
 	{
 		auto node = (Syntax_Node_Statement *)root;
-		printf("Statement()\n");
-		print(node->node, fp, child_indent);
+		fprintf(fp, "Statement()\n");
+		print_syntax(node->node, fp, child_indent);
 	} break;
 
 	case SYNTAX_NODE_BLOCK:
 	{
 		auto node = (Syntax_Node_Block *)root;
-		printf("Block()\n");
+		fprintf(fp, "Block()\n");
 		for (auto statement = node->statement_head; statement; statement = statement->next) {
-			print(statement, fp, child_indent);
+			print_syntax(statement, fp, child_indent);
 		}
 	} break;
 
@@ -95,7 +120,7 @@ void print(Syntax_Node *root, FILE *fp, int child_indent) {
 //
 //
 
-void print(Code_Node *root, FILE *fp, int child_indent) {
+void print_code(Code_Node *root, FILE *fp, int child_indent) {
 	indent(fp, child_indent);
 	child_indent += 1;
 
@@ -115,29 +140,29 @@ void print(Code_Node *root, FILE *fp, int child_indent) {
 	{
 		auto node = (Code_Node_Unary_Operator *)root;
 		printf("Unary Operator(%s): %p\n", unary_operator_kind_string(node->op_kind).data, node->op);
-		print(node->child, fp, child_indent);
+		print_code(node->child, fp, child_indent);
 	} break;
 
 	case CODE_NODE_BINARY_OPERATOR:
 	{
 		auto node = (Code_Node_Binary_Operator *)root;
 		printf("Binary Operator(%s): %p\n", binary_operator_kind_string(node->op_kind).data, node->op);
-		print(node->left, fp, child_indent);
-		print(node->right, fp, child_indent);
+		print_code(node->left, fp, child_indent);
+		print_code(node->right, fp, child_indent);
 	} break;
 
 	case CODE_NODE_EXPRESSION:
 	{
 		auto node = (Code_Node_Expression *)root;
 		printf("Expression()\n");
-		print(node->child, fp, child_indent);
+		print_code(node->child, fp, child_indent);
 	} break;
 
 	case CODE_NODE_STATEMENT:
 	{
 		auto node = (Code_Node_Statement *)root;
 		printf("Statement()\n");
-		print(node->node, fp, child_indent);
+		print_code(node->node, fp, child_indent);
 	} break;
 
 	case CODE_NODE_BLOCK:
@@ -145,7 +170,7 @@ void print(Code_Node *root, FILE *fp, int child_indent) {
 		auto node = (Code_Node_Block *)root;
 		printf("Block()\n");
 		for (auto statement = node->statement_head; statement; statement = statement->next) {
-			print(statement, fp, child_indent);
+			print_code(statement, fp, child_indent);
 		}
 	} break;
 

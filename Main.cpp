@@ -47,6 +47,45 @@ Binary_Operator_Kind token_to_binary_operator(Token_Kind kind) {
 	return _BINARY_OPERATOR_COUNT;
 }
 
+static inline uint32_t murmur_32_scramble(uint32_t k) {
+	k *= 0xcc9e2d51;
+	k = (k << 15) | (k >> 17);
+	k *= 0x1b873593;
+	return k;
+}
+uint32_t murmur3_32(const uint8_t *key, size_t len, uint32_t seed) {
+	uint32_t h = seed;
+	uint32_t k;
+	/* Read in groups of 4. */
+	for (size_t i = len >> 2; i; i--) {
+		// Here is a source of differing results across endiannesses.
+		// A swap here has no effects on hash properties though.
+		memcpy(&k, key, sizeof(uint32_t));
+		key += sizeof(uint32_t);
+		h ^= murmur_32_scramble(k);
+		h = (h << 13) | (h >> 19);
+		h = h * 5 + 0xe6546b64;
+	}
+	/* Read the rest. */
+	k = 0;
+	for (size_t i = len & 3; i; i--) {
+		k <<= 8;
+		k |= key[i - 1];
+	}
+	// A swap is *not* necessary here because the preceding loop already
+	// places the low bytes in the low places according to whatever endianness
+	// we use. Swaps only apply when the memory is copied in a chunk.
+	h ^= murmur_32_scramble(k);
+	/* Finalize. */
+	h ^= len;
+	h ^= h >> 16;
+	h *= 0x85ebca6b;
+	h ^= h >> 13;
+	h *= 0xc2b2ae35;
+	h ^= h >> 16;
+	return h;
+}
+
 template <typename T, uint32_t N>
 struct Bucket_Array {
 	struct Bucket {
@@ -79,34 +118,127 @@ struct Bucket_Array {
 	}
 };
 
+struct Symbol {
+	String          name;
+	Code_Type       type;
+	uint32_t        flags;
+	uint32_t        address;
+	Syntax_Location location;
+};
+
+
+constexpr uint32_t SYMBOL_INDEX_BUCKET_SIZE  = 16;
+constexpr uint32_t SYMBOL_INDEX_MASK         = SYMBOL_INDEX_BUCKET_SIZE - 1;
+constexpr uint32_t SYMBOL_INDEX_SHIFT        = 4;
+constexpr uint32_t SYMBOL_TABLE_BUCKET_COUNT = 128;
+constexpr uint32_t HASH_SEED                = 0x2564;
+
+struct Symbol_Index {
+	uint32_t hash[SYMBOL_INDEX_BUCKET_SIZE]  = {};
+	uint32_t index[SYMBOL_INDEX_BUCKET_SIZE] = {};
+	Symbol_Index *next                       = nullptr;
+};
+
+struct Symbol_Lookup {
+	Symbol_Index  buckets[SYMBOL_TABLE_BUCKET_COUNT];
+};
+
+struct Symbol_Table {
+	Symbol_Lookup lookup;
+	Array<Symbol> buffer;
+};
+
+static inline uint32_t next_power2(uint32_t n) {
+	n--;
+	n |= n >> 1;
+	n |= n >> 2;
+	n |= n >> 4;
+	n |= n >> 8;
+	n |= n >> 16;
+	n++;
+	return n;
+}
+
+static uint32_t symbol_table_put(Symbol_Table *table, const Symbol &sym) {
+	String name = sym.name;
+	auto hash = murmur3_32(name.data, name.length, HASH_SEED) + 1;
+
+	auto pos       = hash & (SYMBOL_TABLE_BUCKET_COUNT - 1);
+	auto buk_index = pos >> SYMBOL_INDEX_SHIFT;
+
+	for (auto bucket = &table->lookup.buckets[buk_index]; bucket; bucket = bucket->next) {
+		uint32_t count = 0;
+		for (auto index = pos & SYMBOL_INDEX_MASK;
+			count < SYMBOL_INDEX_BUCKET_SIZE;
+			++count, index = (index + 1) & SYMBOL_INDEX_MASK) {
+			auto found_hash = bucket->hash[index];
+			if (found_hash == hash) {
+				return bucket->index[index];
+			}
+			else if (found_hash == 0) {
+				uint32_t offset = (uint32_t)table->buffer.count;
+				bucket->hash[index] = hash;
+				bucket->index[index] = offset;
+				table->buffer.add(sym);
+				return offset;
+			}
+		}
+
+		if (!bucket->next) {
+			bucket->next = new Symbol_Index;
+		}
+	}
+
+	return 0;
+}
+
+static uint32_t symbol_table_get(Symbol_Table *table, String name) {
+	auto hash = murmur3_32(name.data, name.length, HASH_SEED) + 1;
+
+	auto pos = hash & (SYMBOL_TABLE_BUCKET_COUNT - 1);
+	auto buk_index = pos >> SYMBOL_INDEX_SHIFT;
+
+	for (auto bucket = &table->lookup.buckets[buk_index]; bucket; bucket = bucket->next) {
+		uint32_t count = 0;
+		for (auto index = pos & SYMBOL_INDEX_MASK;
+			count < SYMBOL_INDEX_BUCKET_SIZE;
+			++count, index = (index + 1) & SYMBOL_INDEX_MASK) {
+			auto found_hash = bucket->hash[index];
+			if (found_hash == hash) {
+				return bucket->index[index];
+			}
+		}
+	}
+
+	return 0;
+}
+
+static inline uint32_t align(uint32_t location, uint32_t alignment) {
+	return ((location + (alignment - 1)) & ~(alignment - 1));
+}
+
 struct Code_Type_Resolver {
+	Symbol_Table symbols;
+	uint32_t     vstack = 0;
+
 	Bucket_Array<Unary_Operator, 8>  unary_operators[_UNARY_OPERATOR_COUNT];
 	Bucket_Array<Binary_Operator, 8> binary_operators[_BINARY_OPERATOR_COUNT];
 };
 
-Code_Node *code_resolve(Code_Type_Resolver *resolver, Syntax_Node *root);
+//Code_Node *code_resolve(Code_Type_Resolver *resolver, Syntax_Node *root);
 Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Syntax_Node_Literal *root);
+
+Code_Node *code_resolve_expression(Code_Type_Resolver *resolver, Syntax_Node *root);
 Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolver, Syntax_Node_Unary_Operator *root);
 Code_Node_Binary_Operator *code_resolve_binary_operator(Code_Type_Resolver *resolver, Syntax_Node_Binary_Operator *root);
-Code_Node_Expression *code_resolve_expression(Code_Type_Resolver *resolver, Syntax_Node_Expression *root);
+
+Code_Node_Expression *code_resolve_root_expression(Code_Type_Resolver *resolver, Syntax_Node_Expression *root);
+Code_Type code_resolve_type(Code_Type_Resolver *resolver, Syntax_Node_Type *root);
+void code_resolve_declaration(Code_Type_Resolver *resolver, Syntax_Node_Declaration *root);
+
 Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Syntax_Node_Statement *root);
 Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Syntax_Node_Block *root);
 
-Code_Node *code_resolve(Code_Type_Resolver *resolver, Syntax_Node *root) {
-	switch (root->kind) {
-		case SYNTAX_NODE_LITERAL: return code_resolve_literal(resolver, (Syntax_Node_Literal *)root);
-		case SYNTAX_NODE_UNARY_OPERATOR: return code_resolve_unary_operator(resolver, (Syntax_Node_Unary_Operator *)root);
-		case SYNTAX_NODE_BINARY_OPERATOR: return code_resolve_binary_operator(resolver, (Syntax_Node_Binary_Operator *)root);
-		case SYNTAX_NODE_EXPRESSION: return code_resolve_expression(resolver, (Syntax_Node_Expression *)root);
-		case SYNTAX_NODE_STATEMENT: return code_resolve_statement(resolver, (Syntax_Node_Statement *)root);
-		case SYNTAX_NODE_BLOCK: return code_resolve_block(resolver, (Syntax_Node_Block *)root);
-
-		NoDefaultCase();
-	}
-
-	Unimplemented();
-	return nullptr;
-}
 
 Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Syntax_Node_Literal *root) {
 	auto node = new Code_Node_Literal;
@@ -116,8 +248,24 @@ Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Syntax_Nod
 	return node;
 }
 
+Code_Node *code_resolve_expression(Code_Type_Resolver *resolver, Syntax_Node *root) {
+	switch (root->kind) {
+	case SYNTAX_NODE_LITERAL:
+		return code_resolve_literal(resolver, (Syntax_Node_Literal *)root);
+
+	case SYNTAX_NODE_UNARY_OPERATOR:
+		return code_resolve_unary_operator(resolver, (Syntax_Node_Unary_Operator *)root);
+
+	case SYNTAX_NODE_BINARY_OPERATOR:
+		return code_resolve_binary_operator(resolver, (Syntax_Node_Binary_Operator *)root);
+
+	NoDefaultCase();
+	}
+	return nullptr;
+}
+
 Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolver, Syntax_Node_Unary_Operator *root) {
-	auto child = code_resolve(resolver, root->child);
+	auto child = code_resolve_expression(resolver, root->child);
 
 	auto op_kind = token_to_unary_operator(root->op);
 
@@ -148,8 +296,8 @@ Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolv
 }
 
 Code_Node_Binary_Operator *code_resolve_binary_operator(Code_Type_Resolver *resolver, Syntax_Node_Binary_Operator *root) {
-	auto left  = code_resolve(resolver, root->left);
-	auto right = code_resolve(resolver, root->right);
+	auto left  = code_resolve_expression(resolver, root->left);
+	auto right = code_resolve_expression(resolver, root->right);
 
 	auto op_kind = token_to_binary_operator(root->op);
 
@@ -181,8 +329,8 @@ Code_Node_Binary_Operator *code_resolve_binary_operator(Code_Type_Resolver *reso
 	return nullptr;
 }
 
-Code_Node_Expression *code_resolve_expression(Code_Type_Resolver *resolver, Syntax_Node_Expression *root) {
-	auto child = code_resolve(resolver, root->child);
+Code_Node_Expression *code_resolve_root_expression(Code_Type_Resolver *resolver, Syntax_Node_Expression *root) {
+	auto child = code_resolve_expression(resolver, root->child);
 
 	Code_Node_Expression *expression = new Code_Node_Expression;
 	expression->location             = root->location;
@@ -192,15 +340,69 @@ Code_Node_Expression *code_resolve_expression(Code_Type_Resolver *resolver, Synt
 	return expression;
 }
 
+Code_Type code_resolve_type(Code_Type_Resolver *resolver, Syntax_Node_Type *root) {
+	if (root->syntax_type == SYNTAX_TYPE_FLOAT) {
+		Code_Type type;
+		type.kind = CODE_TYPE_REAL;
+		return type;
+	}
+
+	Unreachable();
+	return Code_Type{};
+}
+
+void code_resolve_declaration(Code_Type_Resolver *resolver, Syntax_Node_Declaration *root) {
+	String sym_name = root->identifier;
+
+	if (symbol_table_get(&resolver->symbols, sym_name) == 0) {
+		Symbol symbol;
+		symbol.name     = sym_name;
+		symbol.type     = code_resolve_type(resolver, root->type);
+		symbol.flags    = root->flags;
+		symbol.location = root->location;
+
+		if (symbol.flags & DECLARATION_IS_CONSTANT) {
+			symbol.address = UINT32_MAX;
+		}
+		else {
+			Assert(symbol.type.kind == CODE_TYPE_REAL);
+			uint32_t alignment = align(resolver->vstack, sizeof(float));
+			symbol.address = resolver->vstack + alignment;
+			resolver->vstack += alignment + sizeof(float);
+		}
+
+		symbol_table_put(&resolver->symbols, symbol);
+		return;
+	}
+
+	// Already defined in this scope previously
+	Unimplemented();
+}
+
 Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Syntax_Node_Statement *root) {
-	auto node = code_resolve(resolver, root->node);
+	auto node = root->node;
 
-	Code_Node_Statement *statement = new Code_Node_Statement;
-	statement->location            = root->location;
-	statement->node                = node;
-	statement->type                = node->type;
+	switch (node->kind) {
+		case SYNTAX_NODE_EXPRESSION:
+		{
+			auto expression = code_resolve_root_expression(resolver, (Syntax_Node_Expression *)node);
+			Code_Node_Statement *statement = new Code_Node_Statement;
+			statement->location = root->location;
+			statement->node     = expression;
+			statement->type     = expression->type;
+			return statement;
+		} break;
 
-	return statement;
+		case SYNTAX_NODE_DECLARATION:
+		{
+			code_resolve_declaration(resolver, (Syntax_Node_Declaration *)node);
+			return nullptr;
+		} break;
+
+		NoDefaultCase();
+	}
+
+	return nullptr;
 }
 
 Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Syntax_Node_Block *root) {
@@ -211,14 +413,18 @@ Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Syntax_Node_Bl
 	Code_Node_Statement statement_stub_head;
 	Code_Node_Statement *parent_statement = &statement_stub_head;
 
+	uint32_t statement_count = 0;
 	for (auto statement = root->statement_head; statement; statement = statement->next) {
-		auto code_statement    = code_resolve_statement(resolver, statement);
-		parent_statement->next = code_statement;
-		parent_statement       = code_statement;
+		auto code_statement = code_resolve_statement(resolver, statement);
+		if (code_statement) {
+			parent_statement->next = code_statement;
+			parent_statement       = code_statement;
+			statement_count += 1;
+		}
 	}
 
 	block->statement_head  = statement_stub_head.next;
-	block->statement_count = root->statement_count;
+	block->statement_count = statement_count;
 
 	return block;
 }
@@ -226,8 +432,10 @@ Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Syntax_Node_Bl
 int main() {
 	String content = read_entire_file("Simple.kano");
 
+	auto builder = new String_Builder;
+
 	Parser parser;
-	parser_init(&parser, content);
+	parser_init(&parser, content, builder);
 
 	auto node = parse_block(&parser);
 
@@ -241,7 +449,7 @@ int main() {
 		return 1;
 	}
 
-	print(node);
+	print_syntax(node);
 
 	printf("\n\nType Resolution\n");
 
@@ -268,8 +476,15 @@ int main() {
 		resolver.binary_operators[BINARY_OPERATOR_DIV].add(binary_operator);
 	}
 
-	auto code = code_resolve(&resolver, node);
-	print(code);
+	{
+		Symbol sym;
+		sym.name      = "";
+		sym.type.kind = CODE_TYPE_NULL;
+		resolver.symbols.buffer.add(sym);
+	}
+
+	auto code = code_resolve_block(&resolver, node);
+	print_code(code);
 
 	return 0;
 }

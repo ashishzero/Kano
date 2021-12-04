@@ -2,6 +2,12 @@
 #include "Common.h"
 #include "Token.h"
 
+constexpr uint32_t DECLARATION_IS_CONSTANT = 0x1;
+
+enum Syntax_Type {
+	SYNTAX_TYPE_FLOAT
+};
+
 struct Syntax_Location {
 	size_t start_row = 0;
 	size_t start_column = 0;
@@ -22,7 +28,9 @@ enum Syntax_Node_Kind {
 	SYNTAX_NODE_LITERAL,
 	SYNTAX_NODE_UNARY_OPERATOR,
 	SYNTAX_NODE_BINARY_OPERATOR,
+	SYNTAX_NODE_TYPE,
 	SYNTAX_NODE_EXPRESSION,
+	SYNTAX_NODE_DECLARATION,
 	SYNTAX_NODE_STATEMENT,
 	SYNTAX_NODE_BLOCK,
 };
@@ -52,10 +60,24 @@ struct Syntax_Node_Binary_Operator : public Syntax_Node {
 	Syntax_Node *right = nullptr;
 };
 
+struct Syntax_Node_Type : public Syntax_Node {
+	Syntax_Node_Type() { kind = SYNTAX_NODE_TYPE; }
+
+	Syntax_Type syntax_type;
+};
+
 struct Syntax_Node_Expression : public Syntax_Node {
 	Syntax_Node_Expression() { kind = SYNTAX_NODE_EXPRESSION; }
 
 	Syntax_Node *child = nullptr;
+};
+
+struct Syntax_Node_Declaration : public Syntax_Node {
+	Syntax_Node_Declaration() { kind = SYNTAX_NODE_DECLARATION; }
+
+	uint32_t          flags = 0;
+	String            identifier;
+	Syntax_Node_Type *type  = nullptr;
 };
 
 struct Syntax_Node_Statement : public Syntax_Node {

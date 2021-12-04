@@ -109,7 +109,7 @@ static bool parser_accept_token(Parser *parser, Token_Kind kind) {
 	return false;
 }
 
-static bool parser_expect_token(Parser *parser, Token_Kind kind) {
+static bool parser_expect_token(Parser *parser, Token_Kind kind, bool terminate = true) {
 	if (parser_accept_token(parser, kind)) {
 		return true;
 	}
@@ -120,6 +120,7 @@ static bool parser_expect_token(Parser *parser, Token_Kind kind) {
 	const char *got = (char *)token_kind_string(token->kind).data;
 
 	parser_error(parser, token, "Expected: %s, Got: %s\n", expected, got);
+	parser->parsing = false;
 
 	return false;
 }
@@ -242,15 +243,67 @@ Syntax_Node_Expression *parse_root_expression(Parser *parser) {
 	return expression;
 }
 
-Syntax_Node_Statement *parse_statement(Parser *parser) {
-	auto statement  = parser_new_syntax_node<Syntax_Node_Statement>(parser);
-	auto expression = parse_root_expression(parser);
-	statement->node = expression;
-	
-	if (!parser_accept_token(parser, TOKEN_KIND_SEMICOLON)) {
+Syntax_Node_Type *parse_type(Parser *parser) {
+	auto type = parser_new_syntax_node<Syntax_Node_Type>(parser);
+
+	// we only have one type right now and that's float
+	parser_expect_token(parser, TOKEN_KIND_FLOAT);
+	type->syntax_type = SYNTAX_TYPE_FLOAT;
+
+	parser_finish_syntax_node(parser, type);
+	return type;
+}
+
+Syntax_Node_Declaration *parse_declaration(Parser *parser) {
+	auto declaration = parser_new_syntax_node<Syntax_Node_Declaration>(parser);
+
+	if (parser_accept_token(parser, TOKEN_KIND_CONST)) {
+		declaration->flags |= DECLARATION_IS_CONSTANT;
+	}
+	else if (!parser_accept_token(parser, TOKEN_KIND_VAR)) {
 		auto token = lexer_current_token(&parser->lexer);
-		parser_error(parser, token, "Unexpected token: %.*s\n", (int)token->content.length, token->content.data);
+		parser_error(parser, token, "Expected declaration 'var' or 'const'\n");
 		parser->parsing = false;
+	}
+
+	if (parser_expect_token(parser, TOKEN_KIND_IDENTIFIER)) {
+		String identifier;
+		identifier.length       = parser->value.string.length;
+		identifier.data         = parser->value.string.data;
+		declaration->identifier = string_builder_copy(parser->builder, identifier);
+	}
+
+	parser_expect_token(parser, TOKEN_KIND_COLON);
+
+	declaration->type = parse_type(parser);
+
+	parser_finish_syntax_node(parser, declaration);
+	return declaration;
+}
+
+Syntax_Node_Statement *parse_statement(Parser *parser) {
+	auto statement = parser_new_syntax_node<Syntax_Node_Statement>(parser);
+
+	// declaration
+	if (parser_peek_token(parser, TOKEN_KIND_VAR) ||
+		parser_peek_token(parser, TOKEN_KIND_CONST)) {
+		auto declaration = parse_declaration(parser);
+		statement->node  = declaration;
+
+		parser_expect_token(parser, TOKEN_KIND_SEMICOLON);
+	}
+
+	// simple expressions
+	else {
+		auto expression = parse_root_expression(parser);
+		statement->node = expression;
+
+		if (!parser_accept_token(parser, TOKEN_KIND_SEMICOLON)) {
+			auto token = lexer_current_token(&parser->lexer);
+			parser_error(parser, token, "Unexpected token: %.*s\n", (int)token->content.length, token->content.data);
+			parser->parsing = false;
+		}
+
 	}
 
 	parser_finish_syntax_node(parser, statement);
@@ -282,7 +335,7 @@ Syntax_Node_Block *parse_block(Parser *parser) {
 //
 //
 
-void parser_init(Parser *parser, String content) {
+void parser_init(Parser *parser, String content, String_Builder *builder) {
 	lexer_init(&parser->lexer, content);
 
 	parser->error.first.message = "";
@@ -298,6 +351,8 @@ void parser_init(Parser *parser, String content) {
 	}
 
 	lexer_next(&parser->lexer);
+
+	parser->builder = builder;
 }
 
 //

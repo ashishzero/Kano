@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 
 #if defined(__clang__) || defined(__ibmxl__)
 #define COMPILER_CLANG 1
@@ -224,8 +225,13 @@ struct String {
 		Assert(index < length);
 		return data[index];
 	}
-	inline operator bool() const {
-		return length == 0;
+
+	inline bool operator==(String b) {
+		if (length != b.length) return false;
+		return memcmp(data, b.data, length) == 0;
+	}
+	inline bool operator!=(String b) {
+		return !(*this == b);
 	}
 };
 
