@@ -52,6 +52,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="simple.kano" />
+    <None Include="Simple.kano" />
   </ItemGroup>
 </Project>

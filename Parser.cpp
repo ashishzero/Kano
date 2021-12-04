@@ -222,6 +222,14 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec) {
 	return left;
 }
 
+Syntax_Node *parse_statement(Parser *parser) {
+	auto expression = parser_new_syntax_node<Syntax_Node_Expression>(parser);
+	expression->child = parse_expression(parser, 0);
+	parser_finish_syntax_node(parser, expression);
+	parser_expect_token(parser, TOKEN_KIND_SEMICOLON);
+	return expression;
+}
+
 //
 //
 //

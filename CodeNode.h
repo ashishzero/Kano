@@ -6,6 +6,7 @@ enum Code_Node_Kind {
 	CODE_NODE_LITERAL,
 	CODE_NODE_UNARY_OPERATOR,
 	CODE_NODE_BINARY_OPERATOR,
+	CODE_NODE_EXPRESSION,
 
 	_CODE_NODE_COUNT,
 };
@@ -76,4 +77,10 @@ struct Code_Node_Binary_Operator : public Code_Node {
 
 	Code_Node *left = nullptr;
 	Code_Node *right = nullptr;
+};
+
+struct Code_Node_Expression : public Code_Node {
+	Code_Node_Expression() { kind = CODE_NODE_EXPRESSION; }
+
+	Code_Node *child = nullptr;
 };

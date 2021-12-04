@@ -166,7 +166,7 @@
     <ClCompile Include="Printer.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="simple.kano" />
+    <None Include="Simple.kano" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

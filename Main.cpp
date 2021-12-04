@@ -88,12 +88,14 @@ Code_Node *code_resolve(Code_Type_Resolver *resolver, Syntax_Node *root);
 Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Syntax_Node_Literal *root);
 Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolver, Syntax_Node_Unary_Operator *root);
 Code_Node_Binary_Operator *code_resolve_binary_operator(Code_Type_Resolver *resolver, Syntax_Node_Binary_Operator *root);
+Code_Node_Expression *code_resolve_expression(Code_Type_Resolver *resolver, Syntax_Node_Expression *root);
 
 Code_Node *code_resolve(Code_Type_Resolver *resolver, Syntax_Node *root) {
 	switch (root->kind) {
 		case SYNTAX_NODE_LITERAL: return code_resolve_literal(resolver, (Syntax_Node_Literal *)root);
 		case SYNTAX_NODE_UNARY_OPERATOR: return code_resolve_unary_operator(resolver, (Syntax_Node_Unary_Operator *)root);
 		case SYNTAX_NODE_BINARY_OPERATOR: return code_resolve_binary_operator(resolver, (Syntax_Node_Binary_Operator *)root);
+		case SYNTAX_NODE_EXPRESSION: return code_resolve_expression(resolver, (Syntax_Node_Expression *)root);
 
 		NoDefaultCase();
 	}
@@ -175,13 +177,24 @@ Code_Node_Binary_Operator *code_resolve_binary_operator(Code_Type_Resolver *reso
 	return nullptr;
 }
 
+Code_Node_Expression *code_resolve_expression(Code_Type_Resolver *resolver, Syntax_Node_Expression *root) {
+	auto child = code_resolve(resolver, root->child);
+
+	Code_Node_Expression *expression = new Code_Node_Expression;
+	expression->location             = root->location;
+	expression->child                = child;
+	expression->type                 = child->type;
+
+	return expression;
+}
+
 int main() {
-	String content = read_entire_file("simple.kano");
+	String content = read_entire_file("Simple.kano");
 
 	Parser parser;
 	parser_init(&parser, content);
 
-	auto node = parse_expression(&parser, 0);
+	auto node = parse_statement(&parser);
 	print(node);
 
 	printf("\n\nType Resolution\n");

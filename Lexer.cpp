@@ -208,6 +208,7 @@ void lexer_next(Lexer *lexer) {
 		case '-': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_MINUS); return;
 		case '*': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_ASTRICK); return;
 		case '/': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_DIVISION); return;
+		case ';': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_SEMICOLON); return;
 		}
 
 		lexer->cursor++;

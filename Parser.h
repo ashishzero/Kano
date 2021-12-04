@@ -24,4 +24,6 @@ struct Parser {
 Syntax_Node *parse_subexpression(Parser *parser, uint32_t prec);
 Syntax_Node *parse_expression(Parser *parser, uint32_t prec);
 
+Syntax_Node *parse_statement(Parser *parser);
+
 void parser_init(Parser *parser, String content);

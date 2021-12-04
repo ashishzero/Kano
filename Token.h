@@ -4,6 +4,7 @@
 enum Token_Kind {
 	TOKEN_KIND_ERROR = 0,
 
+	TOKEN_KIND_SEMICOLON,
 	TOKEN_KIND_OPEN_BRACKET,
 	TOKEN_KIND_CLOSE_BRACKET,
 
@@ -40,6 +41,8 @@ union Token_Value {
 static inline String token_kind_string(Token_Kind kind) {
 	static String strings[] = {
 		"-unknown-",
+
+		";",
 
 		"(", ")",
 
