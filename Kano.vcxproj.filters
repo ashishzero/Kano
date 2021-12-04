@@ -36,6 +36,9 @@
     <ClInclude Include="CodeNode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Interp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Lexer.cpp">
@@ -48,6 +51,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Printer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Interp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

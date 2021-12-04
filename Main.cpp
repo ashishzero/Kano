@@ -2,6 +2,8 @@
 #include "CodeNode.h"
 #include "Parser.h"
 #include "Printer.h"
+#include "Interp.h"
+#include <iostream>
 
 #include <stdlib.h>
 
@@ -183,6 +185,7 @@ int main() {
 
 	auto node = parse_expression(&parser, 0);
 	print(node);
+	double result=0;
 
 	printf("\n\nType Resolution\n");
 
@@ -211,6 +214,7 @@ int main() {
 
 	auto code = code_resolve(&resolver, node);
 	print(code);
-
+	std::cout << return_value(code, result);
+	
 	return 0;
 }
