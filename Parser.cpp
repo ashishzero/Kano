@@ -222,6 +222,49 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec) {
 	return left;
 }
 
+Syntax_Node_Expression *parse_root_expression(Parser *parser) {
+	auto expression = parser_new_syntax_node<Syntax_Node_Expression>(parser);
+	expression->child = parse_expression(parser, 0);
+
+	if (!expression->child) {
+		expression->child = parser_new_syntax_node<Syntax_Node>(parser);
+		parser_finish_syntax_node(parser, expression->child);
+	}
+
+	parser_finish_syntax_node(parser, expression);
+	return expression;
+}
+
+Syntax_Node_Statement *parse_statement(Parser *parser) {
+	auto statement  = parser_new_syntax_node<Syntax_Node_Statement>(parser);
+	auto expression = parse_root_expression(parser);
+	statement->node = expression;
+	parser_expect_token(parser, TOKEN_KIND_SEMICOLON);
+	parser_finish_syntax_node(parser, statement);
+	return statement;
+}
+
+Syntax_Node_Block *parse_block(Parser *parser) {
+	auto block = parser_new_syntax_node<Syntax_Node_Block>(parser);
+
+	Syntax_Node_Statement statement_stub_head;
+	Syntax_Node_Statement *parent_statement = &statement_stub_head;
+	uint64_t statement_count                = 0;
+
+	while (!parser_end(parser)) {
+		auto statement         = parse_statement(parser);
+		parent_statement->next = statement;
+		parent_statement       = statement;
+		statement_count += 1;
+	}
+
+	block->statement_head  = statement_stub_head.next;
+	block->statement_count = statement_count;
+
+	parser_finish_syntax_node(parser, block);
+	return block;
+}
+
 //
 //
 //

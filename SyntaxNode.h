@@ -21,7 +21,10 @@ enum Syntax_Node_Kind {
 	SYNTAX_NODE_NULL,
 	SYNTAX_NODE_LITERAL,
 	SYNTAX_NODE_UNARY_OPERATOR,
-	SYNTAX_NODE_BINARY_OPERATOR
+	SYNTAX_NODE_BINARY_OPERATOR,
+	SYNTAX_NODE_EXPRESSION,
+	SYNTAX_NODE_STATEMENT,
+	SYNTAX_NODE_BLOCK,
 };
 
 struct Syntax_Node {
@@ -47,4 +50,24 @@ struct Syntax_Node_Binary_Operator : public Syntax_Node {
 	Token_Kind  op;
 	Syntax_Node *left = nullptr;
 	Syntax_Node *right = nullptr;
+};
+
+struct Syntax_Node_Expression : public Syntax_Node {
+	Syntax_Node_Expression() { kind = SYNTAX_NODE_EXPRESSION; }
+
+	Syntax_Node *child = nullptr;
+};
+
+struct Syntax_Node_Statement : public Syntax_Node {
+	Syntax_Node_Statement() { kind = SYNTAX_NODE_STATEMENT; }
+
+	Syntax_Node *node           = nullptr;
+	Syntax_Node_Statement *next = nullptr;
+};
+
+struct Syntax_Node_Block : public Syntax_Node {
+	Syntax_Node_Block() { kind = SYNTAX_NODE_BLOCK; }
+
+	Syntax_Node_Statement *statement_head = nullptr;
+	uint64_t statement_count = 0;
 };

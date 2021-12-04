@@ -64,6 +64,29 @@ void print(Syntax_Node *root, FILE *fp, int child_indent) {
 		print(node->right, fp, child_indent);
 	} break;
 
+	case SYNTAX_NODE_EXPRESSION:
+	{
+		auto node = (Syntax_Node_Expression *)root;
+		printf("Expression()\n");
+		print(node->child, fp, child_indent);
+	} break;
+
+	case SYNTAX_NODE_STATEMENT:
+	{
+		auto node = (Syntax_Node_Statement *)root;
+		printf("Statement()\n");
+		print(node->node, fp, child_indent);
+	} break;
+
+	case SYNTAX_NODE_BLOCK:
+	{
+		auto node = (Syntax_Node_Block *)root;
+		printf("Block()\n");
+		for (auto statement = node->statement_head; statement; statement = statement->next) {
+			print(statement, fp, child_indent);
+		}
+	} break;
+
 	NoDefaultCase();
 	}
 }
@@ -101,6 +124,29 @@ void print(Code_Node *root, FILE *fp, int child_indent) {
 		printf("Binary Operator(%s): %p\n", binary_operator_kind_string(node->op_kind).data, node->op);
 		print(node->left, fp, child_indent);
 		print(node->right, fp, child_indent);
+	} break;
+
+	case CODE_NODE_EXPRESSION:
+	{
+		auto node = (Code_Node_Expression *)root;
+		printf("Expression()\n");
+		print(node->child, fp, child_indent);
+	} break;
+
+	case CODE_NODE_STATEMENT:
+	{
+		auto node = (Code_Node_Statement *)root;
+		printf("Statement()\n");
+		print(node->node, fp, child_indent);
+	} break;
+
+	case CODE_NODE_BLOCK:
+	{
+		auto node = (Code_Node_Block *)root;
+		printf("Block()\n");
+		for (auto statement = node->statement_head; statement; statement = statement->next) {
+			print(statement, fp, child_indent);
+		}
 	} break;
 
 	NoDefaultCase();
