@@ -5,6 +5,7 @@ enum Token_Kind {
 	TOKEN_KIND_ERROR = 0,
 
 	TOKEN_KIND_SEMICOLON,
+	TOKEN_KIND_COLON,
 	TOKEN_KIND_OPEN_BRACKET,
 	TOKEN_KIND_CLOSE_BRACKET,
 
@@ -16,6 +17,13 @@ enum Token_Kind {
 	TOKEN_KIND_REAL,
 	TOKEN_KIND_INTEGER,
 
+	TOKEN_KIND_VAR,
+	TOKEN_KIND_CONST,
+
+	TOKEN_KIND_FLOAT,
+
+	TOKEN_KIND_IDENTIFIER,
+
 	TOKEN_KIND_END,
 
 	_TOKEN_KIND_COUNT
@@ -23,15 +31,19 @@ enum Token_Kind {
 
 struct Token {
 	Token_Kind kind;
-	String content;
-	size_t row;
-	size_t column;
-	size_t offset;
+	String     content;
+	size_t     row;
+	size_t     column;
+	size_t     offset;
 };
 
 union Token_Value {
-	double real;
+	double   real;
 	uint64_t integer;
+	struct {
+		int64_t length;
+		uint8_t *data;
+	} string;
 };
 
 //
@@ -42,7 +54,7 @@ static inline String token_kind_string(Token_Kind kind) {
 	static String strings[] = {
 		"-unknown-",
 
-		";",
+		";", ":",
 
 		"(", ")",
 
@@ -50,6 +62,12 @@ static inline String token_kind_string(Token_Kind kind) {
 
 		"real number",
 		"integer number",
+
+		"var", "const",
+
+		"float",
+
+		"identifier",
 
 		"-end-"
 	};

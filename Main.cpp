@@ -230,6 +230,17 @@ int main() {
 	parser_init(&parser, content);
 
 	auto node = parse_block(&parser);
+
+	if (parser.error_count) {
+		for (auto error = parser.error.first.next; error; error = error->next) {
+			auto row     = error->location.start_row;
+			auto column  = error->location.start_column;
+			auto message = error->message.data;
+			fprintf(stderr, "%zu,%zu: %s\n", row, column, message);
+		}
+		return 1;
+	}
+
 	print(node);
 
 	printf("\n\nType Resolution\n");
