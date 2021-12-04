@@ -89,6 +89,8 @@ Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Syntax_Nod
 Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolver, Syntax_Node_Unary_Operator *root);
 Code_Node_Binary_Operator *code_resolve_binary_operator(Code_Type_Resolver *resolver, Syntax_Node_Binary_Operator *root);
 Code_Node_Expression *code_resolve_expression(Code_Type_Resolver *resolver, Syntax_Node_Expression *root);
+Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Syntax_Node_Statement *root);
+Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Syntax_Node_Block *root);
 
 Code_Node *code_resolve(Code_Type_Resolver *resolver, Syntax_Node *root) {
 	switch (root->kind) {
@@ -96,6 +98,8 @@ Code_Node *code_resolve(Code_Type_Resolver *resolver, Syntax_Node *root) {
 		case SYNTAX_NODE_UNARY_OPERATOR: return code_resolve_unary_operator(resolver, (Syntax_Node_Unary_Operator *)root);
 		case SYNTAX_NODE_BINARY_OPERATOR: return code_resolve_binary_operator(resolver, (Syntax_Node_Binary_Operator *)root);
 		case SYNTAX_NODE_EXPRESSION: return code_resolve_expression(resolver, (Syntax_Node_Expression *)root);
+		case SYNTAX_NODE_STATEMENT: return code_resolve_statement(resolver, (Syntax_Node_Statement *)root);
+		case SYNTAX_NODE_BLOCK: return code_resolve_block(resolver, (Syntax_Node_Block *)root);
 
 		NoDefaultCase();
 	}
@@ -188,13 +192,44 @@ Code_Node_Expression *code_resolve_expression(Code_Type_Resolver *resolver, Synt
 	return expression;
 }
 
+Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Syntax_Node_Statement *root) {
+	auto node = code_resolve(resolver, root->node);
+
+	Code_Node_Statement *statement = new Code_Node_Statement;
+	statement->location            = root->location;
+	statement->node                = node;
+	statement->type                = node->type;
+
+	return statement;
+}
+
+Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Syntax_Node_Block *root) {
+	Code_Node_Block *block = new Code_Node_Block;
+	block->location        = root->location;
+	block->type.kind       = CODE_TYPE_NULL;
+
+	Code_Node_Statement statement_stub_head;
+	Code_Node_Statement *parent_statement = &statement_stub_head;
+
+	for (auto statement = root->statement_head; statement; statement = statement->next) {
+		auto code_statement    = code_resolve_statement(resolver, statement);
+		parent_statement->next = code_statement;
+		parent_statement       = code_statement;
+	}
+
+	block->statement_head  = statement_stub_head.next;
+	block->statement_count = root->statement_count;
+
+	return block;
+}
+
 int main() {
 	String content = read_entire_file("Simple.kano");
 
 	Parser parser;
 	parser_init(&parser, content);
 
-	auto node = parse_statement(&parser);
+	auto node = parse_block(&parser);
 	print(node);
 
 	printf("\n\nType Resolution\n");
