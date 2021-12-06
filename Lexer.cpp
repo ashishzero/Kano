@@ -200,7 +200,19 @@ void lexer_next(Lexer *lexer) {
 			return;
 		}
 
-		// single character identifiers
+		// double character tokens
+		if (a == '>' && b == '>') {
+			lexer->cursor += 2;
+			lexer_make_token(lexer, TOKEN_KIND_BITWISE_SHIFT_RIGHT);
+			return;
+		}
+		else if (a == '<' && b == '<') {
+			lexer->cursor += 2;
+			lexer_make_token(lexer, TOKEN_KIND_BITWISE_SHIFT_LEFT);
+			return;
+		}
+
+		// single character tokens
 		switch (a) {
 			case ':': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_COLON); return;
 			case '=': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_EQUALS); return;
@@ -212,6 +224,9 @@ void lexer_next(Lexer *lexer) {
 			case '/': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_DIVISION); return;
 			case '%': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_REMAINDER); return;
 			case ';': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_SEMICOLON); return;
+			case '&': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_BITWISE_AND); return;
+			case '^': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_BITWISE_XOR); return;
+			case '|': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_BITWISE_OR); return;
 		}
 
 		if (lexer_isalpha(*lexer->cursor)) {

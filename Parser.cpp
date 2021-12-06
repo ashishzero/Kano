@@ -44,6 +44,13 @@ static void parser_init_precedence() {
 
 	BinaryOperatorPrecedence[TOKEN_KIND_PLUS]  = 55;
 	BinaryOperatorPrecedence[TOKEN_KIND_MINUS] = 55;
+
+	BinaryOperatorPrecedence[TOKEN_KIND_BITWISE_SHIFT_RIGHT] = 50;
+	BinaryOperatorPrecedence[TOKEN_KIND_BITWISE_SHIFT_LEFT]  = 50;
+
+	BinaryOperatorPrecedence[TOKEN_KIND_BITWISE_AND] = 30;
+	BinaryOperatorPrecedence[TOKEN_KIND_BITWISE_XOR] = 25;
+	BinaryOperatorPrecedence[TOKEN_KIND_BITWISE_OR]  = 20;
 }
 
 //
@@ -241,7 +248,9 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec) {
 		}
 
 		static const Token_Kind BinaryOpTokens[] = {
-			TOKEN_KIND_PLUS, TOKEN_KIND_MINUS, TOKEN_KIND_ASTRICK, TOKEN_KIND_DIVISION, TOKEN_KIND_REMAINDER
+			TOKEN_KIND_PLUS, TOKEN_KIND_MINUS, TOKEN_KIND_ASTRICK, TOKEN_KIND_DIVISION, TOKEN_KIND_REMAINDER,
+			TOKEN_KIND_BITWISE_SHIFT_RIGHT, TOKEN_KIND_BITWISE_SHIFT_LEFT,
+			TOKEN_KIND_BITWISE_AND,TOKEN_KIND_BITWISE_XOR,TOKEN_KIND_BITWISE_OR,
 		};
 
 		auto token = lexer_current_token(&parser->lexer);

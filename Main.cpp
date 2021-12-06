@@ -43,6 +43,11 @@ Binary_Operator_Kind token_to_binary_operator(Token_Kind kind) {
 		case TOKEN_KIND_ASTRICK: return BINARY_OPERATOR_MULTIPLICATION;
 		case TOKEN_KIND_DIVISION: return BINARY_OPERATOR_DIVISION;
 		case TOKEN_KIND_REMAINDER: return BINARY_OPERATOR_REMAINDER;
+		case TOKEN_KIND_BITWISE_SHIFT_RIGHT: return BINARY_OPERATOR_BITWISE_SHIFT_RIGHT;
+		case TOKEN_KIND_BITWISE_SHIFT_LEFT: return BINARY_OPERATOR_BITWISE_SHIFT_LEFT;
+		case TOKEN_KIND_BITWISE_AND: return BINARY_OPERATOR_BITWISE_AND;
+		case TOKEN_KIND_BITWISE_XOR: return BINARY_OPERATOR_BITWISE_XOR;
+		case TOKEN_KIND_BITWISE_OR: return BINARY_OPERATOR_BITWISE_OR;
 		NoDefaultCase();
 	}
 
@@ -619,6 +624,11 @@ int main() {
 		resolver.binary_operators[BINARY_OPERATOR_MULTIPLICATION].add(binary_operator_int);
 		resolver.binary_operators[BINARY_OPERATOR_DIVISION].add(binary_operator_int);
 		resolver.binary_operators[BINARY_OPERATOR_REMAINDER].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_BITWISE_SHIFT_RIGHT].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_BITWISE_SHIFT_LEFT].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_BITWISE_AND].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_BITWISE_XOR].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_BITWISE_OR].add(binary_operator_int);
 	}
 
 	{

@@ -16,6 +16,13 @@ enum Token_Kind {
 	TOKEN_KIND_DIVISION,
 	TOKEN_KIND_REMAINDER,
 
+	TOKEN_KIND_BITWISE_SHIFT_RIGHT,
+	TOKEN_KIND_BITWISE_SHIFT_LEFT,
+
+	TOKEN_KIND_BITWISE_AND,
+	TOKEN_KIND_BITWISE_XOR,
+	TOKEN_KIND_BITWISE_OR,
+
 	TOKEN_KIND_REAL,
 	TOKEN_KIND_INTEGER,
 
@@ -66,6 +73,10 @@ static inline String token_kind_string(Token_Kind kind) {
 		"(", ")",
 
 		"+", "-", "*", "/", "%",
+
+		">>", "<<",
+
+		"&", "^", "|",
 
 		"real number",
 		"integer number",

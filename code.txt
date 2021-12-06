@@ -12,24 +12,24 @@ Block()
             Destination()
                Stack(0x0)
             Expression()
-               Binary Operator(%): 000000A187AFEA50
+               Binary Operator(&): 00000005C32FE858
                   Literal(int:5)
-                  Literal(int:2)
+                  Stack(0x4)
    Statement()
       Expression()
          Assignment()
             Destination()
                Stack(0x0)
             Expression()
-               Binary Operator(+): 000000A187AFE87C
-                  Binary Operator(+): 000000A187AFE87C
-                     Unary Operator(-): 000000A187AFE820
+               Binary Operator(+): 00000005C32FE51C
+                  Binary Operator(+): 00000005C32FE51C
+                     Unary Operator(-): 00000005C32FE4C0
                         Literal(int:5)
-                     Binary Operator(/): 000000A187AFE9E4
-                        Binary Operator(*): 000000A187AFE96C
+                     Binary Operator(/): 00000005C32FE684
+                        Binary Operator(*): 00000005C32FE60C
                            Literal(int:6)
                            Literal(int:3)
-                        Binary Operator(-): 000000A187AFE8F4
+                        Binary Operator(-): 00000005C32FE594
                            Literal(int:5)
                            Literal(int:8)
                   Literal(int:5)
@@ -39,8 +39,8 @@ Block()
             Destination()
                Stack(0x4)
             Expression()
-               Binary Operator(+): 000000A187AFE87C
-                  Binary Operator(/): 000000A187AFE9E4
+               Binary Operator(+): 00000005C32FE51C
+                  Binary Operator(/): 00000005C32FE684
                      Literal(int:9)
                      Literal(int:3)
                   Literal(int:2)
@@ -50,6 +50,6 @@ Block()
             Destination()
                Stack(0xc)
             Expression()
-               Binary Operator(+): 000000A187AFE894
+               Binary Operator(+): 00000005C32FE534
                   Stack(0x0)
                   Stack(0x4)
