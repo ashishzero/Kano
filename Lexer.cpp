@@ -209,6 +209,34 @@ void lexer_next(Lexer *lexer) {
 		case '*': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_ASTRICK); return;
 		case '/': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_DIVISION); return;
 		case ';': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_SEMICOLON); return;
+		case ':': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_COLON); return;
+		}
+
+		if (lexer_isalpha(*lexer->cursor)) {
+			const char *string = (char *)lexer->cursor;
+
+			do {
+				lexer->cursor++;
+			} while (lexer_isalpha(*lexer->cursor) || lexer_isnum(*lexer->cursor));
+
+			String content;
+			content.data   = (uint8_t *)string;
+			content.length = (lexer->cursor - content.data);
+
+			static const String KeyWords[]          = { "var", "const", "float" };
+			static const Token_Kind KeyWordTokens[] = { TOKEN_KIND_VAR, TOKEN_KIND_CONST, TOKEN_KIND_FLOAT };
+
+			for (uint32_t index = 0; index < ArrayCount(KeyWords); ++index) {
+				if (content == KeyWords[index]) {
+					lexer_make_token(lexer, KeyWordTokens[index]);
+					return;
+				}
+			}
+
+			lexer->value.string.length = content.length;
+			lexer->value.string.data   = content.data;
+			lexer_make_token(lexer, TOKEN_KIND_IDENTIFIER);
+			return;
 		}
 
 		lexer->cursor++;

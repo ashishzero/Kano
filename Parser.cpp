@@ -49,19 +49,25 @@ static void parser_init_precedence() {
 //
 //
 
-static inline void parser_error(Parser *parser, const char *fmt, ...) {
+static inline void parser_error(Parser *parser, Token *token, const char *fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
 	String message = string_vprint(fmt, args);
 	va_end(args);
 
-	auto error = new Error_Node;
-	error->message = message;
-	error->location = parser->location;
-	error->next = nullptr;
+	auto error      = new Error_Node;
+	error->message  = message;
+	error->next     = nullptr;
+
+	error->location.start_row     = token->row;
+	error->location.start_column  = token->column;
+	error->location.finish_row    = token->row;
+	error->location.finish_column = token->column;
+	error->location.start         = token->offset;
+	error->location.finish        = token->offset + token->content.length;
 
 	parser->error.last->next = error;
-	parser->error.last = error;
+	parser->error.last       = error;
 
 	parser->error_count += 1;
 }
@@ -70,9 +76,10 @@ static inline void parser_error(Parser *parser, const char *fmt, ...) {
 //
 //
 
-static inline bool parser_end(Parser *parser) {
-	auto token = lexer_current_token(&parser->lexer);
-	return token->kind == TOKEN_KIND_END;
+static inline bool parser_should_continue(Parser *parser) {
+	auto token      = lexer_current_token(&parser->lexer);
+	parser->parsing = parser->parsing && token->kind != TOKEN_KIND_END;
+	return parser->parsing;
 }
 
 static bool parser_peek_token(Parser *parser, Token_Kind kind) {
@@ -86,15 +93,15 @@ static bool parser_accept_token(Parser *parser, Token_Kind kind) {
 	if (parser_peek_token(parser, kind)) {
 		auto token = lexer_current_token(&parser->lexer);
 
-		parser->location.start_row = token->row;
-		parser->location.start_column = token->column;
-		parser->location.start = token->offset;
+		parser->location.start_row     = token->row;
+		parser->location.start_column  = token->column;
+		parser->location.start         = token->offset;
 
-		parser->location.finish_row = parser->location.start_row;
+		parser->location.finish_row    = parser->location.start_row;
 		parser->location.finish_column = parser->location.start_column;
-		parser->location.finish = parser->location.start;
+		parser->location.finish        = parser->location.start;
 
-		parser->value = parser->lexer.value;
+		parser->value                  = parser->lexer.value;
 
 		lexer_next(&parser->lexer);
 		return true;
@@ -102,7 +109,7 @@ static bool parser_accept_token(Parser *parser, Token_Kind kind) {
 	return false;
 }
 
-static bool parser_expect_token(Parser *parser, Token_Kind kind) {
+static bool parser_expect_token(Parser *parser, Token_Kind kind, bool terminate = true) {
 	if (parser_accept_token(parser, kind)) {
 		return true;
 	}
@@ -112,7 +119,8 @@ static bool parser_expect_token(Parser *parser, Token_Kind kind) {
 	const char *expected = (char *)token_kind_string(kind).data;
 	const char *got = (char *)token_kind_string(token->kind).data;
 
-	parser_error(parser, "Expected: %s, Got: %s\n", expected, got);
+	parser_error(parser, token, "Expected: %s, Got: %s\n", expected, got);
+	parser->parsing = false;
 
 	return false;
 }
@@ -194,7 +202,7 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec) {
 
 	if (!left) return nullptr;
 
-	while (!parser_end(parser)) {
+	while (parser_should_continue(parser)) {
 		static const Token_Kind BinaryOpTokens[] = {
 			TOKEN_KIND_PLUS, TOKEN_KIND_MINUS, TOKEN_KIND_ASTRICK, TOKEN_KIND_DIVISION
 		};
@@ -235,11 +243,69 @@ Syntax_Node_Expression *parse_root_expression(Parser *parser) {
 	return expression;
 }
 
+Syntax_Node_Type *parse_type(Parser *parser) {
+	auto type = parser_new_syntax_node<Syntax_Node_Type>(parser);
+
+	// we only have one type right now and that's float
+	parser_expect_token(parser, TOKEN_KIND_FLOAT);
+	type->syntax_type = SYNTAX_TYPE_FLOAT;
+
+	parser_finish_syntax_node(parser, type);
+	return type;
+}
+
+Syntax_Node_Declaration *parse_declaration(Parser *parser) {
+	auto declaration = parser_new_syntax_node<Syntax_Node_Declaration>(parser);
+
+	if (parser_accept_token(parser, TOKEN_KIND_CONST)) {
+		declaration->flags |= DECLARATION_IS_CONSTANT;
+	}
+	else if (!parser_accept_token(parser, TOKEN_KIND_VAR)) {
+		auto token = lexer_current_token(&parser->lexer);
+		parser_error(parser, token, "Expected declaration 'var' or 'const'\n");
+		parser->parsing = false;
+	}
+
+	if (parser_expect_token(parser, TOKEN_KIND_IDENTIFIER)) {
+		String identifier;
+		identifier.length       = parser->value.string.length;
+		identifier.data         = parser->value.string.data;
+		declaration->identifier = string_builder_copy(parser->builder, identifier);
+	}
+
+	parser_expect_token(parser, TOKEN_KIND_COLON);
+
+	declaration->type = parse_type(parser);
+
+	parser_finish_syntax_node(parser, declaration);
+	return declaration;
+}
+
 Syntax_Node_Statement *parse_statement(Parser *parser) {
-	auto statement  = parser_new_syntax_node<Syntax_Node_Statement>(parser);
-	auto expression = parse_root_expression(parser);
-	statement->node = expression;
-	parser_expect_token(parser, TOKEN_KIND_SEMICOLON);
+	auto statement = parser_new_syntax_node<Syntax_Node_Statement>(parser);
+
+	// declaration
+	if (parser_peek_token(parser, TOKEN_KIND_VAR) ||
+		parser_peek_token(parser, TOKEN_KIND_CONST)) {
+		auto declaration = parse_declaration(parser);
+		statement->node  = declaration;
+
+		parser_expect_token(parser, TOKEN_KIND_SEMICOLON);
+	}
+
+	// simple expressions
+	else {
+		auto expression = parse_root_expression(parser);
+		statement->node = expression;
+
+		if (!parser_accept_token(parser, TOKEN_KIND_SEMICOLON)) {
+			auto token = lexer_current_token(&parser->lexer);
+			parser_error(parser, token, "Unexpected token: %.*s\n", (int)token->content.length, token->content.data);
+			parser->parsing = false;
+		}
+
+	}
+
 	parser_finish_syntax_node(parser, statement);
 	return statement;
 }
@@ -251,7 +317,7 @@ Syntax_Node_Block *parse_block(Parser *parser) {
 	Syntax_Node_Statement *parent_statement = &statement_stub_head;
 	uint64_t statement_count                = 0;
 
-	while (!parser_end(parser)) {
+	while (parser_should_continue(parser)) {
 		auto statement         = parse_statement(parser);
 		parent_statement->next = statement;
 		parent_statement       = statement;
@@ -269,14 +335,15 @@ Syntax_Node_Block *parse_block(Parser *parser) {
 //
 //
 
-void parser_init(Parser *parser, String content) {
+void parser_init(Parser *parser, String content, String_Builder *builder) {
 	lexer_init(&parser->lexer, content);
 
 	parser->error.first.message = "";
-	parser->error.first.next = nullptr;
+	parser->error.first.next    = nullptr;
 
-	parser->error.last = &parser->error.first;
+	parser->error.last  = &parser->error.first;
 	parser->error_count = 0;
+	parser->parsing     = true;
 
 	if (!ParseTableInitialize) {
 		parser_init_precedence();
@@ -284,6 +351,8 @@ void parser_init(Parser *parser, String content) {
 	}
 
 	lexer_next(&parser->lexer);
+
+	parser->builder = builder;
 }
 
 //
