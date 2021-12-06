@@ -31,17 +31,18 @@ static uint32_t UnaryOperatorPrecedence[_TOKEN_KIND_COUNT];
 static uint32_t BinaryOperatorPrecedence[_TOKEN_KIND_COUNT];
 
 static void parser_init_precedence() {
-	UnaryOperatorPrecedence[TOKEN_KIND_PLUS] = 150;
+	UnaryOperatorPrecedence[TOKEN_KIND_PLUS]  = 150;
 	UnaryOperatorPrecedence[TOKEN_KIND_MINUS] = 150;
 
 	//
 	//
 	//
 
-	BinaryOperatorPrecedence[TOKEN_KIND_ASTRICK] = 60;
-	BinaryOperatorPrecedence[TOKEN_KIND_DIVISION] = 60;
+	BinaryOperatorPrecedence[TOKEN_KIND_ASTRICK]   = 60;
+	BinaryOperatorPrecedence[TOKEN_KIND_DIVISION]  = 60;
+	BinaryOperatorPrecedence[TOKEN_KIND_REMAINDER] = 60;
 
-	BinaryOperatorPrecedence[TOKEN_KIND_PLUS] = 55;
+	BinaryOperatorPrecedence[TOKEN_KIND_PLUS]  = 55;
 	BinaryOperatorPrecedence[TOKEN_KIND_MINUS] = 55;
 }
 
@@ -240,7 +241,7 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec) {
 		}
 
 		static const Token_Kind BinaryOpTokens[] = {
-			TOKEN_KIND_PLUS, TOKEN_KIND_MINUS, TOKEN_KIND_ASTRICK, TOKEN_KIND_DIVISION
+			TOKEN_KIND_PLUS, TOKEN_KIND_MINUS, TOKEN_KIND_ASTRICK, TOKEN_KIND_DIVISION, TOKEN_KIND_REMAINDER
 		};
 
 		auto token = lexer_current_token(&parser->lexer);

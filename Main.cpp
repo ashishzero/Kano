@@ -38,10 +38,11 @@ Unary_Operator_Kind token_to_unary_operator(Token_Kind kind) {
 
 Binary_Operator_Kind token_to_binary_operator(Token_Kind kind) {
 	switch (kind) {
-		case TOKEN_KIND_PLUS: return BINARY_OPERATOR_ADD;
-		case TOKEN_KIND_MINUS: return BINARY_OPERATOR_SUB;
-		case TOKEN_KIND_ASTRICK: return BINARY_OPERATOR_MUL;
-		case TOKEN_KIND_DIVISION: return BINARY_OPERATOR_DIV;
+		case TOKEN_KIND_PLUS: return BINARY_OPERATOR_ADDITION;
+		case TOKEN_KIND_MINUS: return BINARY_OPERATOR_SUBTRACTION;
+		case TOKEN_KIND_ASTRICK: return BINARY_OPERATOR_MULTIPLICATION;
+		case TOKEN_KIND_DIVISION: return BINARY_OPERATOR_DIVISION;
+		case TOKEN_KIND_REMAINDER: return BINARY_OPERATOR_REMAINDER;
 		NoDefaultCase();
 	}
 
@@ -601,10 +602,10 @@ int main() {
 		binary_operator_real.parameters[1].kind = CODE_TYPE_REAL;
 		binary_operator_real.output.kind        = CODE_TYPE_REAL;
 
-		resolver.binary_operators[BINARY_OPERATOR_ADD].add(binary_operator_real);
-		resolver.binary_operators[BINARY_OPERATOR_SUB].add(binary_operator_real);
-		resolver.binary_operators[BINARY_OPERATOR_MUL].add(binary_operator_real);
-		resolver.binary_operators[BINARY_OPERATOR_DIV].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_ADDITION].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_SUBTRACTION].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_MULTIPLICATION].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_DIVISION].add(binary_operator_real);
 	}
 
 	{
@@ -613,10 +614,11 @@ int main() {
 		binary_operator_int.parameters[1].kind = CODE_TYPE_INTEGER;
 		binary_operator_int.output.kind        = CODE_TYPE_INTEGER;
 
-		resolver.binary_operators[BINARY_OPERATOR_ADD].add(binary_operator_int);
-		resolver.binary_operators[BINARY_OPERATOR_SUB].add(binary_operator_int);
-		resolver.binary_operators[BINARY_OPERATOR_MUL].add(binary_operator_int);
-		resolver.binary_operators[BINARY_OPERATOR_DIV].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_ADDITION].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_SUBTRACTION].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_MULTIPLICATION].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_DIVISION].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_REMAINDER].add(binary_operator_int);
 	}
 
 	{
@@ -625,10 +627,10 @@ int main() {
 		binary_operator_int_real.parameters[1].kind = CODE_TYPE_REAL;
 		binary_operator_int_real.output.kind        = CODE_TYPE_REAL;
 
-		resolver.binary_operators[BINARY_OPERATOR_ADD].add(binary_operator_int_real);
-		resolver.binary_operators[BINARY_OPERATOR_SUB].add(binary_operator_int_real);
-		resolver.binary_operators[BINARY_OPERATOR_MUL].add(binary_operator_int_real);
-		resolver.binary_operators[BINARY_OPERATOR_DIV].add(binary_operator_int_real);
+		resolver.binary_operators[BINARY_OPERATOR_ADDITION].add(binary_operator_int_real);
+		resolver.binary_operators[BINARY_OPERATOR_SUBTRACTION].add(binary_operator_int_real);
+		resolver.binary_operators[BINARY_OPERATOR_MULTIPLICATION].add(binary_operator_int_real);
+		resolver.binary_operators[BINARY_OPERATOR_DIVISION].add(binary_operator_int_real);
 	}
 
 	{
@@ -637,10 +639,10 @@ int main() {
 		binary_operator_real_int.parameters[1].kind = CODE_TYPE_INTEGER;
 		binary_operator_real_int.output.kind        = CODE_TYPE_REAL;
 
-		resolver.binary_operators[BINARY_OPERATOR_ADD].add(binary_operator_real_int);
-		resolver.binary_operators[BINARY_OPERATOR_SUB].add(binary_operator_real_int);
-		resolver.binary_operators[BINARY_OPERATOR_MUL].add(binary_operator_real_int);
-		resolver.binary_operators[BINARY_OPERATOR_DIV].add(binary_operator_real_int);
+		resolver.binary_operators[BINARY_OPERATOR_ADDITION].add(binary_operator_real_int);
+		resolver.binary_operators[BINARY_OPERATOR_SUBTRACTION].add(binary_operator_real_int);
+		resolver.binary_operators[BINARY_OPERATOR_MULTIPLICATION].add(binary_operator_real_int);
+		resolver.binary_operators[BINARY_OPERATOR_DIVISION].add(binary_operator_real_int);
 	}
 
 	{
@@ -649,10 +651,11 @@ int main() {
 		binary_operator_bool.parameters[1].kind = CODE_TYPE_BOOL;
 		binary_operator_bool.output.kind        = CODE_TYPE_INTEGER;
 
-		resolver.binary_operators[BINARY_OPERATOR_ADD].add(binary_operator_bool);
-		resolver.binary_operators[BINARY_OPERATOR_SUB].add(binary_operator_bool);
-		resolver.binary_operators[BINARY_OPERATOR_MUL].add(binary_operator_bool);
-		resolver.binary_operators[BINARY_OPERATOR_DIV].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_ADDITION].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_SUBTRACTION].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_MULTIPLICATION].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_DIVISION].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_REMAINDER].add(binary_operator_bool);
 	}
 
 	{

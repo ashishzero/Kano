@@ -12,15 +12,24 @@ Block()
             Destination()
                Stack(0x0)
             Expression()
-               Binary Operator(+): 00000052822FEA0C
-                  Binary Operator(+): 00000052822FEA0C
-                     Unary Operator(-): 00000052822FE9B0
+               Binary Operator(%): 000000A187AFEA50
+                  Literal(int:5)
+                  Literal(int:2)
+   Statement()
+      Expression()
+         Assignment()
+            Destination()
+               Stack(0x0)
+            Expression()
+               Binary Operator(+): 000000A187AFE87C
+                  Binary Operator(+): 000000A187AFE87C
+                     Unary Operator(-): 000000A187AFE820
                         Literal(int:5)
-                     Binary Operator(/): 00000052822FEB74
-                        Binary Operator(*): 00000052822FEAFC
+                     Binary Operator(/): 000000A187AFE9E4
+                        Binary Operator(*): 000000A187AFE96C
                            Literal(int:6)
                            Literal(int:3)
-                        Binary Operator(-): 00000052822FEA84
+                        Binary Operator(-): 000000A187AFE8F4
                            Literal(int:5)
                            Literal(int:8)
                   Literal(int:5)
@@ -30,8 +39,8 @@ Block()
             Destination()
                Stack(0x4)
             Expression()
-               Binary Operator(+): 00000052822FEA0C
-                  Binary Operator(/): 00000052822FEB74
+               Binary Operator(+): 000000A187AFE87C
+                  Binary Operator(/): 000000A187AFE9E4
                      Literal(int:9)
                      Literal(int:3)
                   Literal(int:2)
@@ -41,6 +50,6 @@ Block()
             Destination()
                Stack(0xc)
             Expression()
-               Binary Operator(+): 00000052822FEA24
+               Binary Operator(+): 000000A187AFE894
                   Stack(0x0)
                   Stack(0x4)

@@ -29,19 +29,19 @@ double evaluate_unary_operator(Code_Node_Unary_Operator* root) {
 double evaluate_binary_operator(Code_Node_Binary_Operator* root) {
 	auto node = root;
 	switch (node->op_kind) {
-	case BINARY_OPERATOR_ADD:
+	case BINARY_OPERATOR_ADDITION:
 	{
 		return(evaluate_expression(node->left) + evaluate_expression(node->right));
 	}break;
-	case BINARY_OPERATOR_SUB:
+	case BINARY_OPERATOR_SUBTRACTION:
 	{
 		return(evaluate_expression(node->left) - evaluate_expression(node->right));
 	}break;
-	case BINARY_OPERATOR_MUL:
+	case BINARY_OPERATOR_MULTIPLICATION:
 	{
 		return(evaluate_expression(node->left) * evaluate_expression(node->right));
 	}break;
-	case BINARY_OPERATOR_DIV:
+	case BINARY_OPERATOR_DIVISION:
 	{
 		return(evaluate_expression(node->left) / evaluate_expression(node->right));
 	}break;

@@ -23,7 +23,7 @@ static inline String unary_operator_kind_string(Unary_Operator_Kind kind) {
 
 static inline String binary_operator_kind_string(Binary_Operator_Kind kind) {
 	static String strings[] = {
-		"+", "-", "*", "/"
+		"+", "-", "*", "/", "%"
 	};
 	static_assert(ArrayCount(strings) == _BINARY_OPERATOR_COUNT);
 	return strings[kind];

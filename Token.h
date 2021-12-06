@@ -14,6 +14,7 @@ enum Token_Kind {
 	TOKEN_KIND_MINUS,
 	TOKEN_KIND_ASTRICK,
 	TOKEN_KIND_DIVISION,
+	TOKEN_KIND_REMAINDER,
 
 	TOKEN_KIND_REAL,
 	TOKEN_KIND_INTEGER,
@@ -64,7 +65,7 @@ static inline String token_kind_string(Token_Kind kind) {
 
 		"(", ")",
 
-		"+", "-", "*", "/",
+		"+", "-", "*", "/", "%",
 
 		"real number",
 		"integer number",
