@@ -52,12 +52,13 @@ struct Syntax_Node {
 
 struct Literal {
 	enum Kind {
-		INTEGER, REAL
+		INTEGER, REAL, BOOL
 	};
 
 	union Value {
 		int32_t integer = 0;
 		float   real;
+		bool    boolean;
 	};
 
 	Kind  kind = INTEGER;

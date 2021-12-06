@@ -3,17 +3,24 @@ Block()
       Expression()
          Assignment()
             Destination()
+               Stack(0x8)
+            Expression()
+               Literal(bool:false)
+   Statement()
+      Expression()
+         Assignment()
+            Destination()
                Stack(0x0)
             Expression()
-               Binary Operator(+): 0000008C73FEEA2C
-                  Binary Operator(+): 0000008C73FEEA2C
-                     Unary Operator(-): 0000008C73FEE9D0
+               Binary Operator(+): 00000052822FEA0C
+                  Binary Operator(+): 00000052822FEA0C
+                     Unary Operator(-): 00000052822FE9B0
                         Literal(int:5)
-                     Binary Operator(/): 0000008C73FEEB94
-                        Binary Operator(*): 0000008C73FEEB1C
+                     Binary Operator(/): 00000052822FEB74
+                        Binary Operator(*): 00000052822FEAFC
                            Literal(int:6)
                            Literal(int:3)
-                        Binary Operator(-): 0000008C73FEEAA4
+                        Binary Operator(-): 00000052822FEA84
                            Literal(int:5)
                            Literal(int:8)
                   Literal(int:5)
@@ -21,10 +28,10 @@ Block()
       Expression()
          Assignment()
             Destination()
-               Stack(0x8)
+               Stack(0x4)
             Expression()
-               Binary Operator(+): 0000008C73FEEA2C
-                  Binary Operator(/): 0000008C73FEEB94
+               Binary Operator(+): 00000052822FEA0C
+                  Binary Operator(/): 00000052822FEB74
                      Literal(int:9)
                      Literal(int:3)
                   Literal(int:2)
@@ -32,8 +39,8 @@ Block()
       Expression()
          Assignment()
             Destination()
-               Stack(0x18)
+               Stack(0xc)
             Expression()
-               Binary Operator(+): 0000008C73FEEA44
+               Binary Operator(+): 00000052822FEA24
                   Stack(0x0)
-                  Stack(0x8)
+                  Stack(0x4)

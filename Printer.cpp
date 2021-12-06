@@ -4,8 +4,9 @@
 static inline String code_type_kind_string(Code_Type_Kind kind) {
 	static String strings[] = {
 		"-null-",
+		"integer",
 		"real",
-		"integer"
+		"bool"
 	};
 	static_assert(ArrayCount(strings) == _CODE_TYPE_COUNT);
 	return strings[kind];
@@ -151,6 +152,7 @@ void print_code(Code_Node *root, FILE *fp, int child_indent) {
 		switch (node->type.kind) {
 		case CODE_TYPE_REAL:    fprintf(fp, "Literal(float:%f)\n", node->data.real.value); break;
 		case CODE_TYPE_INTEGER: fprintf(fp, "Literal(int:%d)\n", node->data.integer.value); break;
+		case CODE_TYPE_BOOL:    fprintf(fp, "Literal(bool:%s)\n", node->data.boolean.value ? "true" : "false"); break;
 		NoDefaultCase();
 		}
 	} break;

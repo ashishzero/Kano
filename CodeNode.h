@@ -18,8 +18,9 @@ enum Code_Node_Kind {
 
 enum Code_Type_Kind {
 	CODE_TYPE_NULL,
-	CODE_TYPE_REAL,
 	CODE_TYPE_INTEGER,
+	CODE_TYPE_REAL,
+	CODE_TYPE_BOOL,
 
 	_CODE_TYPE_COUNT
 };
@@ -36,9 +37,14 @@ struct Code_Value_Real {
 	float value;
 };
 
+struct Code_Value_Bool {
+	bool value;
+};
+
 union Code_Value {
 	Code_Value_Integer integer;
 	Code_Value_Real    real;
+	Code_Value_Bool    boolean;
 
 	Code_Value() = default;
 };

@@ -175,6 +175,22 @@ Syntax_Node *parse_subexpression(Parser *parser, uint32_t prec) {
 		return node;
 	}
 
+	if (parser_accept_token(parser, TOKEN_KIND_TRUE)) {
+		auto node = parser_new_syntax_node<Syntax_Node_Literal>(parser);
+		node->value.kind = Literal::BOOL;
+		node->value.data.boolean = true;
+		parser_finish_syntax_node(parser, node);
+		return node;
+	}
+
+	if (parser_accept_token(parser, TOKEN_KIND_FALSE)) {
+		auto node = parser_new_syntax_node<Syntax_Node_Literal>(parser);
+		node->value.kind = Literal::BOOL;
+		node->value.data.boolean = false;
+		parser_finish_syntax_node(parser, node);
+		return node;
+	}
+
 	if (parser_accept_token(parser, TOKEN_KIND_IDENTIFIER)) {
 		auto node = parser_new_syntax_node<Syntax_Node_Identifier>(parser);
 		String name;
@@ -271,6 +287,9 @@ Syntax_Node_Type *parse_type(Parser *parser) {
 	}
 	else if (parser_accept_token(parser, TOKEN_KIND_FLOAT)) {
 		type->token_type = TOKEN_KIND_FLOAT;
+	}
+	else if (parser_accept_token(parser, TOKEN_KIND_BOOL)) {
+		type->token_type = TOKEN_KIND_BOOL;
 	}
 	else {
 		auto token = lexer_current_token(&parser->lexer);

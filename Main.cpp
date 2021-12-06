@@ -222,10 +222,6 @@ static uint32_t symbol_table_get(Symbol_Table *table, String name) {
 	return 0;
 }
 
-static inline uint32_t align(uint32_t location, uint32_t alignment) {
-	return ((location + (alignment - 1)) & ~(alignment - 1));
-}
-
 struct Code_Type_Resolver {
 	Symbol_Table symbols;
 	uint32_t     vstack = 0;
@@ -264,6 +260,12 @@ Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Syntax_Nod
 		{
 			node->type.kind       = CODE_TYPE_REAL;
 			node->data.real.value = root->value.data.real;
+		} break;
+
+		case Literal::BOOL:
+		{
+			node->type.kind          = CODE_TYPE_BOOL;
+			node->data.boolean.value = root->value.data.boolean;
 		} break;
 
 		NoDefaultCase();
@@ -440,6 +442,13 @@ Code_Type code_resolve_type(Code_Type_Resolver *resolver, Syntax_Node_Type *root
 			type.kind = CODE_TYPE_REAL;
 			return type;
 		} break;
+
+		case TOKEN_KIND_BOOL:
+		{
+			Code_Type type;
+			type.kind = CODE_TYPE_BOOL;
+			return type;
+		} break;
 	}
 
 	Unreachable();
@@ -461,23 +470,18 @@ void code_resolve_declaration(Code_Type_Resolver *resolver, Syntax_Node_Declarat
 		}
 		else {
 			// TODO: type info
+
+			uint32_t size = 0;
 			switch (symbol.type.kind) {
-				case CODE_TYPE_INTEGER:
-				{
-					uint32_t alignment = align(resolver->vstack, sizeof(int32_t));
-					symbol.address = resolver->vstack + alignment;
-					resolver->vstack += alignment + sizeof(int32_t);
-				} break;
-
-				case CODE_TYPE_REAL:
-				{
-					uint32_t alignment = align(resolver->vstack, sizeof(float));
-					symbol.address = resolver->vstack + alignment;
-					resolver->vstack += alignment + sizeof(float);
-				} break;
-
+				case CODE_TYPE_INTEGER: size = sizeof(int32_t); break;
+				case CODE_TYPE_REAL: size = sizeof(float); break;
+				case CODE_TYPE_BOOL: size = sizeof(bool); break;
 				NoDefaultCase();
 			}
+
+			resolver->vstack = AlignPower2Up(resolver->vstack, size);
+			symbol.address = resolver->vstack;
+			resolver->vstack += size;
 		}
 
 		symbol_table_put(&resolver->symbols, symbol);
@@ -640,6 +644,18 @@ int main() {
 	}
 
 	{
+		Binary_Operator binary_operator_bool;
+		binary_operator_bool.parameters[0].kind = CODE_TYPE_BOOL;
+		binary_operator_bool.parameters[1].kind = CODE_TYPE_BOOL;
+		binary_operator_bool.output.kind        = CODE_TYPE_INTEGER;
+
+		resolver.binary_operators[BINARY_OPERATOR_ADD].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_SUB].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_MUL].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_DIV].add(binary_operator_bool);
+	}
+
+	{
 		Assignment assignment_real;
 		assignment_real.destination.kind = CODE_TYPE_REAL;
 		assignment_real.value.kind       = CODE_TYPE_REAL;
@@ -653,6 +669,30 @@ int main() {
 		assignment_int.value.kind       = CODE_TYPE_INTEGER;
 
 		resolver.assignments.add(assignment_int);
+	}
+
+	{
+		Assignment assignment_bool;
+		assignment_bool.destination.kind = CODE_TYPE_BOOL;
+		assignment_bool.value.kind       = CODE_TYPE_BOOL;
+
+		resolver.assignments.add(assignment_bool);
+	}
+
+	{
+		Assignment assignment_int_bool;
+		assignment_int_bool.destination.kind = CODE_TYPE_INTEGER;
+		assignment_int_bool.value.kind       = CODE_TYPE_BOOL;
+
+		resolver.assignments.add(assignment_int_bool);
+	}
+
+	{
+		Assignment assignment_bool_int;
+		assignment_bool_int.destination.kind = CODE_TYPE_BOOL;
+		assignment_bool_int.value.kind       = CODE_TYPE_INTEGER;
+
+		resolver.assignments.add(assignment_bool_int);
 	}
 
 	{
