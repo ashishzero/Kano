@@ -224,8 +224,8 @@ void lexer_next(Lexer *lexer) {
 			content.data   = (uint8_t *)string;
 			content.length = (lexer->cursor - content.data);
 
-			static const String KeyWords[]          = { "var", "const", "float" };
-			static const Token_Kind KeyWordTokens[] = { TOKEN_KIND_VAR, TOKEN_KIND_CONST, TOKEN_KIND_FLOAT };
+			static const String KeyWords[]          = { "var", "const", "int", "float" };
+			static const Token_Kind KeyWordTokens[] = { TOKEN_KIND_VAR, TOKEN_KIND_CONST, TOKEN_KIND_INT, TOKEN_KIND_FLOAT };
 
 			for (uint32_t index = 0; index < ArrayCount(KeyWords); ++index) {
 				if (content == KeyWords[index]) {

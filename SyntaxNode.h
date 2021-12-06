@@ -4,10 +4,6 @@
 
 constexpr uint32_t DECLARATION_IS_CONSTANT = 0x1;
 
-enum Syntax_Type {
-	SYNTAX_TYPE_FLOAT
-};
-
 struct Syntax_Location {
 	size_t start_row = 0;
 	size_t start_column = 0;
@@ -98,7 +94,7 @@ struct Syntax_Node_Binary_Operator : public Syntax_Node {
 struct Syntax_Node_Type : public Syntax_Node {
 	Syntax_Node_Type() { kind = SYNTAX_NODE_TYPE; }
 
-	Syntax_Type syntax_type;
+	Token_Kind token_type = TOKEN_KIND_ERROR;
 };
 
 struct Syntax_Node_Assignment : public Syntax_Node {

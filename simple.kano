@@ -1,5 +1,9 @@
 
-var number: float;
-number = 8;
-+9/3+2 + number;
-- 5 + 6 * 3 / (5 - 8) + 5;
+var number0: float;
+var number1: int;
+
+number0 = - 5 + 6 * 3 / (5 - 8) + 5;
+number1 = 9/3+2;
+
+var number2: float;
+number2 = number0 + number1;

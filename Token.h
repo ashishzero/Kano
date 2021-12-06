@@ -21,6 +21,7 @@ enum Token_Kind {
 	TOKEN_KIND_VAR,
 	TOKEN_KIND_CONST,
 
+	TOKEN_KIND_INT,
 	TOKEN_KIND_FLOAT,
 
 	TOKEN_KIND_IDENTIFIER,
@@ -66,6 +67,7 @@ static inline String token_kind_string(Token_Kind kind) {
 
 		"var", "const",
 
+		"int",
 		"float",
 
 		"identifier",

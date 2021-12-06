@@ -1,0 +1,39 @@
+Block()
+   Statement()
+      Expression()
+         Assignment()
+            Destination()
+               Stack(0x0)
+            Expression()
+               Binary Operator(+): 0000008C73FEEA2C
+                  Binary Operator(+): 0000008C73FEEA2C
+                     Unary Operator(-): 0000008C73FEE9D0
+                        Literal(int:5)
+                     Binary Operator(/): 0000008C73FEEB94
+                        Binary Operator(*): 0000008C73FEEB1C
+                           Literal(int:6)
+                           Literal(int:3)
+                        Binary Operator(-): 0000008C73FEEAA4
+                           Literal(int:5)
+                           Literal(int:8)
+                  Literal(int:5)
+   Statement()
+      Expression()
+         Assignment()
+            Destination()
+               Stack(0x8)
+            Expression()
+               Binary Operator(+): 0000008C73FEEA2C
+                  Binary Operator(/): 0000008C73FEEB94
+                     Literal(int:9)
+                     Literal(int:3)
+                  Literal(int:2)
+   Statement()
+      Expression()
+         Assignment()
+            Destination()
+               Stack(0x18)
+            Expression()
+               Binary Operator(+): 0000008C73FEEA44
+                  Stack(0x0)
+                  Stack(0x8)

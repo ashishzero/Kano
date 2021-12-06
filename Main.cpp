@@ -426,10 +426,20 @@ Code_Node_Expression *code_resolve_root_expression(Code_Type_Resolver *resolver,
 }
 
 Code_Type code_resolve_type(Code_Type_Resolver *resolver, Syntax_Node_Type *root) {
-	if (root->syntax_type == SYNTAX_TYPE_FLOAT) {
-		Code_Type type;
-		type.kind = CODE_TYPE_REAL;
-		return type;
+	switch (root->token_type) {
+		case TOKEN_KIND_INT: 
+		{
+			Code_Type type;
+			type.kind = CODE_TYPE_INTEGER;
+			return type;
+		} break;
+
+		case TOKEN_KIND_FLOAT:
+		{
+			Code_Type type;
+			type.kind = CODE_TYPE_REAL;
+			return type;
+		} break;
 	}
 
 	Unreachable();
@@ -450,10 +460,24 @@ void code_resolve_declaration(Code_Type_Resolver *resolver, Syntax_Node_Declarat
 			symbol.address = UINT32_MAX;
 		}
 		else {
-			Assert(symbol.type.kind == CODE_TYPE_REAL);
-			uint32_t alignment = align(resolver->vstack, sizeof(float));
-			symbol.address = resolver->vstack + alignment;
-			resolver->vstack += alignment + sizeof(float);
+			// TODO: type info
+			switch (symbol.type.kind) {
+				case CODE_TYPE_INTEGER:
+				{
+					uint32_t alignment = align(resolver->vstack, sizeof(int32_t));
+					symbol.address = resolver->vstack + alignment;
+					resolver->vstack += alignment + sizeof(int32_t);
+				} break;
+
+				case CODE_TYPE_REAL:
+				{
+					uint32_t alignment = align(resolver->vstack, sizeof(float));
+					symbol.address = resolver->vstack + alignment;
+					resolver->vstack += alignment + sizeof(float);
+				} break;
+
+				NoDefaultCase();
+			}
 		}
 
 		symbol_table_put(&resolver->symbols, symbol);
@@ -532,9 +556,11 @@ int main() {
 		return 1;
 	}
 
-	print_syntax(node);
-
-	printf("\n\nType Resolution\n");
+	{
+		auto fp = fopen("syntax.txt", "wb");
+		print_syntax(node, fp);
+		fclose(fp);
+	}
 
 	Code_Type_Resolver resolver;
 
@@ -645,8 +671,14 @@ int main() {
 	}
 
 	auto code = code_resolve_block(&resolver, node);
-	print_code(code);
-	evaluate_node_block(code);
+
+	{
+		auto fp = fopen("code.txt", "wb");
+		print_code(code, fp);
+		fclose(fp);
+	}
+
+	// evaluate_node_block(code);
 
 	return 0;
 }

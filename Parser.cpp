@@ -266,9 +266,16 @@ Syntax_Node_Expression *parse_root_expression(Parser *parser) {
 Syntax_Node_Type *parse_type(Parser *parser) {
 	auto type = parser_new_syntax_node<Syntax_Node_Type>(parser);
 
-	// we only have one type right now and that's float
-	parser_expect_token(parser, TOKEN_KIND_FLOAT);
-	type->syntax_type = SYNTAX_TYPE_FLOAT;
+	if (parser_accept_token(parser, TOKEN_KIND_INT)) {
+		type->token_type = TOKEN_KIND_INT;
+	}
+	else if (parser_accept_token(parser, TOKEN_KIND_FLOAT)) {
+		type->token_type = TOKEN_KIND_FLOAT;
+	}
+	else {
+		auto token = lexer_current_token(&parser->lexer);
+		parser_error(parser, token, "Expected type, got: %s\n", token_kind_string(token->kind).data);
+	}
 
 	parser_finish_syntax_node(parser, type);
 	return type;
