@@ -173,6 +173,15 @@ Syntax_Node *parse_subexpression(Parser *parser, uint32_t prec) {
 		return node;
 	}
 
+	if (parser_accept_token(parser, TOKEN_KIND_IDENTIFIER)) {
+		auto node = parser_new_syntax_node<Syntax_Node_Identifier>(parser);
+		String name;
+		name.length = parser->value.string.length;
+		name.data   = parser->value.string.data;
+		node->name  = string_builder_copy(parser->builder, name);
+		return node;
+	}
+
 	static const Token_Kind UnaryOpTokens[] = {
 		TOKEN_KIND_PLUS, TOKEN_KIND_MINUS
 	};
@@ -203,6 +212,15 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec) {
 	if (!left) return nullptr;
 
 	while (parser_should_continue(parser)) {
+		// assignment
+		if (parser_accept_token(parser, TOKEN_KIND_EQUALS)) {
+			auto assignment = parser_new_syntax_node<Syntax_Node_Assignment>(parser);
+			parser_finish_syntax_node(parser, assignment);
+			assignment->left  = left;
+			assignment->right = parse_root_expression(parser);
+			return assignment;
+		}
+
 		static const Token_Kind BinaryOpTokens[] = {
 			TOKEN_KIND_PLUS, TOKEN_KIND_MINUS, TOKEN_KIND_ASTRICK, TOKEN_KIND_DIVISION
 		};
@@ -217,10 +235,10 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec) {
 			Token_Kind token = BinaryOpTokens[index];
 			if (parser_accept_token(parser, token)) {
 				auto node = parser_new_syntax_node<Syntax_Node_Binary_Operator>(parser);
+				parser_finish_syntax_node(parser, node);
 				node->op = token;
 				node->left = left;
 				node->right = parse_expression(parser, op_prec);
-				parser_finish_syntax_node(parser, node);
 				left = node;
 				break;
 			}

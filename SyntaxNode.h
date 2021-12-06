@@ -26,14 +26,28 @@ struct Syntax_Location {
 enum Syntax_Node_Kind {
 	SYNTAX_NODE_NULL,
 	SYNTAX_NODE_LITERAL,
+	SYNTAX_NODE_IDENTIFIER,
 	SYNTAX_NODE_UNARY_OPERATOR,
 	SYNTAX_NODE_BINARY_OPERATOR,
 	SYNTAX_NODE_TYPE,
+	SYNTAX_NODE_ASSIGNMENT,
 	SYNTAX_NODE_EXPRESSION,
 	SYNTAX_NODE_DECLARATION,
 	SYNTAX_NODE_STATEMENT,
 	SYNTAX_NODE_BLOCK,
 };
+
+struct Syntax_Node;
+struct Syntax_Node_Literal;
+struct Syntax_Node_Identifier;
+struct Syntax_Node_Unary_Operator;
+struct Syntax_Node_Binary_Operator;
+struct Syntax_Node_Type;
+struct Syntax_Node_Assignment;
+struct Syntax_Node_Expression;
+struct Syntax_Node_Declaration;
+struct Syntax_Node_Statement;
+struct Syntax_Node_Block;
 
 struct Syntax_Node {
 	Syntax_Node_Kind kind = SYNTAX_NODE_NULL;
@@ -42,7 +56,14 @@ struct Syntax_Node {
 
 struct Syntax_Node_Literal : public Syntax_Node {
 	Syntax_Node_Literal() { kind = SYNTAX_NODE_LITERAL; }
+
 	double value = 0;
+};
+
+struct Syntax_Node_Identifier : public Syntax_Node {
+	Syntax_Node_Identifier() { kind = SYNTAX_NODE_IDENTIFIER; }
+
+	String name = "";
 };
 
 struct Syntax_Node_Unary_Operator : public Syntax_Node {
@@ -64,6 +85,13 @@ struct Syntax_Node_Type : public Syntax_Node {
 	Syntax_Node_Type() { kind = SYNTAX_NODE_TYPE; }
 
 	Syntax_Type syntax_type;
+};
+
+struct Syntax_Node_Assignment : public Syntax_Node {
+	Syntax_Node_Assignment() { kind = SYNTAX_NODE_ASSIGNMENT; }
+
+	Syntax_Node *left = nullptr;
+	Syntax_Node_Expression *right = nullptr;
 };
 
 struct Syntax_Node_Expression : public Syntax_Node {

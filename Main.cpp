@@ -225,12 +225,12 @@ struct Code_Type_Resolver {
 	Bucket_Array<Binary_Operator, 8> binary_operators[_BINARY_OPERATOR_COUNT];
 };
 
-//Code_Node *code_resolve(Code_Type_Resolver *resolver, Syntax_Node *root);
 Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Syntax_Node_Literal *root);
 
 Code_Node *code_resolve_expression(Code_Type_Resolver *resolver, Syntax_Node *root);
 Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolver, Syntax_Node_Unary_Operator *root);
 Code_Node_Binary_Operator *code_resolve_binary_operator(Code_Type_Resolver *resolver, Syntax_Node_Binary_Operator *root);
+Code_Node_Assignment *code_resolve_assignment(Code_Type_Resolver *resolver, Syntax_Node_Assignment *root);
 
 Code_Node_Expression *code_resolve_root_expression(Code_Type_Resolver *resolver, Syntax_Node_Expression *root);
 Code_Type code_resolve_type(Code_Type_Resolver *resolver, Syntax_Node_Type *root);
@@ -243,9 +243,24 @@ Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Syntax_Node_Bl
 Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Syntax_Node_Literal *root) {
 	auto node = new Code_Node_Literal;
 	node->type.kind = CODE_TYPE_REAL;
-	node->location  = root->location;
 	node->value     = root->value;
 	return node;
+}
+
+Code_Node_Stack *code_resolve_identifier(Code_Type_Resolver *resolver, Syntax_Node_Identifier *root) {
+	uint32_t symbol_index = symbol_table_get(&resolver->symbols, root->name);
+
+	if (symbol_index) {
+		auto symbol = &resolver->symbols.buffer[symbol_index];
+
+		auto stack = new Code_Node_Stack;
+		stack->offset = symbol->address;
+		stack->type = symbol->type;
+		return stack;
+	}
+
+	Unimplemented();
+	return nullptr;
 }
 
 Code_Node *code_resolve_expression(Code_Type_Resolver *resolver, Syntax_Node *root) {
@@ -253,11 +268,17 @@ Code_Node *code_resolve_expression(Code_Type_Resolver *resolver, Syntax_Node *ro
 	case SYNTAX_NODE_LITERAL:
 		return code_resolve_literal(resolver, (Syntax_Node_Literal *)root);
 
+	case SYNTAX_NODE_IDENTIFIER:
+		return code_resolve_identifier(resolver, (Syntax_Node_Identifier *)root);
+
 	case SYNTAX_NODE_UNARY_OPERATOR:
 		return code_resolve_unary_operator(resolver, (Syntax_Node_Unary_Operator *)root);
 
 	case SYNTAX_NODE_BINARY_OPERATOR:
 		return code_resolve_binary_operator(resolver, (Syntax_Node_Binary_Operator *)root);
+
+	case SYNTAX_NODE_ASSIGNMENT:
+		return code_resolve_assignment(resolver, (Syntax_Node_Assignment *)root);
 
 	NoDefaultCase();
 	}
@@ -280,7 +301,6 @@ Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolv
 				auto node = new Code_Node_Unary_Operator;
 
 				node->type     = op->output;
-				node->location = root->location;
 				node->child    = child;
 				node->op_kind  = op_kind;
 				node->op       = op;
@@ -313,7 +333,6 @@ Code_Node_Binary_Operator *code_resolve_binary_operator(Code_Type_Resolver *reso
 				auto node = new Code_Node_Binary_Operator;
 
 				node->type     = op->output;
-				node->location = root->location;
 				node->left     = left;
 				node->right    = right;
 				node->op_kind  = op_kind;
@@ -329,11 +348,45 @@ Code_Node_Binary_Operator *code_resolve_binary_operator(Code_Type_Resolver *reso
 	return nullptr;
 }
 
+Code_Node_Destination *code_resolve_destination(Code_Type_Resolver *resolver, Syntax_Node *root) {
+	switch (root->kind) {
+		case SYNTAX_NODE_IDENTIFIER:
+		{
+			auto stack  = code_resolve_identifier(resolver, (Syntax_Node_Identifier *)root);
+
+			auto dest   = new Code_Node_Destination;
+			dest->child = stack;
+			dest->type  = stack->type;
+			return dest;
+		} break;
+
+		NoDefaultCase();
+	}
+
+	Unimplemented();
+	return nullptr;
+}
+
+Code_Node_Assignment *code_resolve_assignment(Code_Type_Resolver *resolver, Syntax_Node_Assignment *root) {
+	auto destination = code_resolve_destination(resolver, root->left);
+	auto value       = code_resolve_root_expression(resolver, root->right);
+
+	if (destination->type.kind == value->type.kind) {
+		auto assignment         = new Code_Node_Assignment;
+		assignment->destination = destination;
+		assignment->value       = value;
+		assignment->type        = destination->type;
+		return assignment;
+	}
+
+	Unimplemented();
+	return nullptr;
+}
+
 Code_Node_Expression *code_resolve_root_expression(Code_Type_Resolver *resolver, Syntax_Node_Expression *root) {
 	auto child = code_resolve_expression(resolver, root->child);
 
 	Code_Node_Expression *expression = new Code_Node_Expression;
-	expression->location             = root->location;
 	expression->child                = child;
 	expression->type                 = child->type;
 
@@ -387,7 +440,6 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Syntax
 		{
 			auto expression = code_resolve_root_expression(resolver, (Syntax_Node_Expression *)node);
 			Code_Node_Statement *statement = new Code_Node_Statement;
-			statement->location = root->location;
 			statement->node     = expression;
 			statement->type     = expression->type;
 			return statement;
@@ -407,7 +459,6 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Syntax
 
 Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Syntax_Node_Block *root) {
 	Code_Node_Block *block = new Code_Node_Block;
-	block->location        = root->location;
 	block->type.kind       = CODE_TYPE_NULL;
 
 	Code_Node_Statement statement_stub_head;

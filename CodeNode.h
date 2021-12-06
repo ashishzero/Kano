@@ -4,9 +4,12 @@
 enum Code_Node_Kind {
 	CODE_NODE_NULL,
 	CODE_NODE_LITERAL,
+	CODE_NODE_STACK,
+	CODE_NODE_DESTINATION,
 	CODE_NODE_UNARY_OPERATOR,
 	CODE_NODE_BINARY_OPERATOR,
 	CODE_NODE_EXPRESSION,
+	CODE_NODE_ASSIGNMENT,
 	CODE_NODE_STATEMENT,
 	CODE_NODE_BLOCK,
 
@@ -27,13 +30,24 @@ struct Code_Type {
 struct Code_Node {
 	Code_Node_Kind  kind = CODE_NODE_NULL;
 	Code_Type       type;
-	Syntax_Location location;
 };
 
 struct Code_Node_Literal : public Code_Node {
 	Code_Node_Literal() { kind = CODE_NODE_LITERAL; }
 
 	double value = 0;
+};
+
+struct Code_Node_Stack : public Code_Node {
+	Code_Node_Stack() { kind = CODE_NODE_STACK; }
+
+	uint32_t offset = UINT32_MAX;
+};
+
+struct Code_Node_Destination : public Code_Node {
+	Code_Node_Destination() { kind = CODE_NODE_DESTINATION; }
+
+	Code_Node *child = nullptr;
 };
 
 enum Unary_Operator_Kind {
@@ -85,6 +99,13 @@ struct Code_Node_Expression : public Code_Node {
 	Code_Node_Expression() { kind = CODE_NODE_EXPRESSION; }
 
 	Code_Node *child = nullptr;
+};
+
+struct Code_Node_Assignment : public Code_Node {
+	Code_Node_Assignment() { kind = CODE_NODE_ASSIGNMENT; }
+
+	Code_Node_Destination *destination = nullptr;
+	Code_Node_Expression *value = nullptr;
 };
 
 struct Code_Node_Statement : public Code_Node {

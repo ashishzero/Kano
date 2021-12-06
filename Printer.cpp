@@ -49,6 +49,12 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent) {
 		fprintf(fp, "Literal(%f)\n", node->value);
 	} break;
 
+	case SYNTAX_NODE_IDENTIFIER:
+	{
+		auto node = (Syntax_Node_Identifier *)root;
+		fprintf(fp, "Identifier(%s)\n", node->name.data);
+	} break;
+
 	case SYNTAX_NODE_UNARY_OPERATOR:
 	{
 		auto node = (Syntax_Node_Unary_Operator *)root;
@@ -75,6 +81,14 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent) {
 		}
 
 		fprintf(fp, "Type(%s)\n", type_name);
+	} break;
+
+	case SYNTAX_NODE_ASSIGNMENT:
+	{
+		auto node = (Syntax_Node_Assignment *)root;
+		fprintf(fp, "Assignment(=)\n");
+		print_syntax(node->left, fp, child_indent);
+		print_syntax(node->right, fp, child_indent);
 	} break;
 
 	case SYNTAX_NODE_EXPRESSION:
@@ -136,6 +150,19 @@ void print_code(Code_Node *root, FILE *fp, int child_indent) {
 		fprintf(fp, "Literal(%f)\n", node->value);
 	} break;
 
+	case CODE_NODE_STACK:
+	{
+		auto node = (Code_Node_Stack *)root;
+		fprintf(fp, "Stack(0x%x)\n", node->offset);
+	} break;
+
+	case CODE_NODE_DESTINATION:
+	{
+		auto node = (Code_Node_Destination *)root;
+		fprintf(fp, "Destination()\n");
+		print_code(node->child, fp, child_indent);
+	} break;
+
 	case CODE_NODE_UNARY_OPERATOR:
 	{
 		auto node = (Code_Node_Unary_Operator *)root;
@@ -156,6 +183,14 @@ void print_code(Code_Node *root, FILE *fp, int child_indent) {
 		auto node = (Code_Node_Expression *)root;
 		printf("Expression()\n");
 		print_code(node->child, fp, child_indent);
+	} break;
+
+	case CODE_NODE_ASSIGNMENT:
+	{
+		auto node = (Code_Node_Assignment *)root;
+		printf("Assignment()\n");
+		print_code(node->destination, fp, child_indent);
+		print_code(node->value, fp, child_indent);
 	} break;
 
 	case CODE_NODE_STATEMENT:
