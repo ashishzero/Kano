@@ -260,7 +260,7 @@ int main() {
 	}
 
 	auto code = code_resolve_block(&resolver, node);
-	//print(code);
+	print(code);
 	evaluate_node_block(code);
 	
 	return 0;
