@@ -12,3 +12,5 @@ number1 = 9/3+2;
 
 var number2: float;
 number2 = number0 + number1;
+
+is_even = ((number1 % 2) == 0);

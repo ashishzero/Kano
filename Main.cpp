@@ -50,6 +50,12 @@ Binary_Operator_Kind token_to_binary_operator(Token_Kind kind) {
 		case TOKEN_KIND_BITWISE_AND: return BINARY_OPERATOR_BITWISE_AND;
 		case TOKEN_KIND_BITWISE_XOR: return BINARY_OPERATOR_BITWISE_XOR;
 		case TOKEN_KIND_BITWISE_OR: return BINARY_OPERATOR_BITWISE_OR;
+		case TOKEN_KIND_RELATIONAL_GREATER: return BINARY_OPERATOR_RELATIONAL_GREATER;
+		case TOKEN_KIND_RELATIONAL_LESS: return BINARY_OPERATOR_RELATIONAL_LESS;
+		case TOKEN_KIND_RELATIONAL_GREATER_EQUAL: return BINARY_OPERATOR_RELATIONAL_GREATER_EQUAL;
+		case TOKEN_KIND_RELATIONAL_LESS_EQUAL: return BINARY_OPERATOR_RELATIONAL_LESS_EQUAL;
+		case TOKEN_KIND_COMPARE_EQUAL: return BINARY_OPERATOR_COMPARE_EQUAL;
+		case TOKEN_KIND_COMPARE_NOT_EQUAL: return BINARY_OPERATOR_COMPARE_NOT_EQUAL;
 		NoDefaultCase();
 	}
 
@@ -622,6 +628,12 @@ int main() {
 		resolver.binary_operators[BINARY_OPERATOR_SUBTRACTION].add(binary_operator_real);
 		resolver.binary_operators[BINARY_OPERATOR_MULTIPLICATION].add(binary_operator_real);
 		resolver.binary_operators[BINARY_OPERATOR_DIVISION].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_GREATER].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_LESS].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_GREATER_EQUAL].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_LESS_EQUAL].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_COMPARE_EQUAL].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_COMPARE_NOT_EQUAL].add(binary_operator_real);
 	}
 
 	{
@@ -640,6 +652,12 @@ int main() {
 		resolver.binary_operators[BINARY_OPERATOR_BITWISE_AND].add(binary_operator_int);
 		resolver.binary_operators[BINARY_OPERATOR_BITWISE_XOR].add(binary_operator_int);
 		resolver.binary_operators[BINARY_OPERATOR_BITWISE_OR].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_GREATER].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_LESS].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_GREATER_EQUAL].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_LESS_EQUAL].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_COMPARE_EQUAL].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_COMPARE_NOT_EQUAL].add(binary_operator_int);
 	}
 
 	{
@@ -677,6 +695,12 @@ int main() {
 		resolver.binary_operators[BINARY_OPERATOR_MULTIPLICATION].add(binary_operator_bool);
 		resolver.binary_operators[BINARY_OPERATOR_DIVISION].add(binary_operator_bool);
 		resolver.binary_operators[BINARY_OPERATOR_REMAINDER].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_GREATER].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_LESS].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_GREATER_EQUAL].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_LESS_EQUAL].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_COMPARE_EQUAL].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_COMPARE_NOT_EQUAL].add(binary_operator_bool);
 	}
 
 	{

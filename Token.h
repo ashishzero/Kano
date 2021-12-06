@@ -26,6 +26,13 @@ enum Token_Kind {
 
 	TOKEN_KIND_LOGICAL_NOT,
 
+	TOKEN_KIND_RELATIONAL_GREATER,
+	TOKEN_KIND_RELATIONAL_LESS,
+	TOKEN_KIND_RELATIONAL_GREATER_EQUAL,
+	TOKEN_KIND_RELATIONAL_LESS_EQUAL,
+	TOKEN_KIND_COMPARE_EQUAL,
+	TOKEN_KIND_COMPARE_NOT_EQUAL,
+
 	TOKEN_KIND_REAL,
 	TOKEN_KIND_INTEGER,
 
@@ -82,6 +89,9 @@ static inline String token_kind_string(Token_Kind kind) {
 		"&", "^", "|", "~",
 
 		"!",
+
+		">", "<", ">=", "<=",
+		"==", "!=",
 
 		"real number",
 		"integer number",
