@@ -6,7 +6,8 @@ double evaluate_expression(Code_Node* root);
 
 double evaluate_node_literal(Code_Node_Literal* root) {
 	auto node = root;
-	return node->value;
+	Assert(root->type.kind == CODE_TYPE_REAL);
+	return node->data.real.value;
 }
 double evaluate_unary_operator(Code_Node_Unary_Operator* root) {
 	auto node = root;

@@ -120,6 +120,13 @@ struct Bucket_Array {
 	}
 };
 
+#define ForBucketArray(pBucket, pBucketArray) \
+	for (auto pBucket = &(pBucketArray).first; pBucket; pBucket = pBucket->next)
+
+#define ForBucket(nIndex, pBucket, pBukcetArray)	\
+	auto nMaxIter = (pBucket)->next ? (pBukcetArray).bucket_size() : (pBukcetArray).index; \
+	for (uint32_t nIndex = 0; nIndex < nMaxIter; ++nIndex)
+
 struct Symbol {
 	String          name;
 	Code_Type       type;
@@ -225,6 +232,7 @@ struct Code_Type_Resolver {
 
 	Bucket_Array<Unary_Operator, 8>  unary_operators[_UNARY_OPERATOR_COUNT];
 	Bucket_Array<Binary_Operator, 8> binary_operators[_BINARY_OPERATOR_COUNT];
+	Bucket_Array< Assignment, 8>     assignments;
 };
 
 Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Syntax_Node_Literal *root);
@@ -244,8 +252,23 @@ Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Syntax_Node_Bl
 
 Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Syntax_Node_Literal *root) {
 	auto node = new Code_Node_Literal;
-	node->type.kind = CODE_TYPE_REAL;
-	node->value     = root->value;
+
+	switch (root->value.kind) {
+		case Literal::INTEGER: 
+		{
+			node->type.kind          = CODE_TYPE_INTEGER;
+			node->data.integer.value = root->value.data.integer;
+		} break;
+
+		case Literal::REAL:
+		{
+			node->type.kind       = CODE_TYPE_REAL;
+			node->data.real.value = root->value.data.real;
+		} break;
+
+		NoDefaultCase();
+	}
+
 	return node;
 }
 
@@ -294,18 +317,17 @@ Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolv
 
 	auto &operators = resolver->unary_operators[op_kind];
 
-	for (auto buk = &operators.first; buk; buk = buk->next) {
-		auto max_count = buk->next ? operators.bucket_size() : operators.index;
-		for (uint32_t index = 0; index < max_count; ++index) {
-			auto op = &buk->data[index];
+	ForBucketArray(bucket, operators) {
+		ForBucket(index, bucket, operators) {
+			auto op = &bucket->data[index];
 
 			if (op->parameter.kind == child->type.kind) {
 				auto node = new Code_Node_Unary_Operator;
 
-				node->type     = op->output;
-				node->child    = child;
-				node->op_kind  = op_kind;
-				node->op       = op;
+				node->type = op->output;
+				node->child = child;
+				node->op_kind = op_kind;
+				node->op = op;
 
 				return node;
 			}
@@ -325,20 +347,19 @@ Code_Node_Binary_Operator *code_resolve_binary_operator(Code_Type_Resolver *reso
 
 	auto &operators = resolver->binary_operators[op_kind];
 
-	for (auto buk = &operators.first; buk; buk = buk->next) {
-		auto max_count = buk->next ? operators.bucket_size() : operators.index;
-		for (uint32_t index = 0; index < max_count; ++index) {
-			auto op = &buk->data[index];
+	ForBucketArray(bucket, operators) {
+		ForBucket(index, bucket, operators) {
+			auto op = &bucket->data[index];
 
 			if (op->parameters[0].kind == left->type.kind &&
 				op->parameters[1].kind == right->type.kind) {
 				auto node = new Code_Node_Binary_Operator;
 
-				node->type     = op->output;
-				node->left     = left;
-				node->right    = right;
-				node->op_kind  = op_kind;
-				node->op       = op;
+				node->type = op->output;
+				node->left = left;
+				node->right = right;
+				node->op_kind = op_kind;
+				node->op = op;
 
 				return node;
 			}
@@ -373,12 +394,21 @@ Code_Node_Assignment *code_resolve_assignment(Code_Type_Resolver *resolver, Synt
 	auto destination = code_resolve_destination(resolver, root->left);
 	auto value       = code_resolve_root_expression(resolver, root->right);
 
-	if (destination->type.kind == value->type.kind) {
-		auto assignment         = new Code_Node_Assignment;
-		assignment->destination = destination;
-		assignment->value       = value;
-		assignment->type        = destination->type;
-		return assignment;
+	auto &assignments = resolver->assignments;
+
+	ForBucketArray(bucket, assignments) {
+		ForBucket(index, bucket, assignments) {
+			auto assign = &bucket->data[index];
+
+			if (assign->destination.kind == destination->type.kind &&
+				assign->value.kind == value->type.kind) {
+				auto node         = new Code_Node_Assignment;
+				node->destination = destination;
+				node->value       = value;
+				node->type        = destination->type;
+				return node;
+			}
+		}
 	}
 
 	Unimplemented();
@@ -509,24 +539,102 @@ int main() {
 	Code_Type_Resolver resolver;
 
 	{
-		Unary_Operator unary_operator;
-		unary_operator.parameter.kind = CODE_TYPE_REAL;
-		unary_operator.output.kind    = CODE_TYPE_REAL;
+		Unary_Operator unary_operator_real;
+		unary_operator_real.parameter.kind = CODE_TYPE_REAL;
+		unary_operator_real.output.kind    = CODE_TYPE_REAL;
 
-		resolver.unary_operators[UNARY_OPERATOR_PLUS].add(unary_operator);
-		resolver.unary_operators[UNARY_OPERATOR_MINUS].add(unary_operator);
+		resolver.unary_operators[UNARY_OPERATOR_PLUS].add(unary_operator_real);
+		resolver.unary_operators[UNARY_OPERATOR_MINUS].add(unary_operator_real);
 	}
 
 	{
-		Binary_Operator binary_operator;
-		binary_operator.parameters[0].kind = CODE_TYPE_REAL;
-		binary_operator.parameters[1].kind = CODE_TYPE_REAL;
-		binary_operator.output.kind = CODE_TYPE_REAL;
+		Unary_Operator unary_operator_int;
+		unary_operator_int.parameter.kind = CODE_TYPE_INTEGER;
+		unary_operator_int.output.kind    = CODE_TYPE_INTEGER;
 
-		resolver.binary_operators[BINARY_OPERATOR_ADD].add(binary_operator);
-		resolver.binary_operators[BINARY_OPERATOR_SUB].add(binary_operator);
-		resolver.binary_operators[BINARY_OPERATOR_MUL].add(binary_operator);
-		resolver.binary_operators[BINARY_OPERATOR_DIV].add(binary_operator);
+		resolver.unary_operators[UNARY_OPERATOR_PLUS].add(unary_operator_int);
+		resolver.unary_operators[UNARY_OPERATOR_MINUS].add(unary_operator_int);
+	}
+
+	{
+		Unary_Operator unary_operator_int_to_real;
+		unary_operator_int_to_real.parameter.kind = CODE_TYPE_INTEGER;
+		unary_operator_int_to_real.output.kind    = CODE_TYPE_REAL;
+
+		resolver.unary_operators[UNARY_OPERATOR_PLUS].add(unary_operator_int_to_real);
+		resolver.unary_operators[UNARY_OPERATOR_MINUS].add(unary_operator_int_to_real);
+	}
+
+	{
+		Binary_Operator binary_operator_real;
+		binary_operator_real.parameters[0].kind = CODE_TYPE_REAL;
+		binary_operator_real.parameters[1].kind = CODE_TYPE_REAL;
+		binary_operator_real.output.kind        = CODE_TYPE_REAL;
+
+		resolver.binary_operators[BINARY_OPERATOR_ADD].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_SUB].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_MUL].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_DIV].add(binary_operator_real);
+	}
+
+	{
+		Binary_Operator binary_operator_int;
+		binary_operator_int.parameters[0].kind = CODE_TYPE_INTEGER;
+		binary_operator_int.parameters[1].kind = CODE_TYPE_INTEGER;
+		binary_operator_int.output.kind        = CODE_TYPE_INTEGER;
+
+		resolver.binary_operators[BINARY_OPERATOR_ADD].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_SUB].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_MUL].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_DIV].add(binary_operator_int);
+	}
+
+	{
+		Binary_Operator binary_operator_int_real;
+		binary_operator_int_real.parameters[0].kind = CODE_TYPE_INTEGER;
+		binary_operator_int_real.parameters[1].kind = CODE_TYPE_REAL;
+		binary_operator_int_real.output.kind        = CODE_TYPE_REAL;
+
+		resolver.binary_operators[BINARY_OPERATOR_ADD].add(binary_operator_int_real);
+		resolver.binary_operators[BINARY_OPERATOR_SUB].add(binary_operator_int_real);
+		resolver.binary_operators[BINARY_OPERATOR_MUL].add(binary_operator_int_real);
+		resolver.binary_operators[BINARY_OPERATOR_DIV].add(binary_operator_int_real);
+	}
+
+	{
+		Binary_Operator binary_operator_real_int;
+		binary_operator_real_int.parameters[0].kind = CODE_TYPE_REAL;
+		binary_operator_real_int.parameters[1].kind = CODE_TYPE_INTEGER;
+		binary_operator_real_int.output.kind        = CODE_TYPE_REAL;
+
+		resolver.binary_operators[BINARY_OPERATOR_ADD].add(binary_operator_real_int);
+		resolver.binary_operators[BINARY_OPERATOR_SUB].add(binary_operator_real_int);
+		resolver.binary_operators[BINARY_OPERATOR_MUL].add(binary_operator_real_int);
+		resolver.binary_operators[BINARY_OPERATOR_DIV].add(binary_operator_real_int);
+	}
+
+	{
+		Assignment assignment_real;
+		assignment_real.destination.kind = CODE_TYPE_REAL;
+		assignment_real.value.kind       = CODE_TYPE_REAL;
+
+		resolver.assignments.add(assignment_real);
+	}
+
+	{
+		Assignment assignment_int;
+		assignment_int.destination.kind = CODE_TYPE_INTEGER;
+		assignment_int.value.kind       = CODE_TYPE_INTEGER;
+
+		resolver.assignments.add(assignment_int);
+	}
+
+	{
+		Assignment assignment_int_real;
+		assignment_int_real.destination.kind = CODE_TYPE_REAL;
+		assignment_int_real.value.kind       = CODE_TYPE_INTEGER;
+
+		resolver.assignments.add(assignment_int_real);
 	}
 
 	{

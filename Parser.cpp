@@ -160,15 +160,17 @@ Syntax_Node *parse_subexpression(Parser *parser, uint32_t prec) {
 	}
 
 	if (parser_accept_token(parser, TOKEN_KIND_REAL)) {
-		auto node = parser_new_syntax_node<Syntax_Node_Literal>(parser);
-		node->value = parser->value.real;
+		auto node             = parser_new_syntax_node<Syntax_Node_Literal>(parser);
+		node->value.kind      = Literal::REAL;
+		node->value.data.real = (float)parser->value.real;
 		parser_finish_syntax_node(parser, node);
 		return node;
 	}
 
 	if (parser_accept_token(parser, TOKEN_KIND_INTEGER)) {
-		auto node = parser_new_syntax_node<Syntax_Node_Literal>(parser);
-		node->value = (double)parser->value.integer;
+		auto node                = parser_new_syntax_node<Syntax_Node_Literal>(parser);
+		node->value.kind         = Literal::INTEGER;
+		node->value.data.integer = (int32_t)parser->value.integer;
 		parser_finish_syntax_node(parser, node);
 		return node;
 	}

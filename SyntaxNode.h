@@ -54,10 +54,24 @@ struct Syntax_Node {
 	Syntax_Location  location;
 };
 
+struct Literal {
+	enum Kind {
+		INTEGER, REAL
+	};
+
+	union Value {
+		int32_t integer = 0;
+		float   real;
+	};
+
+	Kind  kind = INTEGER;
+	Value data;
+};
+
 struct Syntax_Node_Literal : public Syntax_Node {
 	Syntax_Node_Literal() { kind = SYNTAX_NODE_LITERAL; }
 
-	double value = 0;
+	Literal value;
 };
 
 struct Syntax_Node_Identifier : public Syntax_Node {

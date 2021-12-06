@@ -19,12 +19,28 @@ enum Code_Node_Kind {
 enum Code_Type_Kind {
 	CODE_TYPE_NULL,
 	CODE_TYPE_REAL,
+	CODE_TYPE_INTEGER,
 
 	_CODE_TYPE_COUNT
 };
 
 struct Code_Type {
 	Code_Type_Kind kind = CODE_TYPE_NULL;
+};
+
+struct Code_Value_Integer {
+	int32_t value;
+};
+
+struct Code_Value_Real {
+	float value;
+};
+
+union Code_Value {
+	Code_Value_Integer integer;
+	Code_Value_Real    real;
+
+	Code_Value() = default;
 };
 
 struct Code_Node {
@@ -35,7 +51,7 @@ struct Code_Node {
 struct Code_Node_Literal : public Code_Node {
 	Code_Node_Literal() { kind = CODE_NODE_LITERAL; }
 
-	double value = 0;
+	Code_Value data;
 };
 
 struct Code_Node_Stack : public Code_Node {
@@ -99,6 +115,11 @@ struct Code_Node_Expression : public Code_Node {
 	Code_Node_Expression() { kind = CODE_NODE_EXPRESSION; }
 
 	Code_Node *child = nullptr;
+};
+
+struct Assignment {
+	Code_Type destination;
+	Code_Type value;
 };
 
 struct Code_Node_Assignment : public Code_Node {
