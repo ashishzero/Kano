@@ -2,4 +2,4 @@
 #include "Printer.h"
 #include "Token.h"
 
-double return_value(Code_Node* root, double result);
+void evaluate_node_block(Code_Node_Block* root);

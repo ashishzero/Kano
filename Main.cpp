@@ -233,7 +233,6 @@ int main() {
 
 	auto node = parse_block(&parser);
 	print(node);
-	double result=0;
 
 	printf("\n\nType Resolution\n");
 
@@ -260,9 +259,9 @@ int main() {
 		resolver.binary_operators[BINARY_OPERATOR_DIV].add(binary_operator);
 	}
 
-	auto code = code_resolve(&resolver, node);
-	print(code);
-	std::cout << return_value(code, result);
+	auto code = code_resolve_block(&resolver, node);
+	//print(code);
+	evaluate_node_block(code);
 	
 	return 0;
 }
