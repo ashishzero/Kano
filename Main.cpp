@@ -2,6 +2,8 @@
 #include "CodeNode.h"
 #include "Parser.h"
 #include "Printer.h"
+#include "Interp.h"
+#include <iostream>
 
 #include <stdlib.h>
 
@@ -536,6 +538,7 @@ int main() {
 
 	auto code = code_resolve_block(&resolver, node);
 	print_code(code);
+	evaluate_node_block(code);
 
 	return 0;
 }

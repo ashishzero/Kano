@@ -36,7 +36,11 @@
     <ClInclude Include="CodeNode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+<<<<<<< HEAD
+    <ClInclude Include="Interp.h">
+=======
     <ClInclude Include="StringBuilder.h">
+>>>>>>> ff9b825b5dea9dd0d7ca87dac227d436b602ac12
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -53,7 +57,11 @@
     <ClCompile Include="Printer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+<<<<<<< HEAD
+    <ClCompile Include="Interp.cpp">
+=======
     <ClCompile Include="StringBuilder.cpp">
+>>>>>>> ff9b825b5dea9dd0d7ca87dac227d436b602ac12
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
