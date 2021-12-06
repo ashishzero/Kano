@@ -75,6 +75,8 @@ struct Code_Node_Destination : public Code_Node {
 enum Unary_Operator_Kind {
 	UNARY_OPERATOR_PLUS,
 	UNARY_OPERATOR_MINUS,
+	UNARY_OPERATOR_BITWISE_NOT,
+	UNARY_OPERATOR_LOGICAL_NOT,
 
 	_UNARY_OPERATOR_COUNT
 };

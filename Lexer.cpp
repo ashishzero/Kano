@@ -227,6 +227,8 @@ void lexer_next(Lexer *lexer) {
 			case '&': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_BITWISE_AND); return;
 			case '^': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_BITWISE_XOR); return;
 			case '|': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_BITWISE_OR); return;
+			case '~': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_BITWISE_NOT); return;
+			case '!': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_LOGICAL_NOT); return;
 		}
 
 		if (lexer_isalpha(*lexer->cursor)) {

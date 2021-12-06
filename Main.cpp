@@ -29,6 +29,8 @@ Unary_Operator_Kind token_to_unary_operator(Token_Kind kind) {
 	switch (kind) {
 		case TOKEN_KIND_PLUS:  return UNARY_OPERATOR_PLUS;
 		case TOKEN_KIND_MINUS: return UNARY_OPERATOR_MINUS;
+		case TOKEN_KIND_BITWISE_NOT: return UNARY_OPERATOR_BITWISE_NOT;
+		case TOKEN_KIND_LOGICAL_NOT: return UNARY_OPERATOR_LOGICAL_NOT;
 		NoDefaultCase();
 	}
 
@@ -590,6 +592,15 @@ int main() {
 
 		resolver.unary_operators[UNARY_OPERATOR_PLUS].add(unary_operator_int);
 		resolver.unary_operators[UNARY_OPERATOR_MINUS].add(unary_operator_int);
+		resolver.unary_operators[UNARY_OPERATOR_BITWISE_NOT].add(unary_operator_int);
+	}
+
+	{
+		Unary_Operator unary_operator_bool;
+		unary_operator_bool.parameter.kind = CODE_TYPE_BOOL;
+		unary_operator_bool.output.kind    = CODE_TYPE_BOOL;
+
+		resolver.unary_operators[UNARY_OPERATOR_LOGICAL_NOT].add(unary_operator_bool);
 	}
 
 	{
