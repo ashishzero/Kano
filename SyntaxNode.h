@@ -95,7 +95,8 @@ struct Syntax_Node_Binary_Operator : public Syntax_Node {
 struct Syntax_Node_Type : public Syntax_Node {
 	Syntax_Node_Type() { kind = SYNTAX_NODE_TYPE; }
 
-	Token_Kind token_type = TOKEN_KIND_ERROR;
+	Token_Kind token_type  = TOKEN_KIND_ERROR;
+	Syntax_Node_Type *next = nullptr;
 };
 
 struct Syntax_Node_Assignment : public Syntax_Node {

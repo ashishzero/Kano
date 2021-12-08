@@ -21,12 +21,15 @@ enum Code_Type_Kind {
 	CODE_TYPE_INTEGER,
 	CODE_TYPE_REAL,
 	CODE_TYPE_BOOL,
+	CODE_TYPE_POINTER,
+//	CODE_TYPE_MEMORY_ADDRESS,
 
 	_CODE_TYPE_COUNT
 };
 
 struct Code_Type {
 	Code_Type_Kind kind = CODE_TYPE_NULL;
+	Code_Type *next     = nullptr;
 };
 
 struct Code_Value_Integer {
@@ -51,7 +54,7 @@ union Code_Value {
 
 struct Code_Node {
 	Code_Node_Kind  kind = CODE_NODE_NULL;
-	Code_Type       type;
+	Code_Type       *type = nullptr;
 };
 
 struct Code_Node_Literal : public Code_Node {
@@ -77,6 +80,7 @@ enum Unary_Operator_Kind {
 	UNARY_OPERATOR_MINUS,
 	UNARY_OPERATOR_BITWISE_NOT,
 	UNARY_OPERATOR_LOGICAL_NOT,
+	UNARY_OPERATOR_ADDRESS_OF,
 
 	_UNARY_OPERATOR_COUNT
 };
@@ -90,7 +94,7 @@ struct Code_Node_Unary_Operator : public Code_Node {
 	Code_Node_Unary_Operator() { kind = CODE_NODE_UNARY_OPERATOR; }
 
 	Unary_Operator_Kind op_kind;
-	Unary_Operator *op = nullptr;
+	// Unary_Operator *op = nullptr; // FIXME: DO WE NEED THIS?
 
 	Code_Node *child = nullptr;
 };
@@ -125,7 +129,6 @@ struct Code_Node_Binary_Operator : public Code_Node {
 	Code_Node_Binary_Operator() { kind = CODE_NODE_BINARY_OPERATOR; }
 
 	Binary_Operator_Kind op_kind;
-	Binary_Operator *op = nullptr;
 
 	Code_Node *left = nullptr;
 	Code_Node *right = nullptr;

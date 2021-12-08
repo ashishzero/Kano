@@ -3,7 +3,6 @@
 #include "Parser.h"
 #include "Printer.h"
 #include "Interp.h"
-#include <iostream>
 
 #include <stdlib.h>
 
@@ -31,6 +30,7 @@ Unary_Operator_Kind token_to_unary_operator(Token_Kind kind) {
 		case TOKEN_KIND_MINUS: return UNARY_OPERATOR_MINUS;
 		case TOKEN_KIND_BITWISE_NOT: return UNARY_OPERATOR_BITWISE_NOT;
 		case TOKEN_KIND_LOGICAL_NOT: return UNARY_OPERATOR_LOGICAL_NOT;
+		case TOKEN_KIND_AMPERSAND: return UNARY_OPERATOR_ADDRESS_OF;
 		NoDefaultCase();
 	}
 
@@ -47,7 +47,7 @@ Binary_Operator_Kind token_to_binary_operator(Token_Kind kind) {
 		case TOKEN_KIND_REMAINDER: return BINARY_OPERATOR_REMAINDER;
 		case TOKEN_KIND_BITWISE_SHIFT_RIGHT: return BINARY_OPERATOR_BITWISE_SHIFT_RIGHT;
 		case TOKEN_KIND_BITWISE_SHIFT_LEFT: return BINARY_OPERATOR_BITWISE_SHIFT_LEFT;
-		case TOKEN_KIND_BITWISE_AND: return BINARY_OPERATOR_BITWISE_AND;
+		case TOKEN_KIND_AMPERSAND: return BINARY_OPERATOR_BITWISE_AND;
 		case TOKEN_KIND_BITWISE_XOR: return BINARY_OPERATOR_BITWISE_XOR;
 		case TOKEN_KIND_BITWISE_OR: return BINARY_OPERATOR_BITWISE_OR;
 		case TOKEN_KIND_RELATIONAL_GREATER: return BINARY_OPERATOR_RELATIONAL_GREATER;
@@ -143,7 +143,7 @@ struct Bucket_Array {
 
 struct Symbol {
 	String          name;
-	Code_Type       type;
+	Code_Type       *type;
 	uint32_t        flags;
 	uint32_t        address;
 	Syntax_Location location;
@@ -253,7 +253,7 @@ Code_Node_Binary_Operator *code_resolve_binary_operator(Code_Type_Resolver *reso
 Code_Node_Assignment *code_resolve_assignment(Code_Type_Resolver *resolver, Syntax_Node_Assignment *root);
 
 Code_Node_Expression *code_resolve_root_expression(Code_Type_Resolver *resolver, Syntax_Node_Expression *root);
-Code_Type code_resolve_type(Code_Type_Resolver *resolver, Syntax_Node_Type *root);
+Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Syntax_Node_Type *root);
 void code_resolve_declaration(Code_Type_Resolver *resolver, Syntax_Node_Declaration *root);
 
 Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Syntax_Node_Statement *root);
@@ -266,19 +266,28 @@ Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Syntax_Nod
 	switch (root->value.kind) {
 		case Literal::INTEGER: 
 		{
-			node->type.kind          = CODE_TYPE_INTEGER;
+			// TODO: Make single type table with type information
+			Code_Type *type          = new Code_Type;
+			type->kind               = CODE_TYPE_INTEGER;
+			node->type               = type;
 			node->data.integer.value = root->value.data.integer;
 		} break;
 
 		case Literal::REAL:
 		{
-			node->type.kind       = CODE_TYPE_REAL;
+			// TODO: Make single type table with type information
+			Code_Type *type       = new Code_Type;
+			type->kind            = CODE_TYPE_REAL;
+			node->type            = type;
 			node->data.real.value = root->value.data.real;
 		} break;
 
 		case Literal::BOOL:
 		{
-			node->type.kind          = CODE_TYPE_BOOL;
+			// TODO: Make single type table with type information
+			Code_Type *type          = new Code_Type;
+			type->kind               = CODE_TYPE_BOOL;
+			node->type               = type;
 			node->data.boolean.value = root->value.data.boolean;
 		} break;
 
@@ -332,22 +341,43 @@ Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolv
 	auto op_kind = token_to_unary_operator(root->op);
 
 	auto &operators = resolver->unary_operators[op_kind];
-
 	ForBucketArray(bucket, operators) {
+
 		ForBucket(index, bucket, operators) {
 			auto op = &bucket->data[index];
 
-			if (op->parameter.kind == child->type.kind) {
+			// TODO: Recursively check for pointer types
+			if (op->parameter.kind == child->type->kind) {
 				auto node = new Code_Node_Unary_Operator;
 
-				node->type = op->output;
-				node->child = child;
-				node->op_kind = op_kind;
-				node->op = op;
+				// TODO: DON'T ALLOCATE
+				Code_Type *type = new Code_Type;
+				type->kind     = op->output.kind;
+				node->type     = type;
+				node->child    = child;
+				node->op_kind  = op_kind;
 
 				return node;
 			}
 		}
+	}
+
+	if (op_kind == UNARY_OPERATOR_ADDRESS_OF && child->kind == CODE_NODE_STACK) {
+		auto node = new Code_Node_Unary_Operator;
+
+		// TODO: DON'T ALLOCATE
+		Code_Type *type = new Code_Type;
+		type->kind = CODE_TYPE_POINTER;
+		type->next = new Code_Type;
+
+		// TODO: RECURSIVELY CHECK!!
+		type->next->kind = child->type->kind;
+
+		node->type    = type;
+		node->child   = child;
+		node->op_kind = op_kind;
+
+		return node;
 	}
 
 	Unimplemented();
@@ -367,15 +397,18 @@ Code_Node_Binary_Operator *code_resolve_binary_operator(Code_Type_Resolver *reso
 		ForBucket(index, bucket, operators) {
 			auto op = &bucket->data[index];
 
-			if (op->parameters[0].kind == left->type.kind &&
-				op->parameters[1].kind == right->type.kind) {
+			// TODO: Recursively check for pointer types
+			if (op->parameters[0].kind == left->type->kind &&
+				op->parameters[1].kind == right->type->kind) {
 				auto node = new Code_Node_Binary_Operator;
 
-				node->type = op->output;
-				node->left = left;
+				// TODO: DON'T ALLOCATE
+				Code_Type *type = new Code_Type;
+				type->kind      = op->output.kind;
+				node->type      = type;
+				node->left      = left;
 				node->right = right;
 				node->op_kind = op_kind;
-				node->op = op;
 
 				return node;
 			}
@@ -416,8 +449,9 @@ Code_Node_Assignment *code_resolve_assignment(Code_Type_Resolver *resolver, Synt
 		ForBucket(index, bucket, assignments) {
 			auto assign = &bucket->data[index];
 
-			if (assign->destination.kind == destination->type.kind &&
-				assign->value.kind == value->type.kind) {
+			// TODO: RECURSIVE TYPE CHECKING
+			if (assign->destination.kind == destination->type->kind &&
+				assign->value.kind == value->type->kind) {
 				auto node         = new Code_Node_Assignment;
 				node->destination = destination;
 				node->value       = value;
@@ -425,6 +459,19 @@ Code_Node_Assignment *code_resolve_assignment(Code_Type_Resolver *resolver, Synt
 				return node;
 			}
 		}
+	}
+
+	// TODO: RECURSIVE TYPE CHECKING
+	// We don't need to do this after we implement recursive type checking
+	// in the above loop!!!
+	if (destination->type->kind == CODE_TYPE_POINTER &&
+		value->type->kind == CODE_TYPE_POINTER &&
+		destination->type->next->kind == value->type->next->kind) {
+		auto node         = new Code_Node_Assignment;
+		node->destination = destination;
+		node->value       = value;
+		node->type        = destination->type;
+		return node;
 	}
 
 	Unimplemented();
@@ -441,32 +488,45 @@ Code_Node_Expression *code_resolve_root_expression(Code_Type_Resolver *resolver,
 	return expression;
 }
 
-Code_Type code_resolve_type(Code_Type_Resolver *resolver, Syntax_Node_Type *root) {
+Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Syntax_Node_Type *root) {
+	Code_Type *type = new Code_Type;
+
 	switch (root->token_type) {
 		case TOKEN_KIND_INT: 
 		{
-			Code_Type type;
-			type.kind = CODE_TYPE_INTEGER;
+			type->kind = CODE_TYPE_INTEGER;
+			Assert(root->next == nullptr);
 			return type;
 		} break;
 
 		case TOKEN_KIND_FLOAT:
 		{
-			Code_Type type;
-			type.kind = CODE_TYPE_REAL;
+			type->kind = CODE_TYPE_REAL;
+			Assert(root->next == nullptr);
 			return type;
 		} break;
 
 		case TOKEN_KIND_BOOL:
 		{
-			Code_Type type;
-			type.kind = CODE_TYPE_BOOL;
+			type->kind = CODE_TYPE_BOOL;
+			Assert(root->next == nullptr);
 			return type;
 		} break;
+
+		case TOKEN_KIND_ASTRICK: 
+		{
+			type->kind = CODE_TYPE_POINTER;
+			Assert(root->next);
+			type->next = code_resolve_type(resolver, root->next);
+			return type;
+		} break;
+
+		default: {
+			Unimplemented();
+		}
 	}
 
-	Unreachable();
-	return Code_Type{};
+	return type;
 }
 
 void code_resolve_declaration(Code_Type_Resolver *resolver, Syntax_Node_Declaration *root) {
@@ -486,10 +546,11 @@ void code_resolve_declaration(Code_Type_Resolver *resolver, Syntax_Node_Declarat
 			// TODO: type info
 
 			uint32_t size = 0;
-			switch (symbol.type.kind) {
+			switch (symbol.type->kind) {
 				case CODE_TYPE_INTEGER: size = sizeof(int32_t); break;
 				case CODE_TYPE_REAL: size = sizeof(float); break;
 				case CODE_TYPE_BOOL: size = sizeof(bool); break;
+				case CODE_TYPE_POINTER: size = sizeof(void *); break;
 				NoDefaultCase();
 			}
 
@@ -533,7 +594,9 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Syntax
 
 Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Syntax_Node_Block *root) {
 	Code_Node_Block *block = new Code_Node_Block;
-	block->type.kind       = CODE_TYPE_NULL;
+
+	// TODO: DON'T ALLOCATE
+	block->type = new Code_Type;
 
 	Code_Node_Statement statement_stub_head;
 	Code_Node_Statement *parent_statement = &statement_stub_head;
@@ -754,7 +817,7 @@ int main() {
 	{
 		Symbol sym;
 		sym.name      = "";
-		sym.type.kind = CODE_TYPE_NULL;
+		sym.type      = new Code_Type;
 		resolver.symbols.buffer.add(sym);
 	}
 

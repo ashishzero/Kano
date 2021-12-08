@@ -2,6 +2,10 @@
 var number0: float;
 var number1: int;
 
+var ptr: *float;
+
+ptr = &number0;
+
 var is_even: bool;
 is_even = !false;
 
