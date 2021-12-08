@@ -538,7 +538,9 @@ int main() {
 
 	auto code = code_resolve_block(&resolver, node);
 	print_code(code);
-	evaluate_node_block(code);
+	Interp* interp = new Interp;
+	//interp->stack = new uint8_t[1000];
+	evaluate_node_block(code,interp);
 
 	return 0;
 }
