@@ -241,7 +241,7 @@ Code_Node_Expression *code_resolve_root_expression(Code_Type_Resolver *resolver,
 Code_Node_Assignment *code_resolve_assignment(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Assignment *root);
 Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Type *root);
 
-void code_resolve_declaration(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Declaration *root);
+Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Declaration *root);
 Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Statement *root);
 Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Symbol_Table *parent_symbols, Syntax_Node_Block *root);
 
@@ -293,7 +293,7 @@ Code_Node_Address *code_resolve_identifier(Code_Type_Resolver *resolver, Symbol_
 		auto address = new Code_Node_Address;
 		address->offset = symbol->address;
 		address->flags  = symbol->flags;
-		address->flags |= SYMBOL_BIT_RVALUE;
+		address->flags |= SYMBOL_BIT_LVALUE;
 		address->type   = symbol->type;
 		return address;
 	}
@@ -356,7 +356,7 @@ Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolv
 		}
 	}
 
-	if (op_kind == UNARY_OPERATOR_POINTER_TO && (child->flags & SYMBOL_BIT_RVALUE)) {
+	if (op_kind == UNARY_OPERATOR_POINTER_TO && (child->flags & SYMBOL_BIT_LVALUE)) {
 		auto node = new Code_Node_Unary_Operator;
 		auto type = new Code_Type_Pointer;
 
@@ -456,7 +456,7 @@ Code_Node_Assignment *code_resolve_assignment(Code_Type_Resolver *resolver, Symb
 	auto destination = code_resolve_root_expression(resolver, symbols, root->left);
 	auto value = code_resolve_root_expression(resolver, symbols, root->right);
 
-	if (destination->flags & SYMBOL_BIT_RVALUE) {
+	if (destination->flags & SYMBOL_BIT_LVALUE) {
 		if (!(destination->flags & SYMBOL_BIT_CONSTANT)) {
 			bool match = false;
 
@@ -522,7 +522,7 @@ Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols
 	return type;
 }
 
-void code_resolve_declaration(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Declaration *root) {
+Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Declaration *root) {
 	String sym_name = root->identifier;
 
 	if (!symbol_table_get(symbols, sym_name, false)) {
@@ -542,12 +542,38 @@ void code_resolve_declaration(Code_Type_Resolver *resolver, Symbol_Table *symbol
 			resolver->vstack += size;
 		}
 
-		symbol_table_put(symbols, symbol);
-		return;
+		auto sym = symbol_table_put(symbols, symbol);
+
+		if (root->initializer) {
+			auto address    = new Code_Node_Address;
+			address->offset = sym->address;
+			address->flags  = sym->flags;
+			address->flags |= SYMBOL_BIT_LVALUE;
+			address->type   = sym->type;
+
+			auto destination   = new Code_Node_Expression;
+			destination->child = address;
+			destination->flags = address->flags;
+			destination->type  = address->type;
+
+			auto value = code_resolve_root_expression(resolver, symbols, root->initializer);
+			
+			auto assignment         = new Code_Node_Assignment;
+			assignment->type        = destination->type;
+			assignment->destination = destination;
+			assignment->value       = value;
+			assignment->flags      |= destination->flags;
+
+			return assignment;
+		}
+
+		return nullptr;
 	}
 
 	// Already defined in this scope previously
 	Unimplemented();
+
+	return nullptr;
 }
 
 Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Statement *root) {
@@ -595,7 +621,14 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
 
 		case SYNTAX_NODE_DECLARATION:
 		{
-			code_resolve_declaration(resolver, symbols, (Syntax_Node_Declaration *)node);
+			auto initialization = code_resolve_declaration(resolver, symbols, (Syntax_Node_Declaration *)node);
+
+			if (initialization) {
+				Code_Node_Statement *statement = new Code_Node_Statement;
+				statement->node                = initialization;
+				return statement;
+			}
+
 			return nullptr;
 		} break;
 

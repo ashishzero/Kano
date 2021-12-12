@@ -126,7 +126,8 @@ struct Syntax_Node_Declaration : public Syntax_Node {
 
 	uint32_t          flags = 0;
 	String            identifier;
-	Syntax_Node_Type *type  = nullptr;
+	Syntax_Node_Type *type              = nullptr;
+	Syntax_Node_Expression *initializer = nullptr;
 };
 
 struct Syntax_Node_Statement : public Syntax_Node {

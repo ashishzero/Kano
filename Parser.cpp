@@ -363,6 +363,14 @@ Syntax_Node_Declaration *parse_declaration(Parser *parser) {
 
 	declaration->type = parse_type(parser);
 
+	if (parser_accept_token(parser, TOKEN_KIND_EQUALS)) {
+		declaration->initializer = parse_root_expression(parser);
+	}
+	else if (declaration->flags & TOKEN_KIND_CONST) {
+		auto token = lexer_current_token(&parser->lexer);
+		parser_error(parser, token, "Constant expression must be initialized during declaration");
+	}
+
 	parser_finish_syntax_node(parser, declaration);
 	return declaration;
 }

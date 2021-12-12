@@ -1,6 +1,6 @@
 
 {
-	var number0: float;
+	var number0: float = 5;
 	var number1: int;
 
 	{
