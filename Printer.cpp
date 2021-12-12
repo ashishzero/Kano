@@ -140,6 +140,22 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
 		print_syntax(node->body, fp, child_indent, "Body");
 	} break;
 
+	case SYNTAX_NODE_WHILE:
+	{
+		auto node = (Syntax_Node_While *)root;
+		fprintf(fp, "While()\n");
+		print_syntax(node->condition, fp, child_indent, "Condition");
+		print_syntax(node->body, fp, child_indent, "Body");
+	} break;
+
+	case SYNTAX_NODE_DO:
+	{
+		auto node = (Syntax_Node_Do *)root;
+		fprintf(fp, "Do()\n");
+		print_syntax(node->body, fp, child_indent, "Body");
+		print_syntax(node->condition, fp, child_indent, "Condition");
+	} break;
+
 	case SYNTAX_NODE_DECLARATION:
 	{
 		auto node = (Syntax_Node_Declaration *)root;
@@ -279,6 +295,22 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title) 
 		print_code(node->condition, fp, child_indent, "Condition");
 		print_code(node->increment, fp, child_indent, "Increment");
 		print_code(node->body, fp, child_indent, "Body");
+	} break;
+
+	case CODE_NODE_WHILE:
+	{
+		auto node = (Code_Node_While *)root;
+		fprintf(fp, "While()\n");
+		print_code(node->condition, fp, child_indent, "Condition");
+		print_code(node->body, fp, child_indent, "Body");
+	} break;
+
+	case CODE_NODE_DO:
+	{
+		auto node = (Code_Node_Do *)root;
+		fprintf(fp, "Do()\n");
+		print_code(node->body, fp, child_indent, "Body");
+		print_code(node->condition, fp, child_indent, "Condition");
 	} break;
 
 	case CODE_NODE_BLOCK:

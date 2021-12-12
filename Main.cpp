@@ -678,6 +678,66 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
 			return statement;
 		} break;
 
+		case SYNTAX_NODE_WHILE:
+		{
+			auto while_node = (Syntax_Node_While *)node;
+
+			auto condition = code_resolve_root_expression(resolver, symbols, while_node->condition);
+
+			auto boolean = symbol_table_get(symbols, "bool");
+			if (!code_type_are_same(condition->child->type, boolean->type)) {
+				auto cast = code_implicit_cast(condition->child, boolean->type);
+				if (cast) {
+					condition->child = cast;
+				}
+				else {
+					Unimplemented();
+				}
+			}
+
+			auto while_code       = new Code_Node_While;
+			while_code->condition = condition;
+			while_code->body      = code_resolve_statement(resolver, symbols, while_node->body);
+
+			Code_Node_Statement *statement = new Code_Node_Statement;
+			statement->node = while_code;
+			return statement;
+		} break;
+
+		case SYNTAX_NODE_DO:
+		{
+			auto do_node = (Syntax_Node_Do *)node;
+
+			auto body = code_resolve_statement(resolver, symbols, do_node->body);
+
+			auto do_symbols = symbols;
+			if (body->node->kind == CODE_NODE_BLOCK) {
+				auto block = (Code_Node_Block *)body->node;
+				do_symbols = &block->symbols;
+			}
+
+			auto condition = code_resolve_root_expression(resolver, do_symbols, do_node->condition);
+
+			auto boolean = symbol_table_get(do_symbols, "bool");
+			if (!code_type_are_same(condition->child->type, boolean->type)) {
+				auto cast = code_implicit_cast(condition->child, boolean->type);
+				if (cast) {
+					condition->child = cast;
+				}
+				else {
+					Unimplemented();
+				}
+			}
+
+			auto do_code = new Code_Node_Do;
+			do_code->body      = body;
+			do_code->condition = condition;
+
+			Code_Node_Statement *statement = new Code_Node_Statement;
+			statement->node = do_code;
+			return statement;
+		} break;
+
 		case SYNTAX_NODE_DECLARATION:
 		{
 			auto initialization = code_resolve_declaration(resolver, symbols, (Syntax_Node_Declaration *)node);

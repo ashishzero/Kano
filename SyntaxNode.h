@@ -29,6 +29,8 @@ enum Syntax_Node_Kind {
 	SYNTAX_NODE_EXPRESSION,
 	SYNTAX_NODE_IF,
 	SYNTAX_NODE_FOR,
+	SYNTAX_NODE_WHILE,
+	SYNTAX_NODE_DO,
 	SYNTAX_NODE_DECLARATION,
 	SYNTAX_NODE_STATEMENT,
 	SYNTAX_NODE_BLOCK,
@@ -131,6 +133,20 @@ struct Syntax_Node_For : public Syntax_Node {
 	Syntax_Node_Expression *increment     = nullptr;
 
 	Syntax_Node_Statement *body = nullptr;
+};
+
+struct Syntax_Node_While : public Syntax_Node {
+	Syntax_Node_While() { kind = SYNTAX_NODE_WHILE; }
+
+	Syntax_Node_Expression *condition = nullptr;
+	Syntax_Node_Statement *body       = nullptr;
+};
+
+struct Syntax_Node_Do : public Syntax_Node {
+	Syntax_Node_Do() { kind = SYNTAX_NODE_DO; }
+
+	Syntax_Node_Statement *body       = nullptr;
+	Syntax_Node_Expression *condition = nullptr;
 };
 
 struct Syntax_Node_Declaration : public Syntax_Node {

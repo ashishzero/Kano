@@ -437,6 +437,44 @@ Syntax_Node_Statement *parse_statement(Parser *parser) {
 		statement->node = for_statement;
 	}
 
+	// while
+	else if (parser_accept_token(parser, TOKEN_KIND_WHILE)) {
+		auto while_statement = parser_new_syntax_node<Syntax_Node_While>(parser);
+
+		while_statement->condition = parse_root_expression(parser);
+
+		if (parser_accept_token(parser, TOKEN_KIND_DO)) {
+			while_statement->body = parse_statement(parser);
+		}
+		else if (parser_peek_token(parser, TOKEN_KIND_OPEN_CURLY_BRACKET)) {
+			while_statement->body = parse_statement(parser);
+		}
+		else {
+			auto token = lexer_current_token(&parser->lexer);
+			parser_error(parser, token, "Expected do or a block\n");
+		}
+
+		parser_finish_syntax_node(parser, while_statement);
+
+		statement->node = while_statement;
+	}
+
+	// do
+	else if (parser_accept_token(parser, TOKEN_KIND_DO)) {
+		auto do_statement = parser_new_syntax_node<Syntax_Node_Do>(parser);
+
+		do_statement->body = parse_statement(parser);
+
+		if (parser_expect_token(parser, TOKEN_KIND_WHILE)) {
+			do_statement->condition = parse_root_expression(parser);
+			parser_expect_token(parser, TOKEN_KIND_SEMICOLON);
+		}
+
+		parser_finish_syntax_node(parser, do_statement);
+
+		statement->node = do_statement;
+	}
+
 	// block
 	else if (parser_peek_token(parser, TOKEN_KIND_OPEN_CURLY_BRACKET)) {
 		auto block = parse_block(parser);

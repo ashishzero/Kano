@@ -84,6 +84,8 @@ enum Code_Node_Kind {
 	CODE_NODE_STATEMENT,
 	CODE_NODE_IF,
 	CODE_NODE_FOR,
+	CODE_NODE_WHILE,
+	CODE_NODE_DO,
 	CODE_NODE_BLOCK,
 
 	_CODE_NODE_COUNT,
@@ -230,6 +232,22 @@ struct Code_Node_For : public Code_Node {
 	Code_Node_Statement *body = nullptr;
 
 	Symbol_Table symbols;
+};
+
+struct Code_Node_While : public Code_Node {
+	Code_Node_While() { kind = CODE_NODE_WHILE; }
+
+	Code_Node_Expression *condition = nullptr;
+
+	Code_Node_Statement *body = nullptr;
+};
+
+struct Code_Node_Do : public Code_Node {
+	Code_Node_Do() { kind = CODE_NODE_DO; }
+
+	Code_Node_Statement *body = nullptr;
+
+	Code_Node_Expression *condition = nullptr;
 };
 
 struct Code_Node_Block : public Code_Node {
