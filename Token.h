@@ -53,6 +53,10 @@ enum Token_Kind {
 	TOKEN_KIND_THEN,
 	TOKEN_KIND_ELSE,
 
+	TOKEN_KIND_FOR,
+	TOKEN_KIND_WHILE,
+	TOKEN_KIND_DO,
+
 	TOKEN_KIND_IDENTIFIER,
 
 	TOKEN_KIND_END,
@@ -110,6 +114,8 @@ static inline String token_kind_string(Token_Kind kind) {
 		"int", "float", "bool",
 
 		"if", "then", "else",
+
+		"for", "while", "do",
 
 		"identifier",
 

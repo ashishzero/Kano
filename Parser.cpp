@@ -393,12 +393,6 @@ Syntax_Node_Statement *parse_statement(Parser *parser) {
 		parser_expect_token(parser, TOKEN_KIND_SEMICOLON);
 	}
 
-	// block
-	else if (parser_peek_token(parser, TOKEN_KIND_OPEN_CURLY_BRACKET)) {
-		auto block      = parse_block(parser);
-		statement->node = block;
-	}
-
 	// if
 	else if (parser_accept_token(parser, TOKEN_KIND_IF)) {
 		auto if_statement = parser_new_syntax_node<Syntax_Node_If>(parser);
@@ -423,6 +417,30 @@ Syntax_Node_Statement *parse_statement(Parser *parser) {
 		parser_finish_syntax_node(parser, if_statement);
 
 		statement->node = if_statement;
+	}
+
+	// for
+	else if (parser_accept_token(parser, TOKEN_KIND_FOR)) {
+		auto for_statement = parser_new_syntax_node<Syntax_Node_For>(parser);
+
+		for_statement->initialization = parse_statement(parser);
+
+		for_statement->condition = parse_root_expression(parser);
+		parser_expect_token(parser, TOKEN_KIND_SEMICOLON);
+
+		for_statement->increment = parse_root_expression(parser);
+
+		for_statement->body = parse_statement(parser);
+
+		parser_finish_syntax_node(parser, for_statement);
+
+		statement->node = for_statement;
+	}
+
+	// block
+	else if (parser_peek_token(parser, TOKEN_KIND_OPEN_CURLY_BRACKET)) {
+		auto block = parse_block(parser);
+		statement->node = block;
 	}
 
 	// simple expressions

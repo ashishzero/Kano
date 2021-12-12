@@ -130,6 +130,16 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
 		}
 	} break;
 
+	case SYNTAX_NODE_FOR:
+	{
+		auto node = (Syntax_Node_For *)root;
+		fprintf(fp, "For()\n");
+		print_syntax(node->initialization, fp, child_indent, "Initialization");
+		print_syntax(node->condition, fp, child_indent, "Condition");
+		print_syntax(node->increment, fp, child_indent, "Increment");
+		print_syntax(node->body, fp, child_indent, "Body");
+	} break;
+
 	case SYNTAX_NODE_DECLARATION:
 	{
 		auto node = (Syntax_Node_Declaration *)root;
@@ -257,8 +267,18 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title) 
 		print_code(node->true_statement, fp, child_indent, "True-Statement");
 
 		if (node->false_statement) {
-			print_code(node->true_statement, fp, child_indent, "False-Statement");
+			print_code(node->false_statement, fp, child_indent, "False-Statement");
 		}
+	} break;
+
+	case CODE_NODE_FOR:
+	{
+		auto node = (Code_Node_For *)root;
+		fprintf(fp, "For()\n");
+		print_code(node->initialization, fp, child_indent, "Initialization");
+		print_code(node->condition, fp, child_indent, "Condition");
+		print_code(node->increment, fp, child_indent, "Increment");
+		print_code(node->body, fp, child_indent, "Body");
 	} break;
 
 	case CODE_NODE_BLOCK:

@@ -271,13 +271,15 @@ void lexer_next(Lexer *lexer) {
 				"var", "const", 
 				"true", "false",
 				"int", "float", "bool",
-				"if", "then", "else", };
+				"if", "then", "else",
+				"for", "while", "do" };
 
 			static const Token_Kind KeyWordTokens[] = { 
 				TOKEN_KIND_VAR, TOKEN_KIND_CONST, 
 				TOKEN_KIND_TRUE, TOKEN_KIND_FALSE,
 				TOKEN_KIND_INT, TOKEN_KIND_FLOAT, TOKEN_KIND_BOOL,
-				TOKEN_KIND_IF, TOKEN_KIND_THEN, TOKEN_KIND_ELSE, };
+				TOKEN_KIND_IF, TOKEN_KIND_THEN, TOKEN_KIND_ELSE,
+				TOKEN_KIND_FOR, TOKEN_KIND_WHILE, TOKEN_KIND_DO, };
 
 			static_assert(ArrayCount(KeyWords) == ArrayCount(KeyWordTokens));
 

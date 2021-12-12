@@ -539,12 +539,26 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
 
 		auto symbol = symbol_table_put(symbols, in_symbol);
 
+		if (root->type) {
+			uint32_t size     = symbol->type->runtime_size;
+			resolver->vstack  = AlignPower2Up(resolver->vstack, size);
+			symbol->address   = resolver->vstack;
+			resolver->vstack += size;
+		}
+
+		Code_Node_Assignment *assignment = nullptr;
+
 		if (root->initializer) {
 			auto value = code_resolve_root_expression(resolver, symbols, root->initializer);
 
 			// Implicit type declaration
 			if (!symbol->type) {
-				symbol->type = value->type;
+				symbol->type      = value->type;
+
+				uint32_t size     = symbol->type->runtime_size;
+				resolver->vstack  = AlignPower2Up(resolver->vstack, size);
+				symbol->address   = resolver->vstack;
+				resolver->vstack += size;
 			}
 			else {
 				// If type is explicit, check if the types are same
@@ -559,11 +573,6 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
 				}
 			}
 
-			uint32_t size    = symbol->type->runtime_size;
-			resolver->vstack = AlignPower2Up(resolver->vstack, size);
-			symbol->address     = resolver->vstack;
-			resolver->vstack += size;
-
 			auto address    = new Code_Node_Address;
 			address->offset = symbol->address;
 			address->flags  = symbol->flags;
@@ -575,16 +584,14 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
 			destination->flags = address->flags;
 			destination->type  = address->type;
 			
-			auto assignment         = new Code_Node_Assignment;
+			assignment              = new Code_Node_Assignment;
 			assignment->type        = destination->type;
 			assignment->destination = destination;
 			assignment->value       = value;
 			assignment->flags      |= destination->flags;
-
-			return assignment;
 		}
 
-		return nullptr;
+		return assignment;
 	}
 
 	// Already defined in this scope previously
@@ -610,9 +617,9 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
 		{
 			auto if_node = (Syntax_Node_If *)node;
 
-			auto boolean = symbol_table_get(symbols, "bool");
 			auto condition = code_resolve_root_expression(resolver, symbols, if_node->condition);
 
+			auto boolean = symbol_table_get(symbols, "bool");
 			if (!code_type_are_same(condition->child->type, boolean->type)) {
 				auto cast = code_implicit_cast(condition->child, boolean->type);
 				if (cast) {
@@ -633,6 +640,41 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
 
 			Code_Node_Statement *statement = new Code_Node_Statement;
 			statement->node                = if_code;
+			return statement;
+		} break;
+
+		case SYNTAX_NODE_FOR:
+		{
+			auto for_node = (Syntax_Node_For *)node;
+
+			auto for_code = new Code_Node_For;
+			for_code->symbols.parent = symbols;
+
+			auto stack_top = resolver->vstack;
+
+			for_code->initialization = code_resolve_statement(resolver, &for_code->symbols, for_node->initialization);
+
+			auto condition = code_resolve_root_expression(resolver, &for_code->symbols, for_node->condition);
+
+			auto boolean = symbol_table_get(&for_code->symbols, "bool");
+			if (!code_type_are_same(condition->child->type, boolean->type)) {
+				auto cast = code_implicit_cast(condition->child, boolean->type);
+				if (cast) {
+					condition->child = cast;
+				}
+				else {
+					Unimplemented();
+				}
+			}
+
+			for_code->condition = condition;
+			for_code->increment = code_resolve_root_expression(resolver, &for_code->symbols, for_node->increment);
+			for_code->body = code_resolve_statement(resolver, &for_code->symbols, for_node->body);
+
+			resolver->vstack = stack_top;
+
+			Code_Node_Statement *statement = new Code_Node_Statement;
+			statement->node = for_code;
 			return statement;
 		} break;
 
