@@ -90,6 +90,8 @@ static inline void parser_error(Parser *parser, Token *token, const char *fmt, .
 	parser->error.last       = error;
 
 	parser->error_count += 1;
+
+	DebugTriggerbreakpoint();
 }
 
 //
@@ -377,6 +379,12 @@ Syntax_Node_Statement *parse_statement(Parser *parser) {
 		parser_expect_token(parser, TOKEN_KIND_SEMICOLON);
 	}
 
+	// block
+	else if (parser_peek_token(parser, TOKEN_KIND_OPEN_CURLY_BRACKET)) {
+		auto block      = parse_block(parser);
+		statement->node = block;
+	}
+
 	// simple expressions
 	else {
 		auto expression = parse_root_expression(parser);
@@ -395,24 +403,31 @@ Syntax_Node_Statement *parse_statement(Parser *parser) {
 }
 
 Syntax_Node_Block *parse_block(Parser *parser) {
-	auto block = parser_new_syntax_node<Syntax_Node_Block>(parser);
+	if (parser_expect_token(parser, TOKEN_KIND_OPEN_CURLY_BRACKET)) {
+		auto block = parser_new_syntax_node<Syntax_Node_Block>(parser);
 
-	Syntax_Node_Statement statement_stub_head;
-	Syntax_Node_Statement *parent_statement = &statement_stub_head;
-	uint64_t statement_count                = 0;
+		Syntax_Node_Statement statement_stub_head;
+		Syntax_Node_Statement *parent_statement = &statement_stub_head;
+		uint64_t statement_count = 0;
 
-	while (parser_should_continue(parser)) {
-		auto statement         = parse_statement(parser);
-		parent_statement->next = statement;
-		parent_statement       = statement;
-		statement_count += 1;
+		while (parser_should_continue(parser)) {
+			auto statement = parse_statement(parser);
+			parent_statement->next = statement;
+			parent_statement = statement;
+			statement_count += 1;
+
+			if (parser_accept_token(parser, TOKEN_KIND_CLOSE_CURLY_BRACKET))
+				break;
+		}
+
+		block->statement_head = statement_stub_head.next;
+		block->statement_count = statement_count;
+
+		parser_finish_syntax_node(parser, block);
+		return block;
 	}
 
-	block->statement_head  = statement_stub_head.next;
-	block->statement_count = statement_count;
-
-	parser_finish_syntax_node(parser, block);
-	return block;
+	return nullptr;
 }
 
 //
