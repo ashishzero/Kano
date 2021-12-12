@@ -361,12 +361,18 @@ Syntax_Node_Declaration *parse_declaration(Parser *parser) {
 
 	parser_expect_token(parser, TOKEN_KIND_COLON);
 
-	declaration->type = parse_type(parser);
-
 	if (parser_accept_token(parser, TOKEN_KIND_EQUALS)) {
 		declaration->initializer = parse_root_expression(parser);
 	}
-	else if (declaration->flags & TOKEN_KIND_CONST) {
+	else {
+		declaration->type = parse_type(parser);
+
+		if (parser_accept_token(parser, TOKEN_KIND_EQUALS)) {
+			declaration->initializer = parse_root_expression(parser);
+		}
+	}
+
+	if (declaration->flags & TOKEN_KIND_CONST && !declaration->initializer) {
 		auto token = lexer_current_token(&parser->lexer);
 		parser_error(parser, token, "Constant expression must be initialized during declaration");
 	}

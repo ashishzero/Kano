@@ -139,7 +139,10 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
 		else {
 			fprintf(fp, "Variable Declaration(%s)\n", node->identifier.data);
 		}
-		print_syntax(node->type, fp, child_indent, "Type");
+
+		if (node->type) {
+			print_syntax(node->type, fp, child_indent, "Type");
+		}
 		
 		if (node->initializer) {
 			print_syntax(node->initializer, fp, child_indent, "Initializer");

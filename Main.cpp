@@ -115,7 +115,7 @@ static inline uint32_t next_power2(uint32_t n) {
 	return n;
 }
 
-static const Symbol *symbol_table_put(Symbol_Table *table, const Symbol &sym) {
+static Symbol *symbol_table_put(Symbol_Table *table, const Symbol &sym) {
 	String name = sym.name;
 	auto hash = murmur3_32(name.data, name.length, HASH_SEED) + 1;
 
@@ -137,8 +137,7 @@ static const Symbol *symbol_table_put(Symbol_Table *table, const Symbol &sym) {
 				bucket->hash[index] = hash;
 				bucket->index[index] = offset;
 				table->buffer.add(sym);
-				auto sym_index = bucket->index[offset];
-				return &table->buffer[sym_index];
+				return &table->buffer[offset];
 			}
 		}
 
@@ -525,38 +524,56 @@ Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols
 Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Declaration *root) {
 	String sym_name = root->identifier;
 
+	Assert(root->type || root->initializer);
+
 	if (!symbol_table_get(symbols, sym_name, false)) {
-		Symbol symbol;
-		symbol.name     = sym_name;
-		symbol.type     = code_resolve_type(resolver, symbols, root->type);
-		symbol.flags    = root->flags;
-		symbol.location = root->location;
+		Symbol in_symbol;
+		in_symbol.name     = sym_name;
+		in_symbol.type     = root->type ? code_resolve_type(resolver, symbols, root->type) : nullptr;
+		in_symbol.flags    = root->flags;
+		in_symbol.location = root->location;
 
-		if (symbol.flags & SYMBOL_BIT_CONSTANT) {
-			symbol.address = UINT32_MAX;
-		}
-		else {
-			uint32_t size    = symbol.type->runtime_size;
-			resolver->vstack = AlignPower2Up(resolver->vstack, size);
-			symbol.address   = resolver->vstack;
-			resolver->vstack += size;
+		if (in_symbol.flags & SYMBOL_BIT_CONSTANT) {
+			in_symbol.address = UINT32_MAX;
 		}
 
-		auto sym = symbol_table_put(symbols, symbol);
+		auto symbol = symbol_table_put(symbols, in_symbol);
 
 		if (root->initializer) {
+			auto value = code_resolve_root_expression(resolver, symbols, root->initializer);
+
+			// Implicit type declaration
+			if (!symbol->type) {
+				symbol->type = value->type;
+			}
+			else {
+				// If type is explicit, check if the types are same
+				if (!code_type_are_same(value->type, symbol->type)) {
+					auto cast = code_implicit_cast(value->child, symbol->type);
+					if (cast) {
+						value->child = cast;
+					}
+					else {
+						Unimplemented();
+					}
+				}
+			}
+
+			uint32_t size    = symbol->type->runtime_size;
+			resolver->vstack = AlignPower2Up(resolver->vstack, size);
+			symbol->address     = resolver->vstack;
+			resolver->vstack += size;
+
 			auto address    = new Code_Node_Address;
-			address->offset = sym->address;
-			address->flags  = sym->flags;
+			address->offset = symbol->address;
+			address->flags  = symbol->flags;
 			address->flags |= SYMBOL_BIT_LVALUE;
-			address->type   = sym->type;
+			address->type   = symbol->type;
 
 			auto destination   = new Code_Node_Expression;
 			destination->child = address;
 			destination->flags = address->flags;
 			destination->type  = address->type;
-
-			auto value = code_resolve_root_expression(resolver, symbols, root->initializer);
 			
 			auto assignment         = new Code_Node_Assignment;
 			assignment->type        = destination->type;

@@ -26,4 +26,6 @@
 	else if number1 != 0 {
 		is_even = true;
 	}
+
+	var sum:= 0;
 }
