@@ -273,6 +273,8 @@ struct Array_View {
 	const T *end() const { return data + count; }
 };
 
+inline void *operator new(size_t size, void *ptr) { return ptr; }
+
 template <typename T>
 struct Array {
 	int64_t count = 0;
@@ -324,7 +326,8 @@ struct Array {
 			reserve(c);
 		}
 		count += 1;
-		return data + (count - 1);
+		void *ptr = data + (count - 1);
+		return new(ptr) T;
 	}
 
 	T *addn(uint32_t n) {
@@ -413,3 +416,51 @@ template <typename T> inline void array_free(Array<T> *a) {
 	if (a->data)
 		free(a->data, &a->allocator);
 }
+
+template <typename T, uint32_t N>
+struct Bucket_Array {
+	struct Bucket {
+		T data[N];
+		Bucket *next = nullptr;
+	};
+
+	Bucket first;
+	Bucket *last;
+	uint32_t index;
+
+	Bucket_Array() {
+		last = &first;
+		index = 0;
+	}
+
+	void add(T d) {
+		if (index == N) {
+			Bucket *buk = new Bucket;
+			index = 0;
+			last->next = buk;
+			last = buk;
+		}
+
+		last->data[index++] = d;
+	}
+
+	constexpr uint32_t bucket_size() {
+		return N;
+	}
+};
+
+template <typename T, uint32_t N> inline void bucket_array_free(Bucket_Array<T, N> *a) {
+	auto buck = a->first.next;
+	while (buck) {
+		auto fr_buck = buck;
+		buck = buck->next;
+		free(fr_buck);
+	}
+}
+
+#define ForBucketArray(pBucket, pBucketArray) \
+	for (auto pBucket = &(pBucketArray).first; pBucket; pBucket = pBucket->next)
+
+#define ForBucket(nIndex, pBucket, pBukcetArray)	\
+	auto nMaxIter = (pBucket)->next ? (pBukcetArray).bucket_size() : (pBukcetArray).index; \
+	for (uint32_t nIndex = 0; nIndex < nMaxIter; ++nIndex)
