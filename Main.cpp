@@ -663,6 +663,8 @@ Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Symbol_Table *
 	Code_Node_Statement statement_stub_head;
 	Code_Node_Statement *parent_statement = &statement_stub_head;
 
+	auto stack_top = resolver->vstack;
+
 	uint32_t statement_count = 0;
 	for (auto statement = root->statement_head; statement; statement = statement->next) {
 		auto code_statement = code_resolve_statement(resolver, &block->symbols, statement);
@@ -672,6 +674,8 @@ Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Symbol_Table *
 			statement_count += 1;
 		}
 	}
+
+	resolver->vstack = stack_top;
 
 	block->statement_head  = statement_stub_head.next;
 	block->statement_count = statement_count;
