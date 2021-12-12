@@ -1,8 +1,7 @@
 #pragma once
 #include "Common.h"
 #include "Token.h"
-
-constexpr uint32_t DECLARATION_IS_CONSTANT = 0x1;
+#include "Flags.h"
 
 struct Syntax_Location {
 	size_t start_row = 0;
@@ -95,13 +94,14 @@ struct Syntax_Node_Binary_Operator : public Syntax_Node {
 struct Syntax_Node_Type : public Syntax_Node {
 	Syntax_Node_Type() { kind = SYNTAX_NODE_TYPE; }
 
-	Token_Kind token_type = TOKEN_KIND_ERROR;
+	Token_Kind token_type  = TOKEN_KIND_ERROR;
+	Syntax_Node_Type *next = nullptr;
 };
 
 struct Syntax_Node_Assignment : public Syntax_Node {
 	Syntax_Node_Assignment() { kind = SYNTAX_NODE_ASSIGNMENT; }
 
-	Syntax_Node *left = nullptr;
+	Syntax_Node_Expression *left = nullptr;
 	Syntax_Node_Expression *right = nullptr;
 };
 

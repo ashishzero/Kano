@@ -1,6 +1,5 @@
 #include "Interp.h"
 #include "CodeNode.h"
-#include <iostream>
 
 Find_Type_Value evaluate_expression(Code_Node* root, Interp* interp);
 Find_Type_Value evaluate_node_expression(Code_Node_Expression* root, Interp* interp);
@@ -13,7 +12,7 @@ Find_Type_Value evaluate_node_literal(Code_Node_Literal* root){
 	auto node = root;
 	auto check_kind = (Code_Node*)root;
 	Find_Type_Value type_value;
-	switch (check_kind->type.kind) { 
+	switch (check_kind->type->kind) { 
 		case CODE_TYPE_BOOL:
 		{
 			type_value.value.boolean.value = node->data.boolean.value;
@@ -28,14 +27,15 @@ Find_Type_Value evaluate_node_literal(Code_Node_Literal* root){
 		{
 			type_value.value.real.value = node->data.real.value;
 			type_value.type = CODE_TYPE_REAL;
-		}
+		}break;
+		NoDefaultCase();
 	}
 	return type_value;
 }
 Find_Type_Value evaluate_unary_operator(Code_Node_Unary_Operator* root, Interp* interp) {
 	auto node = root;
 	auto check_kind = (Code_Node*)root;
-	switch (check_kind->type.kind) {
+	switch (check_kind->type->kind) {
 		case CODE_TYPE_BOOL:
 		{
 			switch (node->op_kind) {
@@ -45,6 +45,7 @@ Find_Type_Value evaluate_unary_operator(Code_Node_Unary_Operator* root, Interp* 
 					type_value.type = CODE_TYPE_BOOL;
 					return type_value;
 				}break;
+					NoDefaultCase();
 			}
 		}break;
 		case CODE_TYPE_INTEGER:
@@ -76,42 +77,32 @@ Find_Type_Value evaluate_unary_operator(Code_Node_Unary_Operator* root, Interp* 
 		case CODE_TYPE_REAL:
 		{
 			switch (node->op_kind) {
-				case UNARY_OPERATOR_PLUS: {
-					auto type_value = evaluate_expression(node->child, interp);
-					type_value.value.real.value = 0 + type_value.value.real.value;
-					type_value.type = CODE_TYPE_REAL;
-					return type_value;
-				}break;
-				case UNARY_OPERATOR_MINUS:
-				{
-					auto type_value = evaluate_expression(node->child, interp);
-					type_value.value.real.value = 0 - type_value.value.real.value;
-					type_value.type = CODE_TYPE_REAL;
-					return type_value;
-				}break;
-				NoDefaultCase();
+			case UNARY_OPERATOR_PLUS: {
+				auto type_value = evaluate_expression(node->child, interp);
+				type_value.value.real.value = 0 + type_value.value.real.value;
+				type_value.type = CODE_TYPE_REAL;
+				return type_value;
+			}break;
+			case UNARY_OPERATOR_MINUS:
+			{
+				auto type_value = evaluate_expression(node->child, interp);
+				type_value.value.real.value = 0 - type_value.value.real.value;
+				type_value.type = CODE_TYPE_REAL;
+				return type_value;
+			}break;
+			NoDefaultCase();
 			}
 
-		}
-	}
-	//switch (node->op_kind) {
-	//	case UNARY_OPERATOR_PLUS: {
-	//		return (0 + evaluate_expression(node->child, interp));
-	//	}break;
-	//	case UNARY_OPERATOR_MINUS:
-	//	{
-	//		return (0 - evaluate_expression(node->child, interp));
-	//	}break;
-	//	NoDefaultCase();
-	//	}
-	////return 0;  
+		}break;
+		NoDefaultCase();
+	} 
 }
 
 Find_Type_Value evaluate_binary_operator(Code_Node_Binary_Operator* root, Interp* interp) {
 	auto node = root;
 	auto check_kind = (Code_Node*)root;
 	Find_Type_Value type_value;
-	switch (check_kind->type.kind) {
+	switch (check_kind->type->kind) {
 		case CODE_TYPE_INTEGER:
 		{
 			auto a = evaluate_expression(node->left, interp);
@@ -268,31 +259,12 @@ Find_Type_Value evaluate_binary_operator(Code_Node_Binary_Operator* root, Interp
 					type_value.type = CODE_TYPE_BOOL;
 					return type_value;
 				}break;
+				NoDefaultCase();
 			}
 
 		}break;
 		NoDefaultCase();
 	}
-	//switch (node->op_kind) {
-	//	case BINARY_OPERATOR_ADDITION:
-	//	{
-	//		return(evaluate_expression(node->left, interp, type_value) + evaluate_expression(node->right, interp, type_value));
-	//	}break;
-	//	case BINARY_OPERATOR_SUBTRACTION:
-	//	{
-	//		return(evaluate_expression(node->left, interp, type_value) - evaluate_expression(node->right, interp, type_value));
-	//	}break;
-	//	case BINARY_OPERATOR_MULTIPLICATION:
-	//	{
-	//		return(evaluate_expression(node->left, interp, type_value) * evaluate_expression(node->right, interp, type_value));
-	//	}break;
-	//	case BINARY_OPERATOR_DIVISION:
-	//	{
-	//		return(evaluate_expression(node->left, interp, type_value) / evaluate_expression(node->right, interp, type_value));
-	//	}break;
-	//	NoDefaultCase();
-	//	}
-	//return 0;
 }
 Find_Type_Value evaluate_expression(Code_Node* root, Interp* interp) {
 	switch (root->kind) {
@@ -311,14 +283,14 @@ Find_Type_Value evaluate_expression(Code_Node* root, Interp* interp) {
 			return evaluate_binary_operator((Code_Node_Binary_Operator*)root, interp);
 		} break;
 
-		case CODE_NODE_STACK:
+		case CODE_NODE_ADDRESS:
 		{
-			auto node = (Code_Node_Stack*)root;
+			auto node = (Code_Node_Address*)root;
 			//Assert(node->type.kind == CODE_TYPE_REAL);
 			uint32_t offset = node->offset;
 			Find_Type_Value type_value;
 
-			switch (node->type.kind) {
+			switch (node->type->kind) {
 			case CODE_TYPE_INTEGER: {
 				int* value = (int*)(interp->stack + offset);
 				type_value.value.integer.value = *value;
@@ -347,13 +319,13 @@ Find_Type_Value evaluate_expression(Code_Node* root, Interp* interp) {
 		{
 			auto node = (Code_Node_Assignment*)root;
 		/*float*/	auto value = evaluate_node_expression((Code_Node_Expression*)node->value, interp);
-			Assert(node->destination->child->kind == CODE_NODE_STACK);
+			Assert(node->destination->child->kind == CODE_NODE_ADDRESS);
 
-			auto destiny = (Code_Node_Stack*)node->destination->child;
+			auto destiny = (Code_Node_Address*)node->destination->child;
 			interp_init(interp);
 			Find_Type_Value type_value;
 
-			switch (destiny->type.kind) {
+			switch (destiny->type->kind) {
 				case CODE_TYPE_REAL:
 				{
 					float* dst = (float*)(interp->stack + destiny->offset);
@@ -379,6 +351,7 @@ Find_Type_Value evaluate_expression(Code_Node* root, Interp* interp) {
 					type_value.type = CODE_TYPE_BOOL;
 					return type_value;
 				}break;
+				NoDefaultCase();
 			}
 		}break;
 		NoDefaultCase();

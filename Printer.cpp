@@ -6,7 +6,8 @@ static inline String code_type_kind_string(Code_Type_Kind kind) {
 		"-null-",
 		"integer",
 		"real",
-		"bool"
+		"bool",
+		"*"
 	};
 	static_assert(ArrayCount(strings) == _CODE_TYPE_COUNT);
 	return strings[kind];
@@ -17,7 +18,9 @@ static inline String unary_operator_kind_string(Unary_Operator_Kind kind) {
 		"+",
 		"-",
 		"~",
-		"!"
+		"!",
+		"*",
+		"?"
 	};
 	static_assert(ArrayCount(strings) == _UNARY_OPERATOR_COUNT);
 	return strings[kind];
@@ -58,6 +61,8 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent) {
 		switch (node->value.kind) {
 			case Literal::INTEGER: fprintf(fp, "Literal(int:%d)\n", node->value.data.integer); break;
 			case Literal::REAL:    fprintf(fp, "Literal(float:%f)\n", node->value.data.real);  break;
+			case Literal::BOOL:    fprintf(fp, "Literal(bool:%s)\n", node->value.data.boolean ? "true" : "false"); break;
+			NoDefaultCase();
 		}
 	} break;
 
@@ -88,6 +93,10 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent) {
 
 		const char *type_name = (char *)token_kind_string(node->token_type).data;
 		fprintf(fp, "Type(%s)\n", type_name);
+
+		if (node->next) {
+			print_syntax(node->next, fp, child_indent);
+		}
 	} break;
 
 	case SYNTAX_NODE_ASSIGNMENT:
@@ -108,7 +117,7 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent) {
 	case SYNTAX_NODE_DECLARATION:
 	{
 		auto node = (Syntax_Node_Declaration *)root;
-		if (node->flags & DECLARATION_IS_CONSTANT) {
+		if (node->flags & SYMBOL_BIT_CONSTANT) {
 			fprintf(fp, "Constant Declaration(%s)\n", node->identifier.data);
 		}
 		else {
@@ -155,7 +164,7 @@ void print_code(Code_Node *root, FILE *fp, int child_indent) {
 	{
 		auto node = (Code_Node_Literal *)root;
 
-		switch (node->type.kind) {
+		switch (node->type->kind) {
 		case CODE_TYPE_REAL:    fprintf(fp, "Literal(float:%f)\n", node->data.real.value); break;
 		case CODE_TYPE_INTEGER: fprintf(fp, "Literal(int:%d)\n", node->data.integer.value); break;
 		case CODE_TYPE_BOOL:    fprintf(fp, "Literal(bool:%s)\n", node->data.boolean.value ? "true" : "false"); break;
@@ -163,30 +172,23 @@ void print_code(Code_Node *root, FILE *fp, int child_indent) {
 		}
 	} break;
 
-	case CODE_NODE_STACK:
+	case CODE_NODE_ADDRESS:
 	{
-		auto node = (Code_Node_Stack *)root;
-		fprintf(fp, "Stack(0x%x)\n", node->offset);
-	} break;
-
-	case CODE_NODE_DESTINATION:
-	{
-		auto node = (Code_Node_Destination *)root;
-		fprintf(fp, "Destination()\n");
-		print_code(node->child, fp, child_indent);
+		auto node = (Code_Node_Address *)root;
+		fprintf(fp, "Address(0x%x)\n", node->offset);
 	} break;
 
 	case CODE_NODE_UNARY_OPERATOR:
 	{
 		auto node = (Code_Node_Unary_Operator *)root;
-		fprintf(fp, "Unary Operator(%s): %p\n", unary_operator_kind_string(node->op_kind).data, node->op);
+		fprintf(fp, "Unary Operator(%s)\n", unary_operator_kind_string(node->op_kind).data);
 		print_code(node->child, fp, child_indent);
 	} break;
 
 	case CODE_NODE_BINARY_OPERATOR:
 	{
 		auto node = (Code_Node_Binary_Operator *)root;
-		fprintf(fp, "Binary Operator(%s): %p\n", binary_operator_kind_string(node->op_kind).data, node->op);
+		fprintf(fp, "Binary Operator(%s)\n", binary_operator_kind_string(node->op_kind).data);
 		print_code(node->left, fp, child_indent);
 		print_code(node->right, fp, child_indent);
 	} break;
@@ -220,6 +222,13 @@ void print_code(Code_Node *root, FILE *fp, int child_indent) {
 		for (auto statement = node->statement_head; statement; statement = statement->next) {
 			print_code(statement, fp, child_indent);
 		}
+	} break;
+
+	case CODE_NODE_TYPE_CAST:
+	{
+		auto node = (Code_Node_Type_Cast *)root;
+		fprintf(fp, "TypeCast()\n");
+		print_code(node->child, fp, child_indent);
 	} break;
 
 	NoDefaultCase();

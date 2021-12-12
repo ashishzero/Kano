@@ -235,12 +235,15 @@ void lexer_next(Lexer *lexer) {
 		// single character tokens
 		switch (a) {
 			case ':': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_COLON); return;
+			case '?': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_DEREFERENCE); return;
 			case '=': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_EQUALS); return;
 			case '(': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_OPEN_BRACKET); return;
 			case ')': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_CLOSE_BRACKET); return;
+			case '{': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_OPEN_CURLY_BRACKET); return;
+			case '}': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_CLOSE_CURLY_BRACKET); return;
 			case '+': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_PLUS); return;
 			case '-': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_MINUS); return;
-			case '*': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_ASTRICK); return;
+			case '*': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_ASTERISK); return;
 			case '/': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_DIVISION); return;
 			case '%': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_REMAINDER); return;
 			case ';': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_SEMICOLON); return;
