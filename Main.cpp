@@ -30,7 +30,7 @@ Unary_Operator_Kind token_to_unary_operator(Token_Kind kind) {
 		case TOKEN_KIND_MINUS: return UNARY_OPERATOR_MINUS;
 		case TOKEN_KIND_BITWISE_NOT: return UNARY_OPERATOR_BITWISE_NOT;
 		case TOKEN_KIND_LOGICAL_NOT: return UNARY_OPERATOR_LOGICAL_NOT;
-		case TOKEN_KIND_ASTRICK: return UNARY_OPERATOR_POINTER_TO;
+		case TOKEN_KIND_ASTERISK: return UNARY_OPERATOR_POINTER_TO;
 		case TOKEN_KIND_DEREFERENCE: return UNARY_OPERATOR_DEREFERENCE;
 		NoDefaultCase();
 	}
@@ -43,7 +43,7 @@ Binary_Operator_Kind token_to_binary_operator(Token_Kind kind) {
 	switch (kind) {
 		case TOKEN_KIND_PLUS: return BINARY_OPERATOR_ADDITION;
 		case TOKEN_KIND_MINUS: return BINARY_OPERATOR_SUBTRACTION;
-		case TOKEN_KIND_ASTRICK: return BINARY_OPERATOR_MULTIPLICATION;
+		case TOKEN_KIND_ASTERISK: return BINARY_OPERATOR_MULTIPLICATION;
 		case TOKEN_KIND_DIVISION: return BINARY_OPERATOR_DIVISION;
 		case TOKEN_KIND_REMAINDER: return BINARY_OPERATOR_REMAINDER;
 		case TOKEN_KIND_BITWISE_SHIFT_RIGHT: return BINARY_OPERATOR_BITWISE_SHIFT_RIGHT;
@@ -562,7 +562,7 @@ Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Syntax_Node_Type *roo
 			return resolver->symbols.buffer[index].type;
 		} break;
 
-		case TOKEN_KIND_ASTRICK: 
+		case TOKEN_KIND_ASTERISK: 
 		{
 			auto type       = new Code_Type_Pointer;
 			type->base_type = code_resolve_type(resolver, root->next);

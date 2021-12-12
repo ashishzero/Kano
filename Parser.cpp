@@ -35,14 +35,14 @@ static void parser_init_precedence() {
 	UnaryOperatorPrecedence[TOKEN_KIND_MINUS]       = 150;
 	UnaryOperatorPrecedence[TOKEN_KIND_BITWISE_NOT] = 150;
 	UnaryOperatorPrecedence[TOKEN_KIND_LOGICAL_NOT] = 150;
-	UnaryOperatorPrecedence[TOKEN_KIND_ASTRICK]     = 150;
+	UnaryOperatorPrecedence[TOKEN_KIND_ASTERISK]     = 150;
 	UnaryOperatorPrecedence[TOKEN_KIND_DEREFERENCE] = 150;
 
 	//
 	//
 	//
 
-	BinaryOperatorPrecedence[TOKEN_KIND_ASTRICK]   = 60;
+	BinaryOperatorPrecedence[TOKEN_KIND_ASTERISK]   = 60;
 	BinaryOperatorPrecedence[TOKEN_KIND_DIVISION]  = 60;
 	BinaryOperatorPrecedence[TOKEN_KIND_REMAINDER] = 60;
 
@@ -224,7 +224,7 @@ Syntax_Node *parse_subexpression(Parser *parser, uint32_t prec) {
 		TOKEN_KIND_PLUS, TOKEN_KIND_MINUS,
 		TOKEN_KIND_BITWISE_NOT, 
 		TOKEN_KIND_LOGICAL_NOT,
-		TOKEN_KIND_ASTRICK,
+		TOKEN_KIND_ASTERISK,
 		TOKEN_KIND_DEREFERENCE
 	};
 
@@ -269,7 +269,7 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec) {
 		}
 
 		static const Token_Kind BinaryOpTokens[] = {
-			TOKEN_KIND_PLUS, TOKEN_KIND_MINUS, TOKEN_KIND_ASTRICK, TOKEN_KIND_DIVISION, TOKEN_KIND_REMAINDER,
+			TOKEN_KIND_PLUS, TOKEN_KIND_MINUS, TOKEN_KIND_ASTERISK, TOKEN_KIND_DIVISION, TOKEN_KIND_REMAINDER,
 			TOKEN_KIND_BITWISE_SHIFT_RIGHT, TOKEN_KIND_BITWISE_SHIFT_LEFT,
 			TOKEN_KIND_BITWISE_AND,TOKEN_KIND_BITWISE_XOR,TOKEN_KIND_BITWISE_OR,
 			TOKEN_KIND_RELATIONAL_GREATER, TOKEN_KIND_RELATIONAL_LESS,
@@ -325,8 +325,8 @@ Syntax_Node_Type *parse_type(Parser *parser) {
 	else if (parser_accept_token(parser, TOKEN_KIND_BOOL)) {
 		type->token_type = TOKEN_KIND_BOOL;
 	}
-	else if (parser_accept_token(parser, TOKEN_KIND_ASTRICK)) {
-		type->token_type = TOKEN_KIND_ASTRICK;
+	else if (parser_accept_token(parser, TOKEN_KIND_ASTERISK)) {
+		type->token_type = TOKEN_KIND_ASTERISK;
 		type->next = parse_type(parser);
 	}
 	else {
