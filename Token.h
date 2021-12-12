@@ -19,6 +19,12 @@ enum Token_Kind {
 	TOKEN_KIND_DIVISION,
 	TOKEN_KIND_REMAINDER,
 
+	TOKEN_KIND_COMPOUND_PLUS,
+	TOKEN_KIND_COMPOUND_MINUS,
+	TOKEN_KIND_COMPOUND_MULTIPLY,
+	TOKEN_KIND_COMPOUND_DIVIDE,
+	TOKEN_KIND_COMPOUND_REMAINDER,
+
 	TOKEN_KIND_BITWISE_SHIFT_RIGHT,
 	TOKEN_KIND_BITWISE_SHIFT_LEFT,
 
@@ -94,6 +100,8 @@ static inline String token_kind_string(Token_Kind kind) {
 		"(", ")", "{", "}",
 
 		"+", "-", "*", "/", "%",
+
+		"+=", "-=", "*=", "/=", "%=",
 
 		">>", "<<",
 

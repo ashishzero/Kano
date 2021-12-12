@@ -97,6 +97,11 @@ Binary_Operator_Kind token_to_binary_operator(Token_Kind kind) {
 		case TOKEN_KIND_RELATIONAL_LESS_EQUAL: return BINARY_OPERATOR_RELATIONAL_LESS_EQUAL;
 		case TOKEN_KIND_COMPARE_EQUAL: return BINARY_OPERATOR_COMPARE_EQUAL;
 		case TOKEN_KIND_COMPARE_NOT_EQUAL: return BINARY_OPERATOR_COMPARE_NOT_EQUAL;
+		case TOKEN_KIND_COMPOUND_PLUS: return BINARY_OPERATOR_COMPOUND_ADDITION;
+		case TOKEN_KIND_COMPOUND_MINUS: return BINARY_OPERATOR_COMPOUND_SUBTRACTION;
+		case TOKEN_KIND_COMPOUND_MULTIPLY: return BINARY_OPERATOR_COMPOUND_MULTIPLICATION;
+		case TOKEN_KIND_COMPOUND_DIVIDE: return BINARY_OPERATOR_COMPOUND_DIVISION;
+		case TOKEN_KIND_COMPOUND_REMAINDER: return BINARY_OPERATOR_COMPOUND_REMAINDER;
 		NoDefaultCase();
 	}
 
@@ -421,7 +426,8 @@ Code_Node_Binary_Operator *code_resolve_binary_operator(Code_Type_Resolver *reso
 				}
 			}
 
-			if (left_match && right_match) {
+			if (left_match && right_match && 
+				(!op->compound || (op->compound && (left->flags & SYMBOL_BIT_LVALUE)))) {
 				auto node = new Code_Node_Binary_Operator;
 
 				node->type    = op->output;
@@ -908,6 +914,25 @@ int main() {
 		Binary_Operator binary_operator_int;
 		binary_operator_int.parameters[0] = CompilerTypes[CODE_TYPE_INTEGER];
 		binary_operator_int.parameters[1] = CompilerTypes[CODE_TYPE_INTEGER];
+		binary_operator_int.output        = CompilerTypes[CODE_TYPE_INTEGER];
+		binary_operator_int.compound      = true;
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_ADDITION].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_SUBTRACTION].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_MULTIPLICATION].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_DIVISION].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_REMAINDER].add(binary_operator_int);
+
+		//resolver.binary_operators[BINARY_OPERATOR_BITWISE_SHIFT_RIGHT].add(binary_operator_int);
+		//resolver.binary_operators[BINARY_OPERATOR_BITWISE_SHIFT_LEFT].add(binary_operator_int);
+		//resolver.binary_operators[BINARY_OPERATOR_BITWISE_AND].add(binary_operator_int);
+		//resolver.binary_operators[BINARY_OPERATOR_BITWISE_XOR].add(binary_operator_int);
+		//resolver.binary_operators[BINARY_OPERATOR_BITWISE_OR].add(binary_operator_int);
+	}
+
+	{
+		Binary_Operator binary_operator_int;
+		binary_operator_int.parameters[0] = CompilerTypes[CODE_TYPE_INTEGER];
+		binary_operator_int.parameters[1] = CompilerTypes[CODE_TYPE_INTEGER];
 		binary_operator_int.output        = CompilerTypes[CODE_TYPE_BOOL];
 		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_GREATER].add(binary_operator_int);
 		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_LESS].add(binary_operator_int);
@@ -926,6 +951,18 @@ int main() {
 		resolver.binary_operators[BINARY_OPERATOR_SUBTRACTION].add(binary_operator_real);
 		resolver.binary_operators[BINARY_OPERATOR_MULTIPLICATION].add(binary_operator_real);
 		resolver.binary_operators[BINARY_OPERATOR_DIVISION].add(binary_operator_real);
+	}
+
+	{
+		Binary_Operator binary_operator_real;
+		binary_operator_real.parameters[0] = CompilerTypes[CODE_TYPE_REAL];
+		binary_operator_real.parameters[1] = CompilerTypes[CODE_TYPE_REAL];
+		binary_operator_real.output        = CompilerTypes[CODE_TYPE_REAL];
+		binary_operator_real.compound      = true;
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_ADDITION].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_SUBTRACTION].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_MULTIPLICATION].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_DIVISION].add(binary_operator_real);
 	}
 
 	{
