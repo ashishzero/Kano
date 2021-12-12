@@ -166,9 +166,13 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
 //
 //
 
-void print_code(Code_Node *root, FILE *fp, int child_indent) {
+void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title) {
 	indent(fp, child_indent);
 	child_indent += 1;
+
+	if (title) {
+		fprintf(fp, "%s:", title);
+	}
 
 	switch (root->kind) {
 	case CODE_NODE_NULL:
@@ -192,6 +196,13 @@ void print_code(Code_Node *root, FILE *fp, int child_indent) {
 	{
 		auto node = (Code_Node_Address *)root;
 		fprintf(fp, "Address(0x%x)\n", node->offset);
+	} break;
+
+	case CODE_NODE_TYPE_CAST:
+	{
+		auto node = (Code_Node_Type_Cast *)root;
+		fprintf(fp, "TypeCast()\n");
+		print_code(node->child, fp, child_indent);
 	} break;
 
 	case CODE_NODE_UNARY_OPERATOR:
@@ -231,6 +242,18 @@ void print_code(Code_Node *root, FILE *fp, int child_indent) {
 		print_code(node->node, fp, child_indent);
 	} break;
 
+	case CODE_NODE_IF:
+	{
+		auto node = (Code_Node_If *)root;
+		fprintf(fp, "If()\n");
+		print_code(node->condition, fp, child_indent, "Condition");
+		print_code(node->true_statement, fp, child_indent, "True-Statement");
+
+		if (node->false_statement) {
+			print_code(node->true_statement, fp, child_indent, "False-Statement");
+		}
+	} break;
+
 	case CODE_NODE_BLOCK:
 	{
 		auto node = (Code_Node_Block *)root;
@@ -238,13 +261,6 @@ void print_code(Code_Node *root, FILE *fp, int child_indent) {
 		for (auto statement = node->statement_head; statement; statement = statement->next) {
 			print_code(statement, fp, child_indent);
 		}
-	} break;
-
-	case CODE_NODE_TYPE_CAST:
-	{
-		auto node = (Code_Node_Type_Cast *)root;
-		fprintf(fp, "TypeCast()\n");
-		print_code(node->child, fp, child_indent);
 	} break;
 
 	NoDefaultCase();

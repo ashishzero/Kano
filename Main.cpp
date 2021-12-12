@@ -563,6 +563,36 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
 			return statement;
 		} break;
 
+		case SYNTAX_NODE_IF:
+		{
+			auto if_node = (Syntax_Node_If *)node;
+
+			auto boolean = symbol_table_get(symbols, "bool");
+			auto condition = code_resolve_root_expression(resolver, symbols, if_node->condition);
+
+			if (!code_type_are_same(condition->child->type, boolean->type)) {
+				auto cast = code_implicit_cast(condition->child, boolean->type);
+				if (cast) {
+					condition->child = cast;
+				}
+				else {
+					Unimplemented();
+				}
+			}
+
+			auto if_code = new Code_Node_If;
+			if_code->condition      = condition;
+			if_code->true_statement = code_resolve_statement(resolver, symbols, if_node->true_statement);
+			
+			if (if_node->false_statement) {
+				if_code->false_statement = code_resolve_statement(resolver, symbols, if_node->false_statement);
+			}
+
+			Code_Node_Statement *statement = new Code_Node_Statement;
+			statement->node                = if_code;
+			return statement;
+		} break;
+
 		case SYNTAX_NODE_DECLARATION:
 		{
 			code_resolve_declaration(resolver, symbols, (Syntax_Node_Declaration *)node);

@@ -82,6 +82,7 @@ enum Code_Node_Kind {
 	CODE_NODE_EXPRESSION,
 	CODE_NODE_ASSIGNMENT,
 	CODE_NODE_STATEMENT,
+	CODE_NODE_IF,
 	CODE_NODE_BLOCK,
 
 	_CODE_NODE_COUNT,
@@ -208,6 +209,14 @@ struct Code_Node_Statement : public Code_Node {
 
 	Code_Node *node           = nullptr;
 	Code_Node_Statement *next = nullptr;
+};
+
+struct Code_Node_If : public Code_Node {
+	Code_Node_If() { kind = CODE_NODE_IF; }
+
+	Code_Node_Expression *condition      = nullptr;
+	Code_Node_Statement *true_statement  = nullptr;
+	Code_Node_Statement *false_statement = nullptr;
 };
 
 struct Code_Node_Block : public Code_Node {
