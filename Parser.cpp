@@ -256,7 +256,12 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec) {
 		if (parser_accept_token(parser, TOKEN_KIND_EQUALS)) {
 			auto assignment = parser_new_syntax_node<Syntax_Node_Assignment>(parser);
 			parser_finish_syntax_node(parser, assignment);
-			assignment->left  = left;
+
+			auto left_expression      = parser_new_syntax_node<Syntax_Node_Expression>(parser);
+			left_expression->child    = left;
+			left_expression->location = left->location;
+
+			assignment->left  = left_expression;
 			assignment->right = parse_root_expression(parser);
 			return assignment;
 		}
@@ -335,7 +340,7 @@ Syntax_Node_Declaration *parse_declaration(Parser *parser) {
 	auto declaration = parser_new_syntax_node<Syntax_Node_Declaration>(parser);
 
 	if (parser_accept_token(parser, TOKEN_KIND_CONST)) {
-		declaration->flags |= DECLARATION_IS_CONSTANT;
+		declaration->flags |= SYMBOL_BIT_CONSTANT;
 	}
 	else if (!parser_accept_token(parser, TOKEN_KIND_VAR)) {
 		auto token = lexer_current_token(&parser->lexer);

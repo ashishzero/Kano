@@ -4,8 +4,8 @@
 enum Code_Node_Kind {
 	CODE_NODE_NULL,
 	CODE_NODE_LITERAL,
-	CODE_NODE_STACK,
-	CODE_NODE_DESTINATION,
+	CODE_NODE_ADDRESS,
+	CODE_NODE_TYPE_CAST,
 	CODE_NODE_UNARY_OPERATOR,
 	CODE_NODE_BINARY_OPERATOR,
 	CODE_NODE_EXPRESSION,
@@ -22,14 +22,39 @@ enum Code_Type_Kind {
 	CODE_TYPE_REAL,
 	CODE_TYPE_BOOL,
 	CODE_TYPE_POINTER,
-//	CODE_TYPE_MEMORY_ADDRESS,
 
 	_CODE_TYPE_COUNT
 };
 
 struct Code_Type {
 	Code_Type_Kind kind = CODE_TYPE_NULL;
-	Code_Type *next     = nullptr;
+	uint32_t runtime_size = 0;
+};
+
+struct Code_Type_Integer : public Code_Type {
+	Code_Type_Integer() { kind = CODE_TYPE_INTEGER; runtime_size = sizeof(int32_t); }
+};
+
+struct Code_Type_Real : public Code_Type {
+	Code_Type_Real() { kind = CODE_TYPE_REAL; runtime_size = sizeof(float); }
+};
+
+struct Code_Type_Bool : public Code_Type {
+	Code_Type_Bool() { kind = CODE_TYPE_BOOL; runtime_size = sizeof(bool); }
+};
+
+struct Code_Type_Pointer : public Code_Type {
+	Code_Type_Pointer() { kind = CODE_TYPE_POINTER; runtime_size = sizeof(void *); }
+
+	Code_Type *base_type = nullptr;
+};
+
+struct Symbol {
+	String          name;
+	Code_Type *     type     = nullptr;
+	uint32_t        flags    = 0;
+	uint32_t        address  = UINT32_MAX;
+	Syntax_Location location = {};
 };
 
 struct Code_Value_Integer {
@@ -54,6 +79,7 @@ union Code_Value {
 
 struct Code_Node {
 	Code_Node_Kind  kind = CODE_NODE_NULL;
+	uint32_t        flags = 0;
 	Code_Type       *type = nullptr;
 };
 
@@ -63,16 +89,16 @@ struct Code_Node_Literal : public Code_Node {
 	Code_Value data;
 };
 
-struct Code_Node_Stack : public Code_Node {
-	Code_Node_Stack() { kind = CODE_NODE_STACK; }
+struct Code_Node_Address : public Code_Node {
+	Code_Node_Address() { kind = CODE_NODE_ADDRESS; }
 
 	uint32_t offset = UINT32_MAX;
 };
 
-struct Code_Node_Destination : public Code_Node {
-	Code_Node_Destination() { kind = CODE_NODE_DESTINATION; }
+struct Code_Node_Type_Cast : public Code_Node {
+	Code_Node_Type_Cast() { kind = CODE_NODE_TYPE_CAST; }
 
-	Code_Node *child = nullptr;
+	Code_Node *child          = nullptr;
 };
 
 enum Unary_Operator_Kind {
@@ -86,15 +112,14 @@ enum Unary_Operator_Kind {
 };
 
 struct Unary_Operator {
-	Code_Type parameter;
-	Code_Type output;
+	Code_Type *parameter;
+	Code_Type *output;
 };
 
 struct Code_Node_Unary_Operator : public Code_Node {
 	Code_Node_Unary_Operator() { kind = CODE_NODE_UNARY_OPERATOR; }
 
 	Unary_Operator_Kind op_kind;
-	// Unary_Operator *op = nullptr; // FIXME: DO WE NEED THIS?
 
 	Code_Node *child = nullptr;
 };
@@ -121,8 +146,8 @@ enum Binary_Operator_Kind {
 };
 
 struct Binary_Operator {
-	Code_Type parameters[2];
-	Code_Type output;
+	Code_Type *parameters[2];
+	Code_Type *output;
 };
 
 struct Code_Node_Binary_Operator : public Code_Node {
@@ -140,15 +165,10 @@ struct Code_Node_Expression : public Code_Node {
 	Code_Node *child = nullptr;
 };
 
-struct Assignment {
-	Code_Type destination;
-	Code_Type value;
-};
-
 struct Code_Node_Assignment : public Code_Node {
 	Code_Node_Assignment() { kind = CODE_NODE_ASSIGNMENT; }
 
-	Code_Node_Destination *destination = nullptr;
+	Code_Node_Expression *destination = nullptr;
 	Code_Node_Expression *value = nullptr;
 };
 

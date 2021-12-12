@@ -153,6 +153,7 @@
   <ItemGroup>
     <ClInclude Include="CodeNode.h" />
     <ClInclude Include="Common.h" />
+    <ClInclude Include="Flags.h" />
     <ClInclude Include="Interp.h" />
     <ClInclude Include="Lexer.h" />
     <ClInclude Include="Parser.h" />

@@ -116,7 +116,7 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent) {
 	case SYNTAX_NODE_DECLARATION:
 	{
 		auto node = (Syntax_Node_Declaration *)root;
-		if (node->flags & DECLARATION_IS_CONSTANT) {
+		if (node->flags & SYMBOL_BIT_CONSTANT) {
 			fprintf(fp, "Constant Declaration(%s)\n", node->identifier.data);
 		}
 		else {
@@ -171,17 +171,10 @@ void print_code(Code_Node *root, FILE *fp, int child_indent) {
 		}
 	} break;
 
-	case CODE_NODE_STACK:
+	case CODE_NODE_ADDRESS:
 	{
-		auto node = (Code_Node_Stack *)root;
-		fprintf(fp, "Stack(0x%x)\n", node->offset);
-	} break;
-
-	case CODE_NODE_DESTINATION:
-	{
-		auto node = (Code_Node_Destination *)root;
-		fprintf(fp, "Destination()\n");
-		print_code(node->child, fp, child_indent);
+		auto node = (Code_Node_Address *)root;
+		fprintf(fp, "Address(0x%x)\n", node->offset);
 	} break;
 
 	case CODE_NODE_UNARY_OPERATOR:
@@ -228,6 +221,13 @@ void print_code(Code_Node *root, FILE *fp, int child_indent) {
 		for (auto statement = node->statement_head; statement; statement = statement->next) {
 			print_code(statement, fp, child_indent);
 		}
+	} break;
+
+	case CODE_NODE_TYPE_CAST:
+	{
+		auto node = (Code_Node_Type_Cast *)root;
+		fprintf(fp, "TypeCast()\n");
+		print_code(node->child, fp, child_indent);
 	} break;
 
 	NoDefaultCase();
