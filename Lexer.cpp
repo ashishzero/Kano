@@ -200,17 +200,57 @@ void lexer_next(Lexer *lexer) {
 			return;
 		}
 
-		// single character identifiers
+		// double character tokens
+		if (a == '>' && b == '>') {
+			lexer->cursor += 2;
+			lexer_make_token(lexer, TOKEN_KIND_BITWISE_SHIFT_RIGHT);
+			return;
+		}
+		else if (a == '<' && b == '<') {
+			lexer->cursor += 2;
+			lexer_make_token(lexer, TOKEN_KIND_BITWISE_SHIFT_LEFT);
+			return;
+		}
+		else if (a == '>' && b == '=') {
+			lexer->cursor += 2;
+			lexer_make_token(lexer, TOKEN_KIND_RELATIONAL_GREATER_EQUAL);
+			return;
+		}
+		else if (a == '<' && b == '=') {
+			lexer->cursor += 2;
+			lexer_make_token(lexer, TOKEN_KIND_RELATIONAL_LESS_EQUAL);
+			return;
+		}
+		else if (a == '=' && b == '=') {
+			lexer->cursor += 2;
+			lexer_make_token(lexer, TOKEN_KIND_COMPARE_EQUAL);
+			return;
+		}
+		else if (a == '!' && b == '=') {
+			lexer->cursor += 2;
+			lexer_make_token(lexer, TOKEN_KIND_COMPARE_NOT_EQUAL);
+			return;
+		}
+
+		// single character tokens
 		switch (a) {
+			case ':': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_COLON); return;
+			case '=': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_EQUALS); return;
 			case '(': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_OPEN_BRACKET); return;
 			case ')': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_CLOSE_BRACKET); return;
 			case '+': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_PLUS); return;
 			case '-': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_MINUS); return;
 			case '*': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_ASTRICK); return;
 			case '/': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_DIVISION); return;
+			case '%': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_REMAINDER); return;
 			case ';': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_SEMICOLON); return;
-			case ':': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_COLON); return;
-			case '=': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_EQUALS); return;
+			case '&': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_BITWISE_AND); return;
+			case '^': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_BITWISE_XOR); return;
+			case '|': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_BITWISE_OR); return;
+			case '~': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_BITWISE_NOT); return;
+			case '!': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_LOGICAL_NOT); return;
+			case '>': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_RELATIONAL_GREATER); return;
+			case '<': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_RELATIONAL_LESS); return;
 		}
 
 		if (lexer_isalpha(*lexer->cursor)) {
@@ -224,8 +264,16 @@ void lexer_next(Lexer *lexer) {
 			content.data   = (uint8_t *)string;
 			content.length = (lexer->cursor - content.data);
 
-			static const String KeyWords[]          = { "var", "const", "float" };
-			static const Token_Kind KeyWordTokens[] = { TOKEN_KIND_VAR, TOKEN_KIND_CONST, TOKEN_KIND_FLOAT };
+			static const String KeyWords[]          = { 
+				"var", "const", 
+				"true", "false",
+				"int", "float", "bool" };
+			static const Token_Kind KeyWordTokens[] = { 
+				TOKEN_KIND_VAR, TOKEN_KIND_CONST, 
+				TOKEN_KIND_TRUE, TOKEN_KIND_FALSE,
+				TOKEN_KIND_INT, TOKEN_KIND_FLOAT, TOKEN_KIND_BOOL };
+
+			static_assert(ArrayCount(KeyWords) == ArrayCount(KeyWordTokens));
 
 			for (uint32_t index = 0; index < ArrayCount(KeyWords); ++index) {
 				if (content == KeyWords[index]) {

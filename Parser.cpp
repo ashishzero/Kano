@@ -31,18 +31,36 @@ static uint32_t UnaryOperatorPrecedence[_TOKEN_KIND_COUNT];
 static uint32_t BinaryOperatorPrecedence[_TOKEN_KIND_COUNT];
 
 static void parser_init_precedence() {
-	UnaryOperatorPrecedence[TOKEN_KIND_PLUS] = 150;
-	UnaryOperatorPrecedence[TOKEN_KIND_MINUS] = 150;
+	UnaryOperatorPrecedence[TOKEN_KIND_PLUS]        = 150;
+	UnaryOperatorPrecedence[TOKEN_KIND_MINUS]       = 150;
+	UnaryOperatorPrecedence[TOKEN_KIND_BITWISE_NOT] = 150;
+	UnaryOperatorPrecedence[TOKEN_KIND_LOGICAL_NOT] = 150;
 
 	//
 	//
 	//
 
-	BinaryOperatorPrecedence[TOKEN_KIND_ASTRICK] = 60;
-	BinaryOperatorPrecedence[TOKEN_KIND_DIVISION] = 60;
+	BinaryOperatorPrecedence[TOKEN_KIND_ASTRICK]   = 60;
+	BinaryOperatorPrecedence[TOKEN_KIND_DIVISION]  = 60;
+	BinaryOperatorPrecedence[TOKEN_KIND_REMAINDER] = 60;
 
-	BinaryOperatorPrecedence[TOKEN_KIND_PLUS] = 55;
+	BinaryOperatorPrecedence[TOKEN_KIND_PLUS]  = 55;
 	BinaryOperatorPrecedence[TOKEN_KIND_MINUS] = 55;
+
+	BinaryOperatorPrecedence[TOKEN_KIND_BITWISE_SHIFT_RIGHT] = 50;
+	BinaryOperatorPrecedence[TOKEN_KIND_BITWISE_SHIFT_LEFT]  = 50;
+
+	BinaryOperatorPrecedence[TOKEN_KIND_RELATIONAL_GREATER]       = 45;
+	BinaryOperatorPrecedence[TOKEN_KIND_RELATIONAL_LESS]          = 45;
+	BinaryOperatorPrecedence[TOKEN_KIND_RELATIONAL_GREATER_EQUAL] = 45;
+	BinaryOperatorPrecedence[TOKEN_KIND_RELATIONAL_LESS_EQUAL]    = 45;
+
+	BinaryOperatorPrecedence[TOKEN_KIND_COMPARE_EQUAL]     = 40;
+	BinaryOperatorPrecedence[TOKEN_KIND_COMPARE_NOT_EQUAL] = 40;
+
+	BinaryOperatorPrecedence[TOKEN_KIND_BITWISE_AND] = 30;
+	BinaryOperatorPrecedence[TOKEN_KIND_BITWISE_XOR] = 25;
+	BinaryOperatorPrecedence[TOKEN_KIND_BITWISE_OR]  = 20;
 }
 
 //
@@ -160,15 +178,33 @@ Syntax_Node *parse_subexpression(Parser *parser, uint32_t prec) {
 	}
 
 	if (parser_accept_token(parser, TOKEN_KIND_REAL)) {
-		auto node = parser_new_syntax_node<Syntax_Node_Literal>(parser);
-		node->value = parser->value.real;
+		auto node             = parser_new_syntax_node<Syntax_Node_Literal>(parser);
+		node->value.kind      = Literal::REAL;
+		node->value.data.real = (float)parser->value.real;
 		parser_finish_syntax_node(parser, node);
 		return node;
 	}
 
 	if (parser_accept_token(parser, TOKEN_KIND_INTEGER)) {
+		auto node                = parser_new_syntax_node<Syntax_Node_Literal>(parser);
+		node->value.kind         = Literal::INTEGER;
+		node->value.data.integer = (int32_t)parser->value.integer;
+		parser_finish_syntax_node(parser, node);
+		return node;
+	}
+
+	if (parser_accept_token(parser, TOKEN_KIND_TRUE)) {
 		auto node = parser_new_syntax_node<Syntax_Node_Literal>(parser);
-		node->value = (double)parser->value.integer;
+		node->value.kind = Literal::BOOL;
+		node->value.data.boolean = true;
+		parser_finish_syntax_node(parser, node);
+		return node;
+	}
+
+	if (parser_accept_token(parser, TOKEN_KIND_FALSE)) {
+		auto node = parser_new_syntax_node<Syntax_Node_Literal>(parser);
+		node->value.kind = Literal::BOOL;
+		node->value.data.boolean = false;
 		parser_finish_syntax_node(parser, node);
 		return node;
 	}
@@ -183,7 +219,9 @@ Syntax_Node *parse_subexpression(Parser *parser, uint32_t prec) {
 	}
 
 	static const Token_Kind UnaryOpTokens[] = {
-		TOKEN_KIND_PLUS, TOKEN_KIND_MINUS
+		TOKEN_KIND_PLUS, TOKEN_KIND_MINUS,
+		TOKEN_KIND_BITWISE_NOT, 
+		TOKEN_KIND_LOGICAL_NOT,
 	};
 
 	auto token   = lexer_current_token(&parser->lexer);
@@ -222,7 +260,12 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec) {
 		}
 
 		static const Token_Kind BinaryOpTokens[] = {
-			TOKEN_KIND_PLUS, TOKEN_KIND_MINUS, TOKEN_KIND_ASTRICK, TOKEN_KIND_DIVISION
+			TOKEN_KIND_PLUS, TOKEN_KIND_MINUS, TOKEN_KIND_ASTRICK, TOKEN_KIND_DIVISION, TOKEN_KIND_REMAINDER,
+			TOKEN_KIND_BITWISE_SHIFT_RIGHT, TOKEN_KIND_BITWISE_SHIFT_LEFT,
+			TOKEN_KIND_BITWISE_AND,TOKEN_KIND_BITWISE_XOR,TOKEN_KIND_BITWISE_OR,
+			TOKEN_KIND_RELATIONAL_GREATER, TOKEN_KIND_RELATIONAL_LESS,
+			TOKEN_KIND_RELATIONAL_GREATER_EQUAL, TOKEN_KIND_RELATIONAL_LESS_EQUAL,
+			TOKEN_KIND_COMPARE_EQUAL, TOKEN_KIND_COMPARE_NOT_EQUAL
 		};
 
 		auto token = lexer_current_token(&parser->lexer);
@@ -264,9 +307,19 @@ Syntax_Node_Expression *parse_root_expression(Parser *parser) {
 Syntax_Node_Type *parse_type(Parser *parser) {
 	auto type = parser_new_syntax_node<Syntax_Node_Type>(parser);
 
-	// we only have one type right now and that's float
-	parser_expect_token(parser, TOKEN_KIND_FLOAT);
-	type->syntax_type = SYNTAX_TYPE_FLOAT;
+	if (parser_accept_token(parser, TOKEN_KIND_INT)) {
+		type->token_type = TOKEN_KIND_INT;
+	}
+	else if (parser_accept_token(parser, TOKEN_KIND_FLOAT)) {
+		type->token_type = TOKEN_KIND_FLOAT;
+	}
+	else if (parser_accept_token(parser, TOKEN_KIND_BOOL)) {
+		type->token_type = TOKEN_KIND_BOOL;
+	}
+	else {
+		auto token = lexer_current_token(&parser->lexer);
+		parser_error(parser, token, "Expected type, got: %s\n", token_kind_string(token->kind).data);
+	}
 
 	parser_finish_syntax_node(parser, type);
 	return type;

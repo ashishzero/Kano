@@ -14,6 +14,24 @@ enum Token_Kind {
 	TOKEN_KIND_MINUS,
 	TOKEN_KIND_ASTRICK,
 	TOKEN_KIND_DIVISION,
+	TOKEN_KIND_REMAINDER,
+
+	TOKEN_KIND_BITWISE_SHIFT_RIGHT,
+	TOKEN_KIND_BITWISE_SHIFT_LEFT,
+
+	TOKEN_KIND_BITWISE_AND,
+	TOKEN_KIND_BITWISE_XOR,
+	TOKEN_KIND_BITWISE_OR,
+	TOKEN_KIND_BITWISE_NOT,
+
+	TOKEN_KIND_LOGICAL_NOT,
+
+	TOKEN_KIND_RELATIONAL_GREATER,
+	TOKEN_KIND_RELATIONAL_LESS,
+	TOKEN_KIND_RELATIONAL_GREATER_EQUAL,
+	TOKEN_KIND_RELATIONAL_LESS_EQUAL,
+	TOKEN_KIND_COMPARE_EQUAL,
+	TOKEN_KIND_COMPARE_NOT_EQUAL,
 
 	TOKEN_KIND_REAL,
 	TOKEN_KIND_INTEGER,
@@ -21,7 +39,12 @@ enum Token_Kind {
 	TOKEN_KIND_VAR,
 	TOKEN_KIND_CONST,
 
+	TOKEN_KIND_TRUE,
+	TOKEN_KIND_FALSE,
+
+	TOKEN_KIND_INT,
 	TOKEN_KIND_FLOAT,
+	TOKEN_KIND_BOOL,
 
 	TOKEN_KIND_IDENTIFIER,
 
@@ -59,14 +82,25 @@ static inline String token_kind_string(Token_Kind kind) {
 
 		"(", ")",
 
-		"+", "-", "*", "/",
+		"+", "-", "*", "/", "%",
+
+		">>", "<<",
+
+		"&", "^", "|", "~",
+
+		"!",
+
+		">", "<", ">=", "<=",
+		"==", "!=",
 
 		"real number",
 		"integer number",
 
 		"var", "const",
 
-		"float",
+		"true", "false",
+
+		"int", "float", "bool",
 
 		"identifier",
 

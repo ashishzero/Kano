@@ -1,0 +1,68 @@
+Block()
+   Statement()
+      Expression()
+         Assignment()
+            Destination()
+               Stack(0x8)
+            Expression()
+               Unary Operator(!): 0000002ADBAFE258
+                  Literal(bool:false)
+   Statement()
+      Expression()
+         Assignment()
+            Destination()
+               Stack(0x0)
+            Expression()
+               Binary Operator(&): 0000002ADBAFE5F8
+                  Literal(int:5)
+                  Unary Operator(~): 0000002ADBAFE200
+                     Stack(0x4)
+   Statement()
+      Expression()
+         Assignment()
+            Destination()
+               Stack(0x0)
+            Expression()
+               Binary Operator(+): 0000002ADBAFE2BC
+                  Binary Operator(+): 0000002ADBAFE2BC
+                     Unary Operator(-): 0000002ADBAFE1B0
+                        Literal(int:5)
+                     Binary Operator(/): 0000002ADBAFE424
+                        Binary Operator(*): 0000002ADBAFE3AC
+                           Literal(int:6)
+                           Literal(int:3)
+                        Binary Operator(-): 0000002ADBAFE334
+                           Literal(int:5)
+                           Literal(int:8)
+                  Literal(int:5)
+   Statement()
+      Expression()
+         Assignment()
+            Destination()
+               Stack(0x4)
+            Expression()
+               Binary Operator(+): 0000002ADBAFE2BC
+                  Binary Operator(/): 0000002ADBAFE424
+                     Literal(int:9)
+                     Literal(int:3)
+                  Literal(int:2)
+   Statement()
+      Expression()
+         Assignment()
+            Destination()
+               Stack(0xc)
+            Expression()
+               Binary Operator(+): 0000002ADBAFE2D4
+                  Stack(0x0)
+                  Stack(0x4)
+   Statement()
+      Expression()
+         Assignment()
+            Destination()
+               Stack(0x8)
+            Expression()
+               Binary Operator(==): 0000002ADBAFE94C
+                  Binary Operator(%): 0000002ADBAFE490
+                     Stack(0x4)
+                     Literal(int:2)
+                  Literal(int:0)

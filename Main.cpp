@@ -29,6 +29,8 @@ Unary_Operator_Kind token_to_unary_operator(Token_Kind kind) {
 	switch (kind) {
 		case TOKEN_KIND_PLUS:  return UNARY_OPERATOR_PLUS;
 		case TOKEN_KIND_MINUS: return UNARY_OPERATOR_MINUS;
+		case TOKEN_KIND_BITWISE_NOT: return UNARY_OPERATOR_BITWISE_NOT;
+		case TOKEN_KIND_LOGICAL_NOT: return UNARY_OPERATOR_LOGICAL_NOT;
 		NoDefaultCase();
 	}
 
@@ -38,10 +40,22 @@ Unary_Operator_Kind token_to_unary_operator(Token_Kind kind) {
 
 Binary_Operator_Kind token_to_binary_operator(Token_Kind kind) {
 	switch (kind) {
-		case TOKEN_KIND_PLUS: return BINARY_OPERATOR_ADD;
-		case TOKEN_KIND_MINUS: return BINARY_OPERATOR_SUB;
-		case TOKEN_KIND_ASTRICK: return BINARY_OPERATOR_MUL;
-		case TOKEN_KIND_DIVISION: return BINARY_OPERATOR_DIV;
+		case TOKEN_KIND_PLUS: return BINARY_OPERATOR_ADDITION;
+		case TOKEN_KIND_MINUS: return BINARY_OPERATOR_SUBTRACTION;
+		case TOKEN_KIND_ASTRICK: return BINARY_OPERATOR_MULTIPLICATION;
+		case TOKEN_KIND_DIVISION: return BINARY_OPERATOR_DIVISION;
+		case TOKEN_KIND_REMAINDER: return BINARY_OPERATOR_REMAINDER;
+		case TOKEN_KIND_BITWISE_SHIFT_RIGHT: return BINARY_OPERATOR_BITWISE_SHIFT_RIGHT;
+		case TOKEN_KIND_BITWISE_SHIFT_LEFT: return BINARY_OPERATOR_BITWISE_SHIFT_LEFT;
+		case TOKEN_KIND_BITWISE_AND: return BINARY_OPERATOR_BITWISE_AND;
+		case TOKEN_KIND_BITWISE_XOR: return BINARY_OPERATOR_BITWISE_XOR;
+		case TOKEN_KIND_BITWISE_OR: return BINARY_OPERATOR_BITWISE_OR;
+		case TOKEN_KIND_RELATIONAL_GREATER: return BINARY_OPERATOR_RELATIONAL_GREATER;
+		case TOKEN_KIND_RELATIONAL_LESS: return BINARY_OPERATOR_RELATIONAL_LESS;
+		case TOKEN_KIND_RELATIONAL_GREATER_EQUAL: return BINARY_OPERATOR_RELATIONAL_GREATER_EQUAL;
+		case TOKEN_KIND_RELATIONAL_LESS_EQUAL: return BINARY_OPERATOR_RELATIONAL_LESS_EQUAL;
+		case TOKEN_KIND_COMPARE_EQUAL: return BINARY_OPERATOR_COMPARE_EQUAL;
+		case TOKEN_KIND_COMPARE_NOT_EQUAL: return BINARY_OPERATOR_COMPARE_NOT_EQUAL;
 		NoDefaultCase();
 	}
 
@@ -119,6 +133,13 @@ struct Bucket_Array {
 		return N;
 	}
 };
+
+#define ForBucketArray(pBucket, pBucketArray) \
+	for (auto pBucket = &(pBucketArray).first; pBucket; pBucket = pBucket->next)
+
+#define ForBucket(nIndex, pBucket, pBukcetArray)	\
+	auto nMaxIter = (pBucket)->next ? (pBukcetArray).bucket_size() : (pBukcetArray).index; \
+	for (uint32_t nIndex = 0; nIndex < nMaxIter; ++nIndex)
 
 struct Symbol {
 	String          name;
@@ -215,16 +236,13 @@ static uint32_t symbol_table_get(Symbol_Table *table, String name) {
 	return 0;
 }
 
-static inline uint32_t align(uint32_t location, uint32_t alignment) {
-	return ((location + (alignment - 1)) & ~(alignment - 1));
-}
-
 struct Code_Type_Resolver {
 	Symbol_Table symbols;
 	uint32_t     vstack = 0;
 
 	Bucket_Array<Unary_Operator, 8>  unary_operators[_UNARY_OPERATOR_COUNT];
 	Bucket_Array<Binary_Operator, 8> binary_operators[_BINARY_OPERATOR_COUNT];
+	Bucket_Array< Assignment, 8>     assignments;
 };
 
 Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Syntax_Node_Literal *root);
@@ -244,8 +262,29 @@ Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Syntax_Node_Bl
 
 Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Syntax_Node_Literal *root) {
 	auto node = new Code_Node_Literal;
-	node->type.kind = CODE_TYPE_REAL;
-	node->value     = root->value;
+
+	switch (root->value.kind) {
+		case Literal::INTEGER: 
+		{
+			node->type.kind          = CODE_TYPE_INTEGER;
+			node->data.integer.value = root->value.data.integer;
+		} break;
+
+		case Literal::REAL:
+		{
+			node->type.kind       = CODE_TYPE_REAL;
+			node->data.real.value = root->value.data.real;
+		} break;
+
+		case Literal::BOOL:
+		{
+			node->type.kind          = CODE_TYPE_BOOL;
+			node->data.boolean.value = root->value.data.boolean;
+		} break;
+
+		NoDefaultCase();
+	}
+
 	return node;
 }
 
@@ -294,18 +333,17 @@ Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolv
 
 	auto &operators = resolver->unary_operators[op_kind];
 
-	for (auto buk = &operators.first; buk; buk = buk->next) {
-		auto max_count = buk->next ? operators.bucket_size() : operators.index;
-		for (uint32_t index = 0; index < max_count; ++index) {
-			auto op = &buk->data[index];
+	ForBucketArray(bucket, operators) {
+		ForBucket(index, bucket, operators) {
+			auto op = &bucket->data[index];
 
 			if (op->parameter.kind == child->type.kind) {
 				auto node = new Code_Node_Unary_Operator;
 
-				node->type     = op->output;
-				node->child    = child;
-				node->op_kind  = op_kind;
-				node->op       = op;
+				node->type = op->output;
+				node->child = child;
+				node->op_kind = op_kind;
+				node->op = op;
 
 				return node;
 			}
@@ -325,20 +363,19 @@ Code_Node_Binary_Operator *code_resolve_binary_operator(Code_Type_Resolver *reso
 
 	auto &operators = resolver->binary_operators[op_kind];
 
-	for (auto buk = &operators.first; buk; buk = buk->next) {
-		auto max_count = buk->next ? operators.bucket_size() : operators.index;
-		for (uint32_t index = 0; index < max_count; ++index) {
-			auto op = &buk->data[index];
+	ForBucketArray(bucket, operators) {
+		ForBucket(index, bucket, operators) {
+			auto op = &bucket->data[index];
 
 			if (op->parameters[0].kind == left->type.kind &&
 				op->parameters[1].kind == right->type.kind) {
 				auto node = new Code_Node_Binary_Operator;
 
-				node->type     = op->output;
-				node->left     = left;
-				node->right    = right;
-				node->op_kind  = op_kind;
-				node->op       = op;
+				node->type = op->output;
+				node->left = left;
+				node->right = right;
+				node->op_kind = op_kind;
+				node->op = op;
 
 				return node;
 			}
@@ -373,12 +410,21 @@ Code_Node_Assignment *code_resolve_assignment(Code_Type_Resolver *resolver, Synt
 	auto destination = code_resolve_destination(resolver, root->left);
 	auto value       = code_resolve_root_expression(resolver, root->right);
 
-	if (destination->type.kind == value->type.kind) {
-		auto assignment         = new Code_Node_Assignment;
-		assignment->destination = destination;
-		assignment->value       = value;
-		assignment->type        = destination->type;
-		return assignment;
+	auto &assignments = resolver->assignments;
+
+	ForBucketArray(bucket, assignments) {
+		ForBucket(index, bucket, assignments) {
+			auto assign = &bucket->data[index];
+
+			if (assign->destination.kind == destination->type.kind &&
+				assign->value.kind == value->type.kind) {
+				auto node         = new Code_Node_Assignment;
+				node->destination = destination;
+				node->value       = value;
+				node->type        = destination->type;
+				return node;
+			}
+		}
 	}
 
 	Unimplemented();
@@ -396,10 +442,27 @@ Code_Node_Expression *code_resolve_root_expression(Code_Type_Resolver *resolver,
 }
 
 Code_Type code_resolve_type(Code_Type_Resolver *resolver, Syntax_Node_Type *root) {
-	if (root->syntax_type == SYNTAX_TYPE_FLOAT) {
-		Code_Type type;
-		type.kind = CODE_TYPE_REAL;
-		return type;
+	switch (root->token_type) {
+		case TOKEN_KIND_INT: 
+		{
+			Code_Type type;
+			type.kind = CODE_TYPE_INTEGER;
+			return type;
+		} break;
+
+		case TOKEN_KIND_FLOAT:
+		{
+			Code_Type type;
+			type.kind = CODE_TYPE_REAL;
+			return type;
+		} break;
+
+		case TOKEN_KIND_BOOL:
+		{
+			Code_Type type;
+			type.kind = CODE_TYPE_BOOL;
+			return type;
+		} break;
 	}
 
 	Unreachable();
@@ -420,10 +483,19 @@ void code_resolve_declaration(Code_Type_Resolver *resolver, Syntax_Node_Declarat
 			symbol.address = UINT32_MAX;
 		}
 		else {
-			Assert(symbol.type.kind == CODE_TYPE_REAL);
-			uint32_t alignment = align(resolver->vstack, sizeof(float));
-			symbol.address = resolver->vstack + alignment;
-			resolver->vstack += alignment + sizeof(float);
+			// TODO: type info
+
+			uint32_t size = 0;
+			switch (symbol.type.kind) {
+				case CODE_TYPE_INTEGER: size = sizeof(int32_t); break;
+				case CODE_TYPE_REAL: size = sizeof(float); break;
+				case CODE_TYPE_BOOL: size = sizeof(bool); break;
+				NoDefaultCase();
+			}
+
+			resolver->vstack = AlignPower2Up(resolver->vstack, size);
+			symbol.address = resolver->vstack;
+			resolver->vstack += size;
 		}
 
 		symbol_table_put(&resolver->symbols, symbol);
@@ -502,31 +574,181 @@ int main() {
 		return 1;
 	}
 
-	print_syntax(node);
-
-	printf("\n\nType Resolution\n");
+	{
+		auto fp = fopen("syntax.txt", "wb");
+		print_syntax(node, fp);
+		fclose(fp);
+	}
 
 	Code_Type_Resolver resolver;
 
 	{
-		Unary_Operator unary_operator;
-		unary_operator.parameter.kind = CODE_TYPE_REAL;
-		unary_operator.output.kind    = CODE_TYPE_REAL;
+		Unary_Operator unary_operator_real;
+		unary_operator_real.parameter.kind = CODE_TYPE_REAL;
+		unary_operator_real.output.kind    = CODE_TYPE_REAL;
 
-		resolver.unary_operators[UNARY_OPERATOR_PLUS].add(unary_operator);
-		resolver.unary_operators[UNARY_OPERATOR_MINUS].add(unary_operator);
+		resolver.unary_operators[UNARY_OPERATOR_PLUS].add(unary_operator_real);
+		resolver.unary_operators[UNARY_OPERATOR_MINUS].add(unary_operator_real);
 	}
 
 	{
-		Binary_Operator binary_operator;
-		binary_operator.parameters[0].kind = CODE_TYPE_REAL;
-		binary_operator.parameters[1].kind = CODE_TYPE_REAL;
-		binary_operator.output.kind = CODE_TYPE_REAL;
+		Unary_Operator unary_operator_int;
+		unary_operator_int.parameter.kind = CODE_TYPE_INTEGER;
+		unary_operator_int.output.kind    = CODE_TYPE_INTEGER;
 
-		resolver.binary_operators[BINARY_OPERATOR_ADD].add(binary_operator);
-		resolver.binary_operators[BINARY_OPERATOR_SUB].add(binary_operator);
-		resolver.binary_operators[BINARY_OPERATOR_MUL].add(binary_operator);
-		resolver.binary_operators[BINARY_OPERATOR_DIV].add(binary_operator);
+		resolver.unary_operators[UNARY_OPERATOR_PLUS].add(unary_operator_int);
+		resolver.unary_operators[UNARY_OPERATOR_MINUS].add(unary_operator_int);
+		resolver.unary_operators[UNARY_OPERATOR_BITWISE_NOT].add(unary_operator_int);
+	}
+
+	{
+		Unary_Operator unary_operator_bool;
+		unary_operator_bool.parameter.kind = CODE_TYPE_BOOL;
+		unary_operator_bool.output.kind    = CODE_TYPE_BOOL;
+
+		resolver.unary_operators[UNARY_OPERATOR_LOGICAL_NOT].add(unary_operator_bool);
+	}
+
+	{
+		Unary_Operator unary_operator_int_to_real;
+		unary_operator_int_to_real.parameter.kind = CODE_TYPE_INTEGER;
+		unary_operator_int_to_real.output.kind    = CODE_TYPE_REAL;
+
+		resolver.unary_operators[UNARY_OPERATOR_PLUS].add(unary_operator_int_to_real);
+		resolver.unary_operators[UNARY_OPERATOR_MINUS].add(unary_operator_int_to_real);
+	}
+
+	{
+		Binary_Operator binary_operator_real;
+		binary_operator_real.parameters[0].kind = CODE_TYPE_REAL;
+		binary_operator_real.parameters[1].kind = CODE_TYPE_REAL;
+		binary_operator_real.output.kind        = CODE_TYPE_REAL;
+
+		resolver.binary_operators[BINARY_OPERATOR_ADDITION].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_SUBTRACTION].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_MULTIPLICATION].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_DIVISION].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_GREATER].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_LESS].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_GREATER_EQUAL].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_LESS_EQUAL].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_COMPARE_EQUAL].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_COMPARE_NOT_EQUAL].add(binary_operator_real);
+	}
+
+	{
+		Binary_Operator binary_operator_int;
+		binary_operator_int.parameters[0].kind = CODE_TYPE_INTEGER;
+		binary_operator_int.parameters[1].kind = CODE_TYPE_INTEGER;
+		binary_operator_int.output.kind        = CODE_TYPE_INTEGER;
+
+		resolver.binary_operators[BINARY_OPERATOR_ADDITION].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_SUBTRACTION].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_MULTIPLICATION].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_DIVISION].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_REMAINDER].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_BITWISE_SHIFT_RIGHT].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_BITWISE_SHIFT_LEFT].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_BITWISE_AND].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_BITWISE_XOR].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_BITWISE_OR].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_GREATER].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_LESS].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_GREATER_EQUAL].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_LESS_EQUAL].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_COMPARE_EQUAL].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_COMPARE_NOT_EQUAL].add(binary_operator_int);
+	}
+
+	{
+		Binary_Operator binary_operator_int_real;
+		binary_operator_int_real.parameters[0].kind = CODE_TYPE_INTEGER;
+		binary_operator_int_real.parameters[1].kind = CODE_TYPE_REAL;
+		binary_operator_int_real.output.kind        = CODE_TYPE_REAL;
+
+		resolver.binary_operators[BINARY_OPERATOR_ADDITION].add(binary_operator_int_real);
+		resolver.binary_operators[BINARY_OPERATOR_SUBTRACTION].add(binary_operator_int_real);
+		resolver.binary_operators[BINARY_OPERATOR_MULTIPLICATION].add(binary_operator_int_real);
+		resolver.binary_operators[BINARY_OPERATOR_DIVISION].add(binary_operator_int_real);
+	}
+
+	{
+		Binary_Operator binary_operator_real_int;
+		binary_operator_real_int.parameters[0].kind = CODE_TYPE_REAL;
+		binary_operator_real_int.parameters[1].kind = CODE_TYPE_INTEGER;
+		binary_operator_real_int.output.kind        = CODE_TYPE_REAL;
+
+		resolver.binary_operators[BINARY_OPERATOR_ADDITION].add(binary_operator_real_int);
+		resolver.binary_operators[BINARY_OPERATOR_SUBTRACTION].add(binary_operator_real_int);
+		resolver.binary_operators[BINARY_OPERATOR_MULTIPLICATION].add(binary_operator_real_int);
+		resolver.binary_operators[BINARY_OPERATOR_DIVISION].add(binary_operator_real_int);
+	}
+
+	{
+		Binary_Operator binary_operator_bool;
+		binary_operator_bool.parameters[0].kind = CODE_TYPE_BOOL;
+		binary_operator_bool.parameters[1].kind = CODE_TYPE_BOOL;
+		binary_operator_bool.output.kind        = CODE_TYPE_INTEGER;
+
+		resolver.binary_operators[BINARY_OPERATOR_ADDITION].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_SUBTRACTION].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_MULTIPLICATION].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_DIVISION].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_REMAINDER].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_GREATER].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_LESS].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_GREATER_EQUAL].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_LESS_EQUAL].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_COMPARE_EQUAL].add(binary_operator_bool);
+		resolver.binary_operators[BINARY_OPERATOR_COMPARE_NOT_EQUAL].add(binary_operator_bool);
+	}
+
+	{
+		Assignment assignment_real;
+		assignment_real.destination.kind = CODE_TYPE_REAL;
+		assignment_real.value.kind       = CODE_TYPE_REAL;
+
+		resolver.assignments.add(assignment_real);
+	}
+
+	{
+		Assignment assignment_int;
+		assignment_int.destination.kind = CODE_TYPE_INTEGER;
+		assignment_int.value.kind       = CODE_TYPE_INTEGER;
+
+		resolver.assignments.add(assignment_int);
+	}
+
+	{
+		Assignment assignment_bool;
+		assignment_bool.destination.kind = CODE_TYPE_BOOL;
+		assignment_bool.value.kind       = CODE_TYPE_BOOL;
+
+		resolver.assignments.add(assignment_bool);
+	}
+
+	{
+		Assignment assignment_int_bool;
+		assignment_int_bool.destination.kind = CODE_TYPE_INTEGER;
+		assignment_int_bool.value.kind       = CODE_TYPE_BOOL;
+
+		resolver.assignments.add(assignment_int_bool);
+	}
+
+	{
+		Assignment assignment_bool_int;
+		assignment_bool_int.destination.kind = CODE_TYPE_BOOL;
+		assignment_bool_int.value.kind       = CODE_TYPE_INTEGER;
+
+		resolver.assignments.add(assignment_bool_int);
+	}
+
+	{
+		Assignment assignment_int_real;
+		assignment_int_real.destination.kind = CODE_TYPE_REAL;
+		assignment_int_real.value.kind       = CODE_TYPE_INTEGER;
+
+		resolver.assignments.add(assignment_int_real);
 	}
 
 	{
@@ -539,8 +761,14 @@ int main() {
 	auto code = code_resolve_block(&resolver, node);
 	print_code(code);
 	Interp* interp = new Interp;
+	//Find_Type_Value* type_value = new Find_Type_Value;
 	//interp->stack = new uint8_t[1000];
 	evaluate_node_block(code,interp);
 
+	{
+		auto fp = fopen("code.txt", "wb");
+		print_code(code, fp);
+		fclose(fp);
+	}
 	return 0;
 }

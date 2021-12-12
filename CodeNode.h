@@ -18,13 +18,35 @@ enum Code_Node_Kind {
 
 enum Code_Type_Kind {
 	CODE_TYPE_NULL,
+	CODE_TYPE_INTEGER,
 	CODE_TYPE_REAL,
+	CODE_TYPE_BOOL,
 
 	_CODE_TYPE_COUNT
 };
 
 struct Code_Type {
 	Code_Type_Kind kind = CODE_TYPE_NULL;
+};
+
+struct Code_Value_Integer {
+	int32_t value;
+};
+
+struct Code_Value_Real {
+	float value;
+};
+
+struct Code_Value_Bool {
+	bool value;
+};
+
+union Code_Value {
+	Code_Value_Integer integer;
+	Code_Value_Real    real;
+	Code_Value_Bool    boolean;
+
+	Code_Value() = default;
 };
 
 struct Code_Node {
@@ -35,7 +57,7 @@ struct Code_Node {
 struct Code_Node_Literal : public Code_Node {
 	Code_Node_Literal() { kind = CODE_NODE_LITERAL; }
 
-	double value = 0;
+	Code_Value data;
 };
 
 struct Code_Node_Stack : public Code_Node {
@@ -53,6 +75,8 @@ struct Code_Node_Destination : public Code_Node {
 enum Unary_Operator_Kind {
 	UNARY_OPERATOR_PLUS,
 	UNARY_OPERATOR_MINUS,
+	UNARY_OPERATOR_BITWISE_NOT,
+	UNARY_OPERATOR_LOGICAL_NOT,
 
 	_UNARY_OPERATOR_COUNT
 };
@@ -72,10 +96,22 @@ struct Code_Node_Unary_Operator : public Code_Node {
 };
 
 enum Binary_Operator_Kind {
-	BINARY_OPERATOR_ADD,
-	BINARY_OPERATOR_SUB,
-	BINARY_OPERATOR_MUL,
-	BINARY_OPERATOR_DIV,
+	BINARY_OPERATOR_ADDITION,
+	BINARY_OPERATOR_SUBTRACTION,
+	BINARY_OPERATOR_MULTIPLICATION,
+	BINARY_OPERATOR_DIVISION,
+	BINARY_OPERATOR_REMAINDER,
+	BINARY_OPERATOR_BITWISE_SHIFT_RIGHT,
+	BINARY_OPERATOR_BITWISE_SHIFT_LEFT,
+	BINARY_OPERATOR_BITWISE_AND,
+	BINARY_OPERATOR_BITWISE_XOR,
+	BINARY_OPERATOR_BITWISE_OR,
+	BINARY_OPERATOR_RELATIONAL_GREATER,
+	BINARY_OPERATOR_RELATIONAL_LESS,
+	BINARY_OPERATOR_RELATIONAL_GREATER_EQUAL,
+	BINARY_OPERATOR_RELATIONAL_LESS_EQUAL,
+	BINARY_OPERATOR_COMPARE_EQUAL,
+	BINARY_OPERATOR_COMPARE_NOT_EQUAL,
 
 	_BINARY_OPERATOR_COUNT
 };
@@ -99,6 +135,11 @@ struct Code_Node_Expression : public Code_Node {
 	Code_Node_Expression() { kind = CODE_NODE_EXPRESSION; }
 
 	Code_Node *child = nullptr;
+};
+
+struct Assignment {
+	Code_Type destination;
+	Code_Type value;
 };
 
 struct Code_Node_Assignment : public Code_Node {
