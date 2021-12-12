@@ -6,6 +6,7 @@ enum Token_Kind {
 
 	TOKEN_KIND_SEMICOLON,
 	TOKEN_KIND_COLON,
+	TOKEN_KIND_DEREFERENCE,
 	TOKEN_KIND_EQUALS,
 	TOKEN_KIND_OPEN_BRACKET,
 	TOKEN_KIND_CLOSE_BRACKET,
@@ -19,7 +20,7 @@ enum Token_Kind {
 	TOKEN_KIND_BITWISE_SHIFT_RIGHT,
 	TOKEN_KIND_BITWISE_SHIFT_LEFT,
 
-	TOKEN_KIND_AMPERSAND,
+	TOKEN_KIND_BITWISE_AND,
 	TOKEN_KIND_BITWISE_XOR,
 	TOKEN_KIND_BITWISE_OR,
 	TOKEN_KIND_BITWISE_NOT,
@@ -78,7 +79,7 @@ static inline String token_kind_string(Token_Kind kind) {
 	static String strings[] = {
 		"-unknown-",
 
-		";", ":", "=",
+		";", ":", "?", "=",
 
 		"(", ")",
 

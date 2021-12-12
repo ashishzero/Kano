@@ -4,7 +4,7 @@ var number1: int;
 
 var ptr: *float;
 
-ptr = &number0;
+ptr = *number0;
 
 var is_even: bool;
 is_even = !false;
@@ -13,6 +13,8 @@ number0 = 5 & ~number1;
 
 number0 = - 5 + 6 * 3 / (5 - 8) + 5;
 number1 = 9/3+2;
+
+number0 = ?ptr;
 
 var number2: float;
 number2 = number0 + number1;

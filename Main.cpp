@@ -30,7 +30,8 @@ Unary_Operator_Kind token_to_unary_operator(Token_Kind kind) {
 		case TOKEN_KIND_MINUS: return UNARY_OPERATOR_MINUS;
 		case TOKEN_KIND_BITWISE_NOT: return UNARY_OPERATOR_BITWISE_NOT;
 		case TOKEN_KIND_LOGICAL_NOT: return UNARY_OPERATOR_LOGICAL_NOT;
-		case TOKEN_KIND_AMPERSAND: return UNARY_OPERATOR_ADDRESS_OF;
+		case TOKEN_KIND_ASTRICK: return UNARY_OPERATOR_POINTER_TO;
+		case TOKEN_KIND_DEREFERENCE: return UNARY_OPERATOR_DEREFERENCE;
 		NoDefaultCase();
 	}
 
@@ -47,7 +48,7 @@ Binary_Operator_Kind token_to_binary_operator(Token_Kind kind) {
 		case TOKEN_KIND_REMAINDER: return BINARY_OPERATOR_REMAINDER;
 		case TOKEN_KIND_BITWISE_SHIFT_RIGHT: return BINARY_OPERATOR_BITWISE_SHIFT_RIGHT;
 		case TOKEN_KIND_BITWISE_SHIFT_LEFT: return BINARY_OPERATOR_BITWISE_SHIFT_LEFT;
-		case TOKEN_KIND_AMPERSAND: return BINARY_OPERATOR_BITWISE_AND;
+		case TOKEN_KIND_BITWISE_AND: return BINARY_OPERATOR_BITWISE_AND;
 		case TOKEN_KIND_BITWISE_XOR: return BINARY_OPERATOR_BITWISE_XOR;
 		case TOKEN_KIND_BITWISE_OR: return BINARY_OPERATOR_BITWISE_OR;
 		case TOKEN_KIND_RELATIONAL_GREATER: return BINARY_OPERATOR_RELATIONAL_GREATER;
@@ -410,7 +411,7 @@ Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolv
 		}
 	}
 
-	if (op_kind == UNARY_OPERATOR_ADDRESS_OF && (child->flags & SYMBOL_BIT_RVALUE)) {
+	if (op_kind == UNARY_OPERATOR_POINTER_TO && (child->flags & SYMBOL_BIT_RVALUE)) {
 		auto node = new Code_Node_Unary_Operator;
 		auto type = new Code_Type_Pointer;
 
@@ -419,6 +420,17 @@ Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolv
 		node->type      = type;
 		node->child     = child;
 		node->op_kind   = op_kind;
+
+		return node;
+	}
+
+	else if (op_kind == UNARY_OPERATOR_DEREFERENCE && (child->type->kind == CODE_TYPE_POINTER)) {
+		auto node = new Code_Node_Unary_Operator;
+		auto type = ((Code_Type_Pointer *)child->type)->base_type;
+
+		node->type    = type;
+		node->child   = child;
+		node->op_kind = op_kind;
 
 		return node;
 	}
