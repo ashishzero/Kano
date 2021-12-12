@@ -200,6 +200,27 @@ void lexer_next(Lexer *lexer) {
 			return;
 		}
 
+		// three character tokens
+		if (lexer->cursor + 2 < lexer->content.data + lexer->content.length) {
+			auto c = *(lexer->cursor + 2);
+
+			if (c == '=') {
+				if (a == b) {
+					if (a == '>') {
+						lexer->cursor += 3;
+						lexer_make_token(lexer, TOKEN_KIND_COMPOUND_BITWISE_SHIFT_RIGHT);
+						return;
+					}
+					else if (a == '<') {
+						lexer->cursor += 3;
+						lexer_make_token(lexer, TOKEN_KIND_COMPOUND_BITWISE_SHIFT_LEFT);
+						return;
+					}
+				}
+			}
+		}
+
+
 		// double character tokens
 		if (a == '>' && b == '>') {
 			lexer->cursor += 2;
@@ -222,6 +243,9 @@ void lexer_next(Lexer *lexer) {
 			case '*': lexer->cursor += 2; lexer_make_token(lexer, TOKEN_KIND_COMPOUND_MULTIPLY); return;
 			case '/': lexer->cursor += 2; lexer_make_token(lexer, TOKEN_KIND_COMPOUND_DIVIDE); return;
 			case '%': lexer->cursor += 2; lexer_make_token(lexer, TOKEN_KIND_COMPOUND_REMAINDER); return;
+			case '&': lexer->cursor += 2; lexer_make_token(lexer, TOKEN_KIND_COMPOUND_BITWISE_AND); return;
+			case '^': lexer->cursor += 2; lexer_make_token(lexer, TOKEN_KIND_COMPOUND_BITWISE_XOR); return;
+			case '|': lexer->cursor += 2; lexer_make_token(lexer, TOKEN_KIND_COMPOUND_BITWISE_OR); return;
 			}
 		}
 

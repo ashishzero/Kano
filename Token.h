@@ -28,9 +28,17 @@ enum Token_Kind {
 	TOKEN_KIND_BITWISE_SHIFT_RIGHT,
 	TOKEN_KIND_BITWISE_SHIFT_LEFT,
 
+	TOKEN_KIND_COMPOUND_BITWISE_SHIFT_RIGHT,
+	TOKEN_KIND_COMPOUND_BITWISE_SHIFT_LEFT,
+
 	TOKEN_KIND_BITWISE_AND,
 	TOKEN_KIND_BITWISE_XOR,
 	TOKEN_KIND_BITWISE_OR,
+
+	TOKEN_KIND_COMPOUND_BITWISE_AND,
+	TOKEN_KIND_COMPOUND_BITWISE_XOR,
+	TOKEN_KIND_COMPOUND_BITWISE_OR,
+
 	TOKEN_KIND_BITWISE_NOT,
 
 	TOKEN_KIND_LOGICAL_NOT,
@@ -105,7 +113,13 @@ static inline String token_kind_string(Token_Kind kind) {
 
 		">>", "<<",
 
-		"&", "^", "|", "~",
+		">>=", "<<=",
+
+		"&", "^", "|", 
+
+		"&=", "^=", "|=", 
+		
+		"~",
 
 		"!",
 
