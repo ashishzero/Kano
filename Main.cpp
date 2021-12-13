@@ -482,9 +482,14 @@ Code_Node_Assignment *code_resolve_assignment(Code_Type_Resolver *resolver, Symb
 			}
 
 			if (match) {
+				auto assign_value = new Code_Node_Assignment_Value;
+				assign_value->child = value;
+				assign_value->flags = value->flags;
+				assign_value->type  = value->type;
+
 				auto node = new Code_Node_Assignment;
 				node->destination = destination;
-				node->value = value;
+				node->value = assign_value;
 				node->type = destination->type;
 				return node;
 			}
@@ -520,7 +525,7 @@ Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols
 		case TOKEN_KIND_ASTERISK: 
 		{
 			auto type       = new Code_Type_Pointer;
-			type->base_type = code_resolve_type(resolver, symbols, root->next);
+			type->base_type = code_resolve_type(resolver, symbols, (Syntax_Node_Type *)root->type);
 			return type;
 		} break;
 
@@ -560,7 +565,17 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
 		Code_Node_Assignment *assignment = nullptr;
 
 		if (root->initializer) {
-			auto value = code_resolve_root_expression(resolver, symbols, root->initializer);
+			auto value = new Code_Node_Assignment_Value;
+
+			if (root->initializer->kind == SYNTAX_NODE_EXPRESSION) {
+				value->child = code_resolve_root_expression(resolver, symbols, (Syntax_Node_Expression *)root->initializer);
+			}
+			else {
+				Unimplemented();
+			}
+
+			value->type  = value->child->type;
+			value->flags = value->child->flags;
 
 			// Implicit type declaration
 			if (!symbol->type) {

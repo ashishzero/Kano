@@ -80,6 +80,7 @@ enum Code_Node_Kind {
 	CODE_NODE_UNARY_OPERATOR,
 	CODE_NODE_BINARY_OPERATOR,
 	CODE_NODE_EXPRESSION,
+	CODE_NODE_ASSIGNMENT_VALUE,
 	CODE_NODE_ASSIGNMENT,
 	CODE_NODE_STATEMENT,
 	CODE_NODE_IF,
@@ -211,11 +212,17 @@ struct Code_Node_Expression : public Code_Node {
 	Code_Node *child = nullptr;
 };
 
+struct Code_Node_Assignment_Value : public Code_Node {
+	Code_Node_Assignment_Value() { kind = CODE_NODE_ASSIGNMENT_VALUE; }
+
+	Code_Node *child = nullptr;
+};
+
 struct Code_Node_Assignment : public Code_Node {
 	Code_Node_Assignment() { kind = CODE_NODE_ASSIGNMENT; }
 
 	Code_Node_Expression *destination = nullptr;
-	Code_Node_Expression *value = nullptr;
+	Code_Node_Assignment_Value *value = nullptr;
 };
 
 struct Code_Node_Statement : public Code_Node {

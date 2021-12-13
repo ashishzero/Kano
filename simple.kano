@@ -1,5 +1,15 @@
 
 {
+	//const factorial := proc (var n: float) float {
+	//	if n < 1 then return n;
+	//	return n * factorial(n - 1);
+	//}
+
+	const adder : proc (var a: int, var b: int) -> int = proc (var a: int, var b: int) -> int {
+		var result:= a + b;
+		return a + b;
+	}
+
 	var number0: float = 5;
 	var number1: int;
 

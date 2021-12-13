@@ -101,9 +101,16 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
 		const char *type_name = (char *)token_kind_string(node->token_type).data;
 		fprintf(fp, "Type(%s)\n", type_name);
 
-		if (node->next) {
-			print_syntax(node->next, fp, child_indent);
+		if (node->type) {
+			print_syntax(node->type, fp, child_indent);
 		}
+	} break;
+
+	case SYNTAX_NODE_RETURN:
+	{
+		auto node = (Syntax_Node_Return *)root;
+		fprintf(fp, "Return()\n");
+		print_syntax(node->expression, fp, child_indent);
 	} break;
 
 	case SYNTAX_NODE_ASSIGNMENT:
@@ -157,6 +164,34 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
 		fprintf(fp, "Do()\n");
 		print_syntax(node->body, fp, child_indent, "Body");
 		print_syntax(node->condition, fp, child_indent, "Condition");
+	} break;
+
+	case SYNTAX_NODE_PROCEDURE_ARGUMENT:
+	{
+		auto node = (Syntax_Node_Procedure_Argument *)root;
+		fprintf(fp, "Arg()\n");
+		print_syntax(node->declaration, fp, child_indent);
+	} break;
+
+	case SYNTAX_NODE_PROCEDURE_PROTOTYPE:
+	{
+		auto node = (Syntax_Node_Procedure_Prototype *)root;
+		fprintf(fp, "Procedure-Prototype()\n");
+		for (auto arg = node->arguments; arg; arg = arg->next) {
+			print_syntax(arg, fp, child_indent);
+		}
+
+		if (node->return_type) {
+			print_syntax(node->return_type, fp, child_indent, "Return-Type");
+		}
+	} break;
+
+	case SYNTAX_NODE_PROCEDURE:
+	{
+		auto node = (Syntax_Node_Procedure *)root;
+		fprintf(fp, "Procedure()\n");
+		print_syntax(node->prototype, fp, child_indent, "Prototype");
+		print_syntax(node->body, fp, child_indent, "Body");
 	} break;
 
 	case SYNTAX_NODE_DECLARATION:

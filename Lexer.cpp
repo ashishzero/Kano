@@ -232,6 +232,11 @@ void lexer_next(Lexer *lexer) {
 			lexer_make_token(lexer, TOKEN_KIND_BITWISE_SHIFT_LEFT);
 			return;
 		}
+		else if (a == '-' && b == '>') {
+			lexer->cursor += 2;
+			lexer_make_token(lexer, TOKEN_KIND_DASH_ARROW);
+			return;
+		}
 		else if (b == '=') {
 			switch (a) {
 			case '>': lexer->cursor += 2; lexer_make_token(lexer, TOKEN_KIND_RELATIONAL_GREATER_EQUAL); return;
@@ -252,6 +257,7 @@ void lexer_next(Lexer *lexer) {
 		// single character tokens
 		switch (a) {
 		case ':': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_COLON); return;
+		case ',': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_COMMA); return;
 		case '?': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_DEREFERENCE); return;
 		case '=': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_EQUALS); return;
 		case '(': lexer->cursor++; lexer_make_token(lexer, TOKEN_KIND_OPEN_BRACKET); return;
@@ -289,14 +295,16 @@ void lexer_next(Lexer *lexer) {
 				"true", "false",
 				"int", "float", "bool",
 				"if", "then", "else",
-				"for", "while", "do" };
+				"for", "while", "do",
+				"proc", "return" };
 
 			static const Token_Kind KeyWordTokens[] = {
 				TOKEN_KIND_VAR, TOKEN_KIND_CONST,
 				TOKEN_KIND_TRUE, TOKEN_KIND_FALSE,
 				TOKEN_KIND_INT, TOKEN_KIND_FLOAT, TOKEN_KIND_BOOL,
 				TOKEN_KIND_IF, TOKEN_KIND_THEN, TOKEN_KIND_ELSE,
-				TOKEN_KIND_FOR, TOKEN_KIND_WHILE, TOKEN_KIND_DO, };
+				TOKEN_KIND_FOR, TOKEN_KIND_WHILE, TOKEN_KIND_DO,
+				TOKEN_KIND_PROC, TOKEN_KIND_RETURN };
 
 			static_assert(ArrayCount(KeyWords) == ArrayCount(KeyWordTokens));
 

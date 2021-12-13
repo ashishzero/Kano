@@ -322,7 +322,16 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec) {
 
 Syntax_Node_Expression *parse_root_expression(Parser *parser) {
 	auto expression = parser_new_syntax_node<Syntax_Node_Expression>(parser);
-	expression->child = parse_expression(parser, 0);
+
+	if (parser_accept_token(parser, TOKEN_KIND_RETURN)) {
+		auto return_node        = parser_new_syntax_node<Syntax_Node_Return>(parser);
+		return_node->expression = parse_expression(parser, 0);
+		parser_finish_syntax_node(parser, return_node);
+		expression->child       = return_node;
+	}
+	else {
+		expression->child = parse_expression(parser, 0);
+	}
 
 	if (!expression->child) {
 		expression->child = parser_new_syntax_node<Syntax_Node>(parser);
@@ -331,6 +340,76 @@ Syntax_Node_Expression *parse_root_expression(Parser *parser) {
 
 	parser_finish_syntax_node(parser, expression);
 	return expression;
+}
+
+Syntax_Node_Procedure_Argument *parse_procedure_argument(Parser *parser) {
+	auto arg = parser_new_syntax_node<Syntax_Node_Procedure_Argument>(parser);
+
+	auto token = lexer_current_token(&parser->lexer);
+	arg->declaration = parse_declaration(parser);
+
+	if (arg->declaration->flags & SYMBOL_BIT_CONSTANT) {
+		parser_error(parser, token, "Procedure argument can not have constant declaration");
+	}
+
+	if (arg->declaration->initializer) {
+		parser_error(parser, token, "Procedure argument can not be initialized");
+	}
+
+	parser_finish_syntax_node(parser, arg);
+	
+	return arg;
+}
+
+Syntax_Node_Procedure_Prototype *parse_procedure_prototype(Parser *parser) {
+	auto proc_prototype = parser_new_syntax_node<Syntax_Node_Procedure_Prototype>(parser);
+
+	if (parser_expect_token(parser, TOKEN_KIND_PROC)) {
+		if (parser_expect_token(parser, TOKEN_KIND_OPEN_BRACKET)) {
+
+			Syntax_Node_Procedure_Argument arg_stub;
+			Syntax_Node_Procedure_Argument *parent_arg = &arg_stub;
+
+			uint64_t arg_count = 0;
+			while (parser_should_continue(parser)) {
+				if (parser_peek_token(parser, TOKEN_KIND_CLOSE_BRACKET)) {
+					break;
+				}
+
+				if (arg_count) {
+					parser_expect_token(parser, TOKEN_KIND_COMMA);
+				}
+
+				parent_arg->next = parse_procedure_argument(parser);
+				parent_arg       = parent_arg->next;
+
+				arg_count += 1;
+			}
+
+			parser_expect_token(parser, TOKEN_KIND_CLOSE_BRACKET);
+
+			proc_prototype->arguments      = arg_stub.next;
+			proc_prototype->argument_count = arg_count;
+		}
+
+		if (parser_accept_token(parser, TOKEN_KIND_DASH_ARROW)) {
+			proc_prototype->return_type = parse_type(parser);
+		}
+	}
+
+	parser_finish_syntax_node(parser, proc_prototype);
+
+	return proc_prototype;
+}
+
+Syntax_Node_Procedure *parse_procedure(Parser *parser) {
+	auto proc = parser_new_syntax_node<Syntax_Node_Procedure>(parser);
+
+	proc->prototype = parse_procedure_prototype(parser);
+	proc->body      = parse_statement(parser);
+
+	parser_finish_syntax_node(parser, proc);
+	return proc;
 }
 
 Syntax_Node_Type *parse_type(Parser *parser) {
@@ -347,7 +426,11 @@ Syntax_Node_Type *parse_type(Parser *parser) {
 	}
 	else if (parser_accept_token(parser, TOKEN_KIND_ASTERISK)) {
 		type->token_type = TOKEN_KIND_ASTERISK;
-		type->next = parse_type(parser);
+		type->type       = parse_type(parser);
+	}
+	else if (parser_peek_token(parser, TOKEN_KIND_PROC)) {
+		type->token_type = TOKEN_KIND_PROC;
+		type->type       = parse_procedure_prototype(parser);
 	}
 	else {
 		auto token = lexer_current_token(&parser->lexer);
@@ -379,13 +462,23 @@ Syntax_Node_Declaration *parse_declaration(Parser *parser) {
 
 	parser_expect_token(parser, TOKEN_KIND_COLON);
 
+	bool parse_initialization = false;
 	if (parser_accept_token(parser, TOKEN_KIND_EQUALS)) {
-		declaration->initializer = parse_root_expression(parser);
+		parse_initialization = true;
 	}
 	else {
 		declaration->type = parse_type(parser);
 
 		if (parser_accept_token(parser, TOKEN_KIND_EQUALS)) {
+			parse_initialization = true;
+		}
+	}
+
+	if (parse_initialization) {
+		if (parser_peek_token(parser, TOKEN_KIND_PROC)) {
+			declaration->initializer = parse_procedure(parser);
+		}
+		else {
 			declaration->initializer = parse_root_expression(parser);
 		}
 	}
@@ -408,7 +501,10 @@ Syntax_Node_Statement *parse_statement(Parser *parser) {
 		auto declaration = parse_declaration(parser);
 		statement->node  = declaration;
 
-		parser_expect_token(parser, TOKEN_KIND_SEMICOLON);
+		if (!declaration->initializer ||
+			declaration->initializer->kind == SYNTAX_NODE_EXPRESSION) {
+			parser_expect_token(parser, TOKEN_KIND_SEMICOLON);
+		}
 	}
 
 	// if

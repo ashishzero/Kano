@@ -25,12 +25,16 @@ enum Syntax_Node_Kind {
 	SYNTAX_NODE_UNARY_OPERATOR,
 	SYNTAX_NODE_BINARY_OPERATOR,
 	SYNTAX_NODE_TYPE,
+	SYNTAX_NODE_RETURN,
 	SYNTAX_NODE_ASSIGNMENT,
 	SYNTAX_NODE_EXPRESSION,
 	SYNTAX_NODE_IF,
 	SYNTAX_NODE_FOR,
 	SYNTAX_NODE_WHILE,
 	SYNTAX_NODE_DO,
+	SYNTAX_NODE_PROCEDURE_ARGUMENT,
+	SYNTAX_NODE_PROCEDURE_PROTOTYPE,
+	SYNTAX_NODE_PROCEDURE,
 	SYNTAX_NODE_DECLARATION,
 	SYNTAX_NODE_STATEMENT,
 	SYNTAX_NODE_BLOCK,
@@ -46,6 +50,11 @@ struct Syntax_Node_Assignment;
 struct Syntax_Node_Expression;
 struct Syntax_Node_If;
 struct Syntax_Node_For;
+struct Syntax_Node_While;
+struct Syntax_Node_Do;
+struct Syntax_Node_Procedure_Argument;
+struct Syntax_Node_Procedure_Prototype;
+struct Syntax_Node_Procedure;
 struct Syntax_Node_Declaration;
 struct Syntax_Node_Statement;
 struct Syntax_Node_Block;
@@ -101,7 +110,13 @@ struct Syntax_Node_Type : public Syntax_Node {
 	Syntax_Node_Type() { kind = SYNTAX_NODE_TYPE; }
 
 	Token_Kind token_type  = TOKEN_KIND_ERROR;
-	Syntax_Node_Type *next = nullptr;
+	Syntax_Node *type = nullptr;
+};
+
+struct Syntax_Node_Return : public Syntax_Node {
+	Syntax_Node_Return() { kind = SYNTAX_NODE_RETURN; }
+
+	Syntax_Node *expression = nullptr;
 };
 
 struct Syntax_Node_Assignment : public Syntax_Node {
@@ -149,13 +164,36 @@ struct Syntax_Node_Do : public Syntax_Node {
 	Syntax_Node_Expression *condition = nullptr;
 };
 
+struct Syntax_Node_Procedure_Argument : public Syntax_Node {
+	Syntax_Node_Procedure_Argument() { kind = SYNTAX_NODE_PROCEDURE_ARGUMENT; }
+
+	Syntax_Node_Declaration *declaration = nullptr;
+	Syntax_Node_Procedure_Argument *next = nullptr;
+};
+
+struct Syntax_Node_Procedure_Prototype : public Syntax_Node {
+	Syntax_Node_Procedure_Prototype() { kind = SYNTAX_NODE_PROCEDURE_PROTOTYPE; }
+
+	Syntax_Node_Procedure_Argument *arguments = nullptr;
+	uint64_t argument_count = 0;
+
+	Syntax_Node_Type *return_type = nullptr;
+};
+
+struct Syntax_Node_Procedure : public Syntax_Node {
+	Syntax_Node_Procedure() { kind = SYNTAX_NODE_PROCEDURE; }
+
+	Syntax_Node_Procedure_Prototype *prototype = nullptr;
+	Syntax_Node_Statement *body = nullptr;
+};
+
 struct Syntax_Node_Declaration : public Syntax_Node {
 	Syntax_Node_Declaration() { kind = SYNTAX_NODE_DECLARATION; }
 
 	uint32_t          flags = 0;
 	String            identifier;
-	Syntax_Node_Type *type              = nullptr;
-	Syntax_Node_Expression *initializer = nullptr;
+	Syntax_Node_Type *type = nullptr;
+	Syntax_Node *     initializer = nullptr;
 };
 
 struct Syntax_Node_Statement : public Syntax_Node {
