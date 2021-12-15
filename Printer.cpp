@@ -32,7 +32,10 @@ static inline String binary_operator_kind_string(Binary_Operator_Kind kind) {
 		">>", ">>",
 		"&", "^", "|",
 		">", "<", ">=", "<=",
-		"==", "!="
+		"==", "!=",
+		"+=", "-=", "*=", "/=", "%=",
+		">>=", "<<=",
+		"&=", "^=", "|="
 	};
 	static_assert(ArrayCount(strings) == _BINARY_OPERATOR_COUNT);
 	return strings[kind];
@@ -130,6 +133,32 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
 		}
 	} break;
 
+	case SYNTAX_NODE_FOR:
+	{
+		auto node = (Syntax_Node_For *)root;
+		fprintf(fp, "For()\n");
+		print_syntax(node->initialization, fp, child_indent, "Initialization");
+		print_syntax(node->condition, fp, child_indent, "Condition");
+		print_syntax(node->increment, fp, child_indent, "Increment");
+		print_syntax(node->body, fp, child_indent, "Body");
+	} break;
+
+	case SYNTAX_NODE_WHILE:
+	{
+		auto node = (Syntax_Node_While *)root;
+		fprintf(fp, "While()\n");
+		print_syntax(node->condition, fp, child_indent, "Condition");
+		print_syntax(node->body, fp, child_indent, "Body");
+	} break;
+
+	case SYNTAX_NODE_DO:
+	{
+		auto node = (Syntax_Node_Do *)root;
+		fprintf(fp, "Do()\n");
+		print_syntax(node->body, fp, child_indent, "Body");
+		print_syntax(node->condition, fp, child_indent, "Condition");
+	} break;
+
 	case SYNTAX_NODE_DECLARATION:
 	{
 		auto node = (Syntax_Node_Declaration *)root;
@@ -139,7 +168,10 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
 		else {
 			fprintf(fp, "Variable Declaration(%s)\n", node->identifier.data);
 		}
-		print_syntax(node->type, fp, child_indent, "Type");
+
+		if (node->type) {
+			print_syntax(node->type, fp, child_indent, "Type");
+		}
 		
 		if (node->initializer) {
 			print_syntax(node->initializer, fp, child_indent, "Initializer");
@@ -254,8 +286,34 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title) 
 		print_code(node->true_statement, fp, child_indent, "True-Statement");
 
 		if (node->false_statement) {
-			print_code(node->true_statement, fp, child_indent, "False-Statement");
+			print_code(node->false_statement, fp, child_indent, "False-Statement");
 		}
+	} break;
+
+	case CODE_NODE_FOR:
+	{
+		auto node = (Code_Node_For *)root;
+		fprintf(fp, "For()\n");
+		print_code(node->initialization, fp, child_indent, "Initialization");
+		print_code(node->condition, fp, child_indent, "Condition");
+		print_code(node->increment, fp, child_indent, "Increment");
+		print_code(node->body, fp, child_indent, "Body");
+	} break;
+
+	case CODE_NODE_WHILE:
+	{
+		auto node = (Code_Node_While *)root;
+		fprintf(fp, "While()\n");
+		print_code(node->condition, fp, child_indent, "Condition");
+		print_code(node->body, fp, child_indent, "Body");
+	} break;
+
+	case CODE_NODE_DO:
+	{
+		auto node = (Code_Node_Do *)root;
+		fprintf(fp, "Do()\n");
+		print_code(node->body, fp, child_indent, "Body");
+		print_code(node->condition, fp, child_indent, "Condition");
 	} break;
 
 	case CODE_NODE_BLOCK:

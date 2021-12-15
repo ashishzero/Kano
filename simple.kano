@@ -26,4 +26,21 @@
 	else if number1 != 0 {
 		is_even = true;
 	}
+
+	var sum:= 0;
+
+	for var i:= 0; i < 100; i = i + 1 {
+		sum = sum + i;
+	}
+
+	while sum {
+		sum = sum - 1;
+	}
+
+	var i:= 9;
+
+	do {
+		sum += 1;
+		i -= 1;
+	} while i >= 0;
 }

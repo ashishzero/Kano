@@ -83,6 +83,9 @@ enum Code_Node_Kind {
 	CODE_NODE_ASSIGNMENT,
 	CODE_NODE_STATEMENT,
 	CODE_NODE_IF,
+	CODE_NODE_FOR,
+	CODE_NODE_WHILE,
+	CODE_NODE_DO,
 	CODE_NODE_BLOCK,
 
 	_CODE_NODE_COUNT,
@@ -178,6 +181,16 @@ enum Binary_Operator_Kind {
 	BINARY_OPERATOR_RELATIONAL_LESS_EQUAL,
 	BINARY_OPERATOR_COMPARE_EQUAL,
 	BINARY_OPERATOR_COMPARE_NOT_EQUAL,
+	BINARY_OPERATOR_COMPOUND_ADDITION,
+	BINARY_OPERATOR_COMPOUND_SUBTRACTION,
+	BINARY_OPERATOR_COMPOUND_MULTIPLICATION,
+	BINARY_OPERATOR_COMPOUND_DIVISION,
+	BINARY_OPERATOR_COMPOUND_REMAINDER,
+	BINARY_OPERATOR_COMPOUND_BITWISE_SHIFT_RIGHT,
+	BINARY_OPERATOR_COMPOUND_BITWISE_SHIFT_LEFT,
+	BINARY_OPERATOR_COMPOUND_BITWISE_AND,
+	BINARY_OPERATOR_COMPOUND_BITWISE_XOR,
+	BINARY_OPERATOR_COMPOUND_BITWISE_OR,
 
 	_BINARY_OPERATOR_COUNT
 };
@@ -185,6 +198,7 @@ enum Binary_Operator_Kind {
 struct Binary_Operator {
 	Code_Type *parameters[2];
 	Code_Type *output;
+	bool compound = false;
 };
 
 struct Code_Node_Binary_Operator : public Code_Node {
@@ -222,6 +236,34 @@ struct Code_Node_If : public Code_Node {
 	Code_Node_Expression *condition      = nullptr;
 	Code_Node_Statement *true_statement  = nullptr;
 	Code_Node_Statement *false_statement = nullptr;
+};
+
+struct Code_Node_For : public Code_Node {
+	Code_Node_For() { kind = CODE_NODE_FOR; }
+
+	Code_Node_Statement *initialization = nullptr;
+	Code_Node_Expression *condition     = nullptr;
+	Code_Node_Expression *increment     = nullptr;
+
+	Code_Node_Statement *body = nullptr;
+
+	Symbol_Table symbols;
+};
+
+struct Code_Node_While : public Code_Node {
+	Code_Node_While() { kind = CODE_NODE_WHILE; }
+
+	Code_Node_Expression *condition = nullptr;
+
+	Code_Node_Statement *body = nullptr;
+};
+
+struct Code_Node_Do : public Code_Node {
+	Code_Node_Do() { kind = CODE_NODE_DO; }
+
+	Code_Node_Statement *body = nullptr;
+
+	Code_Node_Expression *condition = nullptr;
 };
 
 struct Code_Node_Block : public Code_Node {

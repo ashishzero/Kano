@@ -19,12 +19,26 @@ enum Token_Kind {
 	TOKEN_KIND_DIVISION,
 	TOKEN_KIND_REMAINDER,
 
+	TOKEN_KIND_COMPOUND_PLUS,
+	TOKEN_KIND_COMPOUND_MINUS,
+	TOKEN_KIND_COMPOUND_MULTIPLY,
+	TOKEN_KIND_COMPOUND_DIVIDE,
+	TOKEN_KIND_COMPOUND_REMAINDER,
+
 	TOKEN_KIND_BITWISE_SHIFT_RIGHT,
 	TOKEN_KIND_BITWISE_SHIFT_LEFT,
+
+	TOKEN_KIND_COMPOUND_BITWISE_SHIFT_RIGHT,
+	TOKEN_KIND_COMPOUND_BITWISE_SHIFT_LEFT,
 
 	TOKEN_KIND_BITWISE_AND,
 	TOKEN_KIND_BITWISE_XOR,
 	TOKEN_KIND_BITWISE_OR,
+
+	TOKEN_KIND_COMPOUND_BITWISE_AND,
+	TOKEN_KIND_COMPOUND_BITWISE_XOR,
+	TOKEN_KIND_COMPOUND_BITWISE_OR,
+
 	TOKEN_KIND_BITWISE_NOT,
 
 	TOKEN_KIND_LOGICAL_NOT,
@@ -52,6 +66,10 @@ enum Token_Kind {
 	TOKEN_KIND_IF,
 	TOKEN_KIND_THEN,
 	TOKEN_KIND_ELSE,
+
+	TOKEN_KIND_FOR,
+	TOKEN_KIND_WHILE,
+	TOKEN_KIND_DO,
 
 	TOKEN_KIND_IDENTIFIER,
 
@@ -91,9 +109,17 @@ static inline String token_kind_string(Token_Kind kind) {
 
 		"+", "-", "*", "/", "%",
 
+		"+=", "-=", "*=", "/=", "%=",
+
 		">>", "<<",
 
-		"&", "^", "|", "~",
+		">>=", "<<=",
+
+		"&", "^", "|", 
+
+		"&=", "^=", "|=", 
+		
+		"~",
 
 		"!",
 
@@ -110,6 +136,8 @@ static inline String token_kind_string(Token_Kind kind) {
 		"int", "float", "bool",
 
 		"if", "then", "else",
+
+		"for", "while", "do",
 
 		"identifier",
 

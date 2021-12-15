@@ -28,6 +28,9 @@ enum Syntax_Node_Kind {
 	SYNTAX_NODE_ASSIGNMENT,
 	SYNTAX_NODE_EXPRESSION,
 	SYNTAX_NODE_IF,
+	SYNTAX_NODE_FOR,
+	SYNTAX_NODE_WHILE,
+	SYNTAX_NODE_DO,
 	SYNTAX_NODE_DECLARATION,
 	SYNTAX_NODE_STATEMENT,
 	SYNTAX_NODE_BLOCK,
@@ -42,6 +45,7 @@ struct Syntax_Node_Type;
 struct Syntax_Node_Assignment;
 struct Syntax_Node_Expression;
 struct Syntax_Node_If;
+struct Syntax_Node_For;
 struct Syntax_Node_Declaration;
 struct Syntax_Node_Statement;
 struct Syntax_Node_Block;
@@ -119,6 +123,30 @@ struct Syntax_Node_If : public Syntax_Node {
 	Syntax_Node_Expression *condition      = nullptr;
 	Syntax_Node_Statement *true_statement  = nullptr;
 	Syntax_Node_Statement *false_statement = nullptr;
+};
+
+struct Syntax_Node_For : public Syntax_Node {
+	Syntax_Node_For() { kind = SYNTAX_NODE_FOR; }
+
+	Syntax_Node_Statement *initialization = nullptr;
+	Syntax_Node_Expression *condition     = nullptr;
+	Syntax_Node_Expression *increment     = nullptr;
+
+	Syntax_Node_Statement *body = nullptr;
+};
+
+struct Syntax_Node_While : public Syntax_Node {
+	Syntax_Node_While() { kind = SYNTAX_NODE_WHILE; }
+
+	Syntax_Node_Expression *condition = nullptr;
+	Syntax_Node_Statement *body       = nullptr;
+};
+
+struct Syntax_Node_Do : public Syntax_Node {
+	Syntax_Node_Do() { kind = SYNTAX_NODE_DO; }
+
+	Syntax_Node_Statement *body       = nullptr;
+	Syntax_Node_Expression *condition = nullptr;
 };
 
 struct Syntax_Node_Declaration : public Syntax_Node {

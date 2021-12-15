@@ -97,6 +97,16 @@ Binary_Operator_Kind token_to_binary_operator(Token_Kind kind) {
 		case TOKEN_KIND_RELATIONAL_LESS_EQUAL: return BINARY_OPERATOR_RELATIONAL_LESS_EQUAL;
 		case TOKEN_KIND_COMPARE_EQUAL: return BINARY_OPERATOR_COMPARE_EQUAL;
 		case TOKEN_KIND_COMPARE_NOT_EQUAL: return BINARY_OPERATOR_COMPARE_NOT_EQUAL;
+		case TOKEN_KIND_COMPOUND_PLUS: return BINARY_OPERATOR_COMPOUND_ADDITION;
+		case TOKEN_KIND_COMPOUND_MINUS: return BINARY_OPERATOR_COMPOUND_SUBTRACTION;
+		case TOKEN_KIND_COMPOUND_MULTIPLY: return BINARY_OPERATOR_COMPOUND_MULTIPLICATION;
+		case TOKEN_KIND_COMPOUND_DIVIDE: return BINARY_OPERATOR_COMPOUND_DIVISION;
+		case TOKEN_KIND_COMPOUND_REMAINDER: return BINARY_OPERATOR_COMPOUND_REMAINDER;
+		case TOKEN_KIND_COMPOUND_BITWISE_SHIFT_RIGHT: return BINARY_OPERATOR_COMPOUND_BITWISE_SHIFT_RIGHT;
+		case TOKEN_KIND_COMPOUND_BITWISE_SHIFT_LEFT: return BINARY_OPERATOR_COMPOUND_BITWISE_SHIFT_LEFT;
+		case TOKEN_KIND_COMPOUND_BITWISE_AND: return BINARY_OPERATOR_COMPOUND_BITWISE_AND;
+		case TOKEN_KIND_COMPOUND_BITWISE_XOR: return BINARY_OPERATOR_COMPOUND_BITWISE_XOR;
+		case TOKEN_KIND_COMPOUND_BITWISE_OR: return BINARY_OPERATOR_COMPOUND_BITWISE_OR;
 		NoDefaultCase();
 	}
 
@@ -115,7 +125,7 @@ static inline uint32_t next_power2(uint32_t n) {
 	return n;
 }
 
-static const Symbol *symbol_table_put(Symbol_Table *table, const Symbol &sym) {
+static Symbol *symbol_table_put(Symbol_Table *table, const Symbol &sym) {
 	String name = sym.name;
 	auto hash = murmur3_32(name.data, name.length, HASH_SEED) + 1;
 
@@ -137,8 +147,7 @@ static const Symbol *symbol_table_put(Symbol_Table *table, const Symbol &sym) {
 				bucket->hash[index] = hash;
 				bucket->index[index] = offset;
 				table->buffer.add(sym);
-				auto sym_index = bucket->index[offset];
-				return &table->buffer[sym_index];
+				return &table->buffer[offset];
 			}
 		}
 
@@ -422,7 +431,8 @@ Code_Node_Binary_Operator *code_resolve_binary_operator(Code_Type_Resolver *reso
 				}
 			}
 
-			if (left_match && right_match) {
+			if (left_match && right_match && 
+				(!op->compound || (op->compound && (left->flags & SYMBOL_BIT_LVALUE)))) {
 				auto node = new Code_Node_Binary_Operator;
 
 				node->type    = op->output;
@@ -525,49 +535,74 @@ Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols
 Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Declaration *root) {
 	String sym_name = root->identifier;
 
-	if (!symbol_table_get(symbols, sym_name, false)) {
-		Symbol symbol;
-		symbol.name     = sym_name;
-		symbol.type     = code_resolve_type(resolver, symbols, root->type);
-		symbol.flags    = root->flags;
-		symbol.location = root->location;
+	Assert(root->type || root->initializer);
 
-		if (symbol.flags & SYMBOL_BIT_CONSTANT) {
-			symbol.address = UINT32_MAX;
+	if (!symbol_table_get(symbols, sym_name, false)) {
+		Symbol in_symbol;
+		in_symbol.name     = sym_name;
+		in_symbol.type     = root->type ? code_resolve_type(resolver, symbols, root->type) : nullptr;
+		in_symbol.flags    = root->flags;
+		in_symbol.location = root->location;
+
+		if (in_symbol.flags & SYMBOL_BIT_CONSTANT) {
+			in_symbol.address = UINT32_MAX;
 		}
-		else {
-			uint32_t size    = symbol.type->runtime_size;
-			resolver->vstack = AlignPower2Up(resolver->vstack, size);
-			symbol.address   = resolver->vstack;
+
+		auto symbol = symbol_table_put(symbols, in_symbol);
+
+		if (root->type) {
+			uint32_t size     = symbol->type->runtime_size;
+			resolver->vstack  = AlignPower2Up(resolver->vstack, size);
+			symbol->address   = resolver->vstack;
 			resolver->vstack += size;
 		}
 
-		auto sym = symbol_table_put(symbols, symbol);
+		Code_Node_Assignment *assignment = nullptr;
 
 		if (root->initializer) {
+			auto value = code_resolve_root_expression(resolver, symbols, root->initializer);
+
+			// Implicit type declaration
+			if (!symbol->type) {
+				symbol->type      = value->type;
+
+				uint32_t size     = symbol->type->runtime_size;
+				resolver->vstack  = AlignPower2Up(resolver->vstack, size);
+				symbol->address   = resolver->vstack;
+				resolver->vstack += size;
+			}
+			else {
+				// If type is explicit, check if the types are same
+				if (!code_type_are_same(value->type, symbol->type)) {
+					auto cast = code_implicit_cast(value->child, symbol->type);
+					if (cast) {
+						value->child = cast;
+					}
+					else {
+						Unimplemented();
+					}
+				}
+			}
+
 			auto address    = new Code_Node_Address;
-			address->offset = sym->address;
-			address->flags  = sym->flags;
+			address->offset = symbol->address;
+			address->flags  = symbol->flags;
 			address->flags |= SYMBOL_BIT_LVALUE;
-			address->type   = sym->type;
+			address->type   = symbol->type;
 
 			auto destination   = new Code_Node_Expression;
 			destination->child = address;
 			destination->flags = address->flags;
 			destination->type  = address->type;
-
-			auto value = code_resolve_root_expression(resolver, symbols, root->initializer);
 			
-			auto assignment         = new Code_Node_Assignment;
+			assignment              = new Code_Node_Assignment;
 			assignment->type        = destination->type;
 			assignment->destination = destination;
 			assignment->value       = value;
 			assignment->flags      |= destination->flags;
-
-			return assignment;
 		}
 
-		return nullptr;
+		return assignment;
 	}
 
 	// Already defined in this scope previously
@@ -593,9 +628,9 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
 		{
 			auto if_node = (Syntax_Node_If *)node;
 
-			auto boolean = symbol_table_get(symbols, "bool");
 			auto condition = code_resolve_root_expression(resolver, symbols, if_node->condition);
 
+			auto boolean = symbol_table_get(symbols, "bool");
 			if (!code_type_are_same(condition->child->type, boolean->type)) {
 				auto cast = code_implicit_cast(condition->child, boolean->type);
 				if (cast) {
@@ -616,6 +651,101 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
 
 			Code_Node_Statement *statement = new Code_Node_Statement;
 			statement->node                = if_code;
+			return statement;
+		} break;
+
+		case SYNTAX_NODE_FOR:
+		{
+			auto for_node = (Syntax_Node_For *)node;
+
+			auto for_code = new Code_Node_For;
+			for_code->symbols.parent = symbols;
+
+			auto stack_top = resolver->vstack;
+
+			for_code->initialization = code_resolve_statement(resolver, &for_code->symbols, for_node->initialization);
+
+			auto condition = code_resolve_root_expression(resolver, &for_code->symbols, for_node->condition);
+
+			auto boolean = symbol_table_get(&for_code->symbols, "bool");
+			if (!code_type_are_same(condition->child->type, boolean->type)) {
+				auto cast = code_implicit_cast(condition->child, boolean->type);
+				if (cast) {
+					condition->child = cast;
+				}
+				else {
+					Unimplemented();
+				}
+			}
+
+			for_code->condition = condition;
+			for_code->increment = code_resolve_root_expression(resolver, &for_code->symbols, for_node->increment);
+			for_code->body = code_resolve_statement(resolver, &for_code->symbols, for_node->body);
+
+			resolver->vstack = stack_top;
+
+			Code_Node_Statement *statement = new Code_Node_Statement;
+			statement->node = for_code;
+			return statement;
+		} break;
+
+		case SYNTAX_NODE_WHILE:
+		{
+			auto while_node = (Syntax_Node_While *)node;
+
+			auto condition = code_resolve_root_expression(resolver, symbols, while_node->condition);
+
+			auto boolean = symbol_table_get(symbols, "bool");
+			if (!code_type_are_same(condition->child->type, boolean->type)) {
+				auto cast = code_implicit_cast(condition->child, boolean->type);
+				if (cast) {
+					condition->child = cast;
+				}
+				else {
+					Unimplemented();
+				}
+			}
+
+			auto while_code       = new Code_Node_While;
+			while_code->condition = condition;
+			while_code->body      = code_resolve_statement(resolver, symbols, while_node->body);
+
+			Code_Node_Statement *statement = new Code_Node_Statement;
+			statement->node = while_code;
+			return statement;
+		} break;
+
+		case SYNTAX_NODE_DO:
+		{
+			auto do_node = (Syntax_Node_Do *)node;
+
+			auto body = code_resolve_statement(resolver, symbols, do_node->body);
+
+			auto do_symbols = symbols;
+			if (body->node->kind == CODE_NODE_BLOCK) {
+				auto block = (Code_Node_Block *)body->node;
+				do_symbols = &block->symbols;
+			}
+
+			auto condition = code_resolve_root_expression(resolver, do_symbols, do_node->condition);
+
+			auto boolean = symbol_table_get(do_symbols, "bool");
+			if (!code_type_are_same(condition->child->type, boolean->type)) {
+				auto cast = code_implicit_cast(condition->child, boolean->type);
+				if (cast) {
+					condition->child = cast;
+				}
+				else {
+					Unimplemented();
+				}
+			}
+
+			auto do_code = new Code_Node_Do;
+			do_code->body      = body;
+			do_code->condition = condition;
+
+			Code_Node_Statement *statement = new Code_Node_Statement;
+			statement->node = do_code;
 			return statement;
 		} break;
 
@@ -663,6 +793,8 @@ Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Symbol_Table *
 	Code_Node_Statement statement_stub_head;
 	Code_Node_Statement *parent_statement = &statement_stub_head;
 
+	auto stack_top = resolver->vstack;
+
 	uint32_t statement_count = 0;
 	for (auto statement = root->statement_head; statement; statement = statement->next) {
 		auto code_statement = code_resolve_statement(resolver, &block->symbols, statement);
@@ -672,6 +804,8 @@ Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Symbol_Table *
 			statement_count += 1;
 		}
 	}
+
+	resolver->vstack = stack_top;
 
 	block->statement_head  = statement_stub_head.next;
 	block->statement_count = statement_count;
@@ -785,6 +919,25 @@ int main() {
 		Binary_Operator binary_operator_int;
 		binary_operator_int.parameters[0] = CompilerTypes[CODE_TYPE_INTEGER];
 		binary_operator_int.parameters[1] = CompilerTypes[CODE_TYPE_INTEGER];
+		binary_operator_int.output        = CompilerTypes[CODE_TYPE_INTEGER];
+		binary_operator_int.compound      = true;
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_ADDITION].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_SUBTRACTION].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_MULTIPLICATION].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_DIVISION].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_REMAINDER].add(binary_operator_int);
+
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_BITWISE_SHIFT_RIGHT].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_BITWISE_SHIFT_LEFT].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_BITWISE_AND].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_BITWISE_XOR].add(binary_operator_int);
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_BITWISE_OR].add(binary_operator_int);
+	}
+
+	{
+		Binary_Operator binary_operator_int;
+		binary_operator_int.parameters[0] = CompilerTypes[CODE_TYPE_INTEGER];
+		binary_operator_int.parameters[1] = CompilerTypes[CODE_TYPE_INTEGER];
 		binary_operator_int.output        = CompilerTypes[CODE_TYPE_BOOL];
 		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_GREATER].add(binary_operator_int);
 		resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_LESS].add(binary_operator_int);
@@ -803,6 +956,18 @@ int main() {
 		resolver.binary_operators[BINARY_OPERATOR_SUBTRACTION].add(binary_operator_real);
 		resolver.binary_operators[BINARY_OPERATOR_MULTIPLICATION].add(binary_operator_real);
 		resolver.binary_operators[BINARY_OPERATOR_DIVISION].add(binary_operator_real);
+	}
+
+	{
+		Binary_Operator binary_operator_real;
+		binary_operator_real.parameters[0] = CompilerTypes[CODE_TYPE_REAL];
+		binary_operator_real.parameters[1] = CompilerTypes[CODE_TYPE_REAL];
+		binary_operator_real.output        = CompilerTypes[CODE_TYPE_REAL];
+		binary_operator_real.compound      = true;
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_ADDITION].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_SUBTRACTION].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_MULTIPLICATION].add(binary_operator_real);
+		resolver.binary_operators[BINARY_OPERATOR_COMPOUND_DIVISION].add(binary_operator_real);
 	}
 
 	{

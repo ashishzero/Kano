@@ -63,6 +63,19 @@ static void parser_init_precedence() {
 	BinaryOperatorPrecedence[TOKEN_KIND_BITWISE_AND] = 30;
 	BinaryOperatorPrecedence[TOKEN_KIND_BITWISE_XOR] = 25;
 	BinaryOperatorPrecedence[TOKEN_KIND_BITWISE_OR]  = 20;
+
+	BinaryOperatorPrecedence[TOKEN_KIND_COMPOUND_PLUS]      = 15;
+	BinaryOperatorPrecedence[TOKEN_KIND_COMPOUND_MINUS]     = 15;
+	BinaryOperatorPrecedence[TOKEN_KIND_COMPOUND_MULTIPLY]  = 15;
+	BinaryOperatorPrecedence[TOKEN_KIND_COMPOUND_DIVIDE]    = 15;
+	BinaryOperatorPrecedence[TOKEN_KIND_COMPOUND_REMAINDER] = 15;
+
+	BinaryOperatorPrecedence[TOKEN_KIND_COMPOUND_BITWISE_SHIFT_RIGHT] = 15;
+	BinaryOperatorPrecedence[TOKEN_KIND_COMPOUND_BITWISE_SHIFT_LEFT]  = 15;
+
+	BinaryOperatorPrecedence[TOKEN_KIND_COMPOUND_BITWISE_AND] = 15;
+	BinaryOperatorPrecedence[TOKEN_KIND_COMPOUND_BITWISE_XOR] = 15;
+	BinaryOperatorPrecedence[TOKEN_KIND_COMPOUND_BITWISE_OR]  = 15;
 }
 
 //
@@ -276,7 +289,12 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec) {
 			TOKEN_KIND_BITWISE_AND,TOKEN_KIND_BITWISE_XOR,TOKEN_KIND_BITWISE_OR,
 			TOKEN_KIND_RELATIONAL_GREATER, TOKEN_KIND_RELATIONAL_LESS,
 			TOKEN_KIND_RELATIONAL_GREATER_EQUAL, TOKEN_KIND_RELATIONAL_LESS_EQUAL,
-			TOKEN_KIND_COMPARE_EQUAL, TOKEN_KIND_COMPARE_NOT_EQUAL
+			TOKEN_KIND_COMPARE_EQUAL, TOKEN_KIND_COMPARE_NOT_EQUAL,
+			TOKEN_KIND_COMPOUND_PLUS, TOKEN_KIND_COMPOUND_MINUS, 
+			TOKEN_KIND_COMPOUND_MULTIPLY, TOKEN_KIND_COMPOUND_DIVIDE,
+			TOKEN_KIND_COMPOUND_REMAINDER,
+			TOKEN_KIND_COMPOUND_BITWISE_SHIFT_RIGHT, TOKEN_KIND_COMPOUND_BITWISE_SHIFT_LEFT,
+			TOKEN_KIND_COMPOUND_BITWISE_AND, TOKEN_KIND_COMPOUND_BITWISE_XOR, TOKEN_KIND_COMPOUND_BITWISE_OR,
 		};
 
 		auto token = lexer_current_token(&parser->lexer);
@@ -361,12 +379,18 @@ Syntax_Node_Declaration *parse_declaration(Parser *parser) {
 
 	parser_expect_token(parser, TOKEN_KIND_COLON);
 
-	declaration->type = parse_type(parser);
-
 	if (parser_accept_token(parser, TOKEN_KIND_EQUALS)) {
 		declaration->initializer = parse_root_expression(parser);
 	}
-	else if (declaration->flags & TOKEN_KIND_CONST) {
+	else {
+		declaration->type = parse_type(parser);
+
+		if (parser_accept_token(parser, TOKEN_KIND_EQUALS)) {
+			declaration->initializer = parse_root_expression(parser);
+		}
+	}
+
+	if (declaration->flags & TOKEN_KIND_CONST && !declaration->initializer) {
 		auto token = lexer_current_token(&parser->lexer);
 		parser_error(parser, token, "Constant expression must be initialized during declaration");
 	}
@@ -385,12 +409,6 @@ Syntax_Node_Statement *parse_statement(Parser *parser) {
 		statement->node  = declaration;
 
 		parser_expect_token(parser, TOKEN_KIND_SEMICOLON);
-	}
-
-	// block
-	else if (parser_peek_token(parser, TOKEN_KIND_OPEN_CURLY_BRACKET)) {
-		auto block      = parse_block(parser);
-		statement->node = block;
 	}
 
 	// if
@@ -417,6 +435,68 @@ Syntax_Node_Statement *parse_statement(Parser *parser) {
 		parser_finish_syntax_node(parser, if_statement);
 
 		statement->node = if_statement;
+	}
+
+	// for
+	else if (parser_accept_token(parser, TOKEN_KIND_FOR)) {
+		auto for_statement = parser_new_syntax_node<Syntax_Node_For>(parser);
+
+		for_statement->initialization = parse_statement(parser);
+
+		for_statement->condition = parse_root_expression(parser);
+		parser_expect_token(parser, TOKEN_KIND_SEMICOLON);
+
+		for_statement->increment = parse_root_expression(parser);
+
+		for_statement->body = parse_statement(parser);
+
+		parser_finish_syntax_node(parser, for_statement);
+
+		statement->node = for_statement;
+	}
+
+	// while
+	else if (parser_accept_token(parser, TOKEN_KIND_WHILE)) {
+		auto while_statement = parser_new_syntax_node<Syntax_Node_While>(parser);
+
+		while_statement->condition = parse_root_expression(parser);
+
+		if (parser_accept_token(parser, TOKEN_KIND_DO)) {
+			while_statement->body = parse_statement(parser);
+		}
+		else if (parser_peek_token(parser, TOKEN_KIND_OPEN_CURLY_BRACKET)) {
+			while_statement->body = parse_statement(parser);
+		}
+		else {
+			auto token = lexer_current_token(&parser->lexer);
+			parser_error(parser, token, "Expected do or a block\n");
+		}
+
+		parser_finish_syntax_node(parser, while_statement);
+
+		statement->node = while_statement;
+	}
+
+	// do
+	else if (parser_accept_token(parser, TOKEN_KIND_DO)) {
+		auto do_statement = parser_new_syntax_node<Syntax_Node_Do>(parser);
+
+		do_statement->body = parse_statement(parser);
+
+		if (parser_expect_token(parser, TOKEN_KIND_WHILE)) {
+			do_statement->condition = parse_root_expression(parser);
+			parser_expect_token(parser, TOKEN_KIND_SEMICOLON);
+		}
+
+		parser_finish_syntax_node(parser, do_statement);
+
+		statement->node = do_statement;
+	}
+
+	// block
+	else if (parser_peek_token(parser, TOKEN_KIND_OPEN_CURLY_BRACKET)) {
+		auto block = parse_block(parser);
+		statement->node = block;
 	}
 
 	// simple expressions
