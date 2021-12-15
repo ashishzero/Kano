@@ -267,14 +267,17 @@ void lexer_next(Lexer *lexer) {
 			content.data   = (uint8_t *)string;
 			content.length = (lexer->cursor - content.data);
 
-			static const String KeyWords[]          = { 
+			static const String KeyWords[] = { 
 				"var", "const", 
 				"true", "false",
-				"int", "float", "bool" };
+				"int", "float", "bool",
+				"if", "then", "else", };
+
 			static const Token_Kind KeyWordTokens[] = { 
 				TOKEN_KIND_VAR, TOKEN_KIND_CONST, 
 				TOKEN_KIND_TRUE, TOKEN_KIND_FALSE,
-				TOKEN_KIND_INT, TOKEN_KIND_FLOAT, TOKEN_KIND_BOOL };
+				TOKEN_KIND_INT, TOKEN_KIND_FLOAT, TOKEN_KIND_BOOL,
+				TOKEN_KIND_IF, TOKEN_KIND_THEN, TOKEN_KIND_ELSE, };
 
 			static_assert(ArrayCount(KeyWords) == ArrayCount(KeyWordTokens));
 

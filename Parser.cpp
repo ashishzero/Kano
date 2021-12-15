@@ -363,6 +363,14 @@ Syntax_Node_Declaration *parse_declaration(Parser *parser) {
 
 	declaration->type = parse_type(parser);
 
+	if (parser_accept_token(parser, TOKEN_KIND_EQUALS)) {
+		declaration->initializer = parse_root_expression(parser);
+	}
+	else if (declaration->flags & TOKEN_KIND_CONST) {
+		auto token = lexer_current_token(&parser->lexer);
+		parser_error(parser, token, "Constant expression must be initialized during declaration");
+	}
+
 	parser_finish_syntax_node(parser, declaration);
 	return declaration;
 }
@@ -383,6 +391,32 @@ Syntax_Node_Statement *parse_statement(Parser *parser) {
 	else if (parser_peek_token(parser, TOKEN_KIND_OPEN_CURLY_BRACKET)) {
 		auto block      = parse_block(parser);
 		statement->node = block;
+	}
+
+	// if
+	else if (parser_accept_token(parser, TOKEN_KIND_IF)) {
+		auto if_statement = parser_new_syntax_node<Syntax_Node_If>(parser);
+
+		if_statement->condition = parse_root_expression(parser);
+
+		if (parser_accept_token(parser, TOKEN_KIND_THEN)) {
+			if_statement->true_statement = parse_statement(parser);
+		}
+		else if (parser_peek_token(parser, TOKEN_KIND_OPEN_CURLY_BRACKET)) {
+			if_statement->true_statement = parse_statement(parser);
+		}
+		else {
+			auto token = lexer_current_token(&parser->lexer);
+			parser_error(parser, token, "Expected then or a block\n");
+		}
+
+		if (parser_accept_token(parser, TOKEN_KIND_ELSE)) {
+			if_statement->false_statement = parse_statement(parser);
+		}
+
+		parser_finish_syntax_node(parser, if_statement);
+
+		statement->node = if_statement;
 	}
 
 	// simple expressions

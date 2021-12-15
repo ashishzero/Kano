@@ -1,21 +1,6 @@
 #pragma once
 #include "SyntaxNode.h"
 
-enum Code_Node_Kind {
-	CODE_NODE_NULL,
-	CODE_NODE_LITERAL,
-	CODE_NODE_ADDRESS,
-	CODE_NODE_TYPE_CAST,
-	CODE_NODE_UNARY_OPERATOR,
-	CODE_NODE_BINARY_OPERATOR,
-	CODE_NODE_EXPRESSION,
-	CODE_NODE_ASSIGNMENT,
-	CODE_NODE_STATEMENT,
-	CODE_NODE_BLOCK,
-
-	_CODE_NODE_COUNT,
-};
-
 enum Code_Type_Kind {
 	CODE_TYPE_NULL,
 	CODE_TYPE_INTEGER,
@@ -49,12 +34,64 @@ struct Code_Type_Pointer : public Code_Type {
 	Code_Type *base_type = nullptr;
 };
 
+//
+//
+//
+
 struct Symbol {
 	String          name;
 	Code_Type *     type     = nullptr;
 	uint32_t        flags    = 0;
 	uint32_t        address  = UINT32_MAX;
 	Syntax_Location location = {};
+};
+
+constexpr uint32_t SYMBOL_INDEX_BUCKET_SIZE = 16;
+constexpr uint32_t SYMBOL_INDEX_MASK = SYMBOL_INDEX_BUCKET_SIZE - 1;
+constexpr uint32_t SYMBOL_INDEX_SHIFT = 4;
+constexpr uint32_t SYMBOL_TABLE_BUCKET_COUNT = 128;
+constexpr uint32_t HASH_SEED = 0x2564;
+
+struct Symbol_Index {
+	uint32_t hash[SYMBOL_INDEX_BUCKET_SIZE] = {};
+	uint32_t index[SYMBOL_INDEX_BUCKET_SIZE] = {};
+	Symbol_Index *next = nullptr;
+};
+
+struct Symbol_Lookup {
+	Symbol_Index  buckets[SYMBOL_TABLE_BUCKET_COUNT];
+};
+
+struct Symbol_Table {
+	Symbol_Lookup lookup;
+	Array<Symbol> buffer;
+	Symbol_Table *parent = nullptr;
+};
+
+//
+//
+//
+
+enum Code_Node_Kind {
+	CODE_NODE_NULL,
+	CODE_NODE_LITERAL,
+	CODE_NODE_ADDRESS,
+	CODE_NODE_TYPE_CAST,
+	CODE_NODE_UNARY_OPERATOR,
+	CODE_NODE_BINARY_OPERATOR,
+	CODE_NODE_EXPRESSION,
+	CODE_NODE_ASSIGNMENT,
+	CODE_NODE_STATEMENT,
+	CODE_NODE_IF,
+	CODE_NODE_BLOCK,
+
+	_CODE_NODE_COUNT,
+};
+
+struct Code_Node {
+	Code_Node_Kind  kind = CODE_NODE_NULL;
+	uint32_t        flags = 0;
+	Code_Type       *type = nullptr;
 };
 
 struct Code_Value_Integer {
@@ -69,18 +106,17 @@ struct Code_Value_Bool {
 	bool value;
 };
 
+struct Code_Value_Pointer {
+	uint32_t value;
+};
+
 union Code_Value {
 	Code_Value_Integer integer;
 	Code_Value_Real    real;
 	Code_Value_Bool    boolean;
+	Code_Value_Pointer pointer;
 
 	Code_Value() = default;
-};
-
-struct Code_Node {
-	Code_Node_Kind  kind = CODE_NODE_NULL;
-	uint32_t        flags = 0;
-	Code_Type       *type = nullptr;
 };
 
 struct Code_Node_Literal : public Code_Node {
@@ -180,9 +216,19 @@ struct Code_Node_Statement : public Code_Node {
 	Code_Node_Statement *next = nullptr;
 };
 
+struct Code_Node_If : public Code_Node {
+	Code_Node_If() { kind = CODE_NODE_IF; }
+
+	Code_Node_Expression *condition      = nullptr;
+	Code_Node_Statement *true_statement  = nullptr;
+	Code_Node_Statement *false_statement = nullptr;
+};
+
 struct Code_Node_Block : public Code_Node {
 	Code_Node_Block() { kind = CODE_NODE_BLOCK; }
 
 	Code_Node_Statement *statement_head = nullptr;
 	uint64_t statement_count            = 0;
+
+	Symbol_Table symbols;
 };
