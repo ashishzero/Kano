@@ -235,7 +235,7 @@ struct Code_Node_If : public Code_Node {
 
 	Code_Node_Expression *condition      = nullptr;
 	Code_Node_Statement *true_statement  = nullptr;
-	Code_Node_Statement *false_statement = nullptr;
+	Code_Node_Statement *false_statement = nullptr; 
 };
 
 struct Code_Node_For : public Code_Node {

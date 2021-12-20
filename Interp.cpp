@@ -3,11 +3,66 @@
 
 Find_Type_Value evaluate_expression(Code_Node* root, Interp* interp);
 Find_Type_Value evaluate_node_expression(Code_Node_Expression* root, Interp* interp);
+void evaluate_node_statement(Code_Node_Statement* root, Interp* interp);
 
 void interp_init(Interp* interp, size_t size) {
 	interp->stack = new uint8_t[size];
 }
 
+void print_values(Find_Type_Value result) {
+	switch (result.type) {
+		case CODE_TYPE_BOOL:
+		{
+			printf("statement executes:: %d\n", (int)result.value.boolean.value);
+		}break;
+		case CODE_TYPE_REAL:
+		{
+			printf("statement executes:: %f\n", result.value.real.value);
+		}break;
+		case CODE_TYPE_INTEGER:
+		{
+			printf("statement executes:: %d\n", result.value.integer.value);
+		}break;
+		case CODE_TYPE_POINTER: {
+			printf("statement executes:: %u\n", result.value.pointer.value);
+		}break;
+	}
+}
+void evaluate_do_block(Code_Node_Do* root, Interp* interp) {
+	Find_Type_Value cond;
+	do {
+		evaluate_node_statement((Code_Node_Statement*)root->body, interp);
+		cond = evaluate_node_expression((Code_Node_Expression*)root->condition, interp);
+	} while (cond.value.boolean.value);
+}
+void evaluate_while_block(Code_Node_While* root, Interp* interp) {
+	auto cond = evaluate_node_expression((Code_Node_Expression*)root->condition, interp);
+	while (cond.value.boolean.value) {
+		evaluate_node_statement((Code_Node_Statement*)root->body, interp);
+		cond = evaluate_node_expression((Code_Node_Expression*)root->condition, interp);
+		printf("statement executes:: %d\n", (int)cond.value.boolean.value);
+	}
+}
+void evaluate_if_block(Code_Node_If* root,Interp* interp) {
+	auto cond = evaluate_node_expression((Code_Node_Expression*)root->condition, interp);
+	if (cond.value.boolean.value)
+		evaluate_node_statement((Code_Node_Statement*)root->true_statement, interp);
+	else
+		evaluate_node_statement((Code_Node_Statement*)root->false_statement, interp);
+}
+
+void evaluate_for_block(Code_Node_For* root, Interp* interp) {
+	evaluate_node_statement((Code_Node_Statement*)root->initialization, interp);
+	auto cond = evaluate_node_expression((Code_Node_Expression*)root->condition, interp);
+	printf("statement executes:: %d\n", (int)cond.value.boolean.value);
+	while (cond.value.boolean.value) {
+		evaluate_node_statement((Code_Node_Statement*)root->body, interp);
+		auto incre = evaluate_node_expression((Code_Node_Expression*)root->increment, interp);
+		print_values(incre);
+		cond = evaluate_node_expression((Code_Node_Expression*)root->condition, interp);
+	}
+
+}
 Find_Type_Value evaluate_code_node_assignment(Code_Node_Assignment* node, Interp* interp) {
 	auto value = evaluate_node_expression((Code_Node_Expression*)node->value, interp);
 	Assert(node->destination->child->kind == CODE_NODE_ADDRESS);
@@ -179,6 +234,8 @@ Find_Type_Value evaluate_binary_operator(Code_Node_Binary_Operator* root, Interp
 	{
 		auto a = evaluate_expression(node->left, interp);
 		auto b = evaluate_expression(node->right, interp);
+		auto destiny = (Code_Node_Address*)node->left;
+		int* dst = (int*)(interp->stack + destiny->offset);
 		switch (node->op_kind) {
 		case BINARY_OPERATOR_ADDITION:
 		{
@@ -246,6 +303,66 @@ Find_Type_Value evaluate_binary_operator(Code_Node_Binary_Operator* root, Interp
 			type_value.type = CODE_TYPE_BOOL;
 			return type_value;
 		}break;
+		case BINARY_OPERATOR_COMPOUND_ADDITION:
+		{
+			a.value.integer.value += b.value.integer.value;
+			*dst = a.value.integer.value;
+			return a;
+		}break;
+		case BINARY_OPERATOR_COMPOUND_SUBTRACTION:
+		{
+			a.value.integer.value -= b.value.integer.value;
+			*dst = a.value.integer.value;
+			return a;
+		}break;
+		case BINARY_OPERATOR_COMPOUND_MULTIPLICATION:
+		{
+			a.value.integer.value *= b.value.integer.value;
+			*dst = a.value.integer.value;
+			return a;
+		}break;
+		case BINARY_OPERATOR_COMPOUND_DIVISION:
+		{
+			a.value.integer.value /= b.value.integer.value;
+			*dst = a.value.integer.value;
+			return a;
+		}break;
+		case BINARY_OPERATOR_COMPOUND_REMAINDER:
+		{
+			a.value.integer.value %= b.value.integer.value;
+			*dst = a.value.integer.value;
+			return a;
+		}break;
+		case BINARY_OPERATOR_COMPOUND_BITWISE_SHIFT_RIGHT:
+		{
+			a.value.integer.value >>= b.value.integer.value;
+			*dst = a.value.integer.value;
+			return a;
+		}break;
+		case BINARY_OPERATOR_COMPOUND_BITWISE_SHIFT_LEFT:
+		{
+			a.value.integer.value <<= b.value.integer.value;
+			*dst = a.value.integer.value;
+			return a;
+		}break;
+		case BINARY_OPERATOR_COMPOUND_BITWISE_AND:
+		{
+			a.value.integer.value &= b.value.integer.value;
+			*dst = a.value.integer.value;
+			return a;
+		}break;
+		case BINARY_OPERATOR_COMPOUND_BITWISE_XOR:
+		{
+			a.value.integer.value ^= b.value.integer.value;
+			*dst = a.value.integer.value;
+			return a;
+		}break;
+		case BINARY_OPERATOR_COMPOUND_BITWISE_OR:
+		{
+			a.value.integer.value |= b.value.integer.value;
+			*dst = a.value.integer.value;
+			return a;
+		}break;
 		NoDefaultCase();
 		}
 
@@ -254,6 +371,8 @@ Find_Type_Value evaluate_binary_operator(Code_Node_Binary_Operator* root, Interp
 	{
 		auto a = evaluate_expression(node->left, interp);
 		auto b = evaluate_expression(node->right, interp);
+		auto destiny = (Code_Node_Address*)node->left;
+		float* dst = (float*)(interp->stack + destiny->offset);
 		switch (node->op_kind) {
 		case BINARY_OPERATOR_ADDITION:
 		{
@@ -285,6 +404,30 @@ Find_Type_Value evaluate_binary_operator(Code_Node_Binary_Operator* root, Interp
 			type_value.type = CODE_TYPE_BOOL;
 			return type_value;
 		}break;
+		case BINARY_OPERATOR_COMPOUND_ADDITION:
+		{
+			a.value.real.value += b.value.real.value;
+			*dst = a.value.real.value;
+			return a;
+		}break;
+		case BINARY_OPERATOR_COMPOUND_SUBTRACTION:
+		{
+			a.value.real.value -= b.value.real.value;
+			*dst = a.value.real.value;
+			return a;
+		}break;
+		case BINARY_OPERATOR_COMPOUND_MULTIPLICATION:
+		{
+			a.value.real.value *= b.value.real.value;
+			*dst = a.value.real.value;
+			return a;
+		}break;
+		case BINARY_OPERATOR_COMPOUND_DIVISION:
+		{
+			a.value.real.value /= b.value.real.value;
+			*dst = a.value.real.value;
+			return a;
+		}break;
 		NoDefaultCase();
 		}
 	}break;
@@ -295,39 +438,39 @@ Find_Type_Value evaluate_binary_operator(Code_Node_Binary_Operator* root, Interp
 		switch (node->op_kind) {
 		case BINARY_OPERATOR_RELATIONAL_GREATER:
 		{
-			type_value.value.boolean.value = a.value.boolean.value > b.value.boolean.value;
+			type_value.value.boolean.value = a.value.integer.value > b.value.integer.value;
 			type_value.type = CODE_TYPE_BOOL;
 			return type_value;
 		}break;
 		case BINARY_OPERATOR_RELATIONAL_LESS:
 		{
-			type_value.value.boolean.value = a.value.boolean.value < b.value.boolean.value;
+			type_value.value.boolean.value = a.value.integer.value < b.value.integer.value;
 			type_value.type = CODE_TYPE_BOOL;
 			return type_value;
 
 		}break;
 		case BINARY_OPERATOR_RELATIONAL_GREATER_EQUAL:
 		{
-			type_value.value.boolean.value = a.value.boolean.value >= b.value.boolean.value;
+			type_value.value.boolean.value = a.value.integer.value >= b.value.integer.value;
 			type_value.type = CODE_TYPE_BOOL;
 			return type_value;
 		}break;
 		case BINARY_OPERATOR_RELATIONAL_LESS_EQUAL:
 		{
-			type_value.value.boolean.value = a.value.boolean.value <= b.value.boolean.value;
+			type_value.value.boolean.value = a.value.integer.value <= b.value.integer.value;
 			type_value.type = CODE_TYPE_BOOL;
 			return type_value;
 
 		}break;
 		case BINARY_OPERATOR_COMPARE_EQUAL:
 		{
-			type_value.value.boolean.value = (a.value.boolean.value == b.value.boolean.value);
+			type_value.value.boolean.value = (a.value.integer.value == b.value.integer.value);
 			type_value.type = CODE_TYPE_BOOL;
 			return type_value;
 		}break;
 		case BINARY_OPERATOR_COMPARE_NOT_EQUAL:
 		{
-			type_value.value.boolean.value = a.value.boolean.value != b.value.boolean.value;
+			type_value.value.boolean.value = a.value.integer.value != b.value.integer.value;
 			type_value.type = CODE_TYPE_BOOL;
 			return type_value;
 		}break;
@@ -391,6 +534,38 @@ Find_Type_Value evaluate_expression(Code_Node* root, Interp* interp) {
 	{
 		return evaluate_code_node_assignment((Code_Node_Assignment*)root, interp);
 	}break;
+
+	case CODE_NODE_TYPE_CAST:
+	{
+		auto cast = (Code_Node_Type_Cast*)root;
+		auto value = evaluate_expression(cast->child, interp);
+		Find_Type_Value type_value;
+		type_value.type = cast->type->kind;
+
+		switch (type_value.type) {
+		case CODE_TYPE_REAL:
+		{
+			Assert(value.type == CODE_TYPE_INTEGER);
+			type_value.value.real.value = (float)value.value.integer.value;
+		}break;
+		case CODE_TYPE_INTEGER:
+		{
+			type_value.value.integer.value = value.value.integer.value;
+		}break;
+		case CODE_TYPE_BOOL:
+		{
+			type_value.value.boolean.value = value.value.boolean.value;
+		}break;
+		NoDefaultCase();
+		}
+
+		return type_value;
+	}break;
+	case CODE_NODE_IF:
+	{
+		return evaluate_expression((Code_Node*)root, interp);
+	}break;
+
 	NoDefaultCase();
 	}
 	//return 0;
@@ -406,32 +581,34 @@ void evaluate_node_statement(Code_Node_Statement* root, Interp* interp) {
 	case CODE_NODE_EXPRESSION:
 	{
 		auto result = evaluate_node_expression((Code_Node_Expression*)root->node, interp);
-		switch (result.type) {
-		case CODE_TYPE_INTEGER: {
-			printf("statement executes:: %d\n", result.value.integer.value);
-		}break;
-		case CODE_TYPE_REAL: {
-			printf("statement executes:: %f\n", result.value.real.value);
-		}break;
-
-		case CODE_TYPE_BOOL: {
-			printf("statement executes:: %d\n", (int)result.value.boolean.value);
-		}break;
-		case CODE_TYPE_POINTER: {
-			printf("statement executes:: %u\n", result.value.pointer.value);
-		}break;
-			NoDefaultCase();
-		}
+		print_values(result);
 
 	}break;
 	case CODE_NODE_ASSIGNMENT:
 	{
-		auto a = evaluate_code_node_assignment((Code_Node_Assignment*)root->node, interp);
+		auto result = evaluate_code_node_assignment((Code_Node_Assignment*)root->node, interp);
+		print_values(result);
 		//Unimplemented();
 	}break;
 	case CODE_NODE_BLOCK:
 	{
 		evaluate_node_block((Code_Node_Block*)root->node,interp);
+	}break;
+	case CODE_NODE_IF:
+	{
+		evaluate_if_block((Code_Node_If*)root->node, interp);
+	}break;
+	case CODE_NODE_FOR:
+	{
+		evaluate_for_block((Code_Node_For*)root->node, interp);
+	}break;
+	case CODE_NODE_WHILE:
+	{
+		evaluate_while_block((Code_Node_While*)root->node, interp);
+	}break;
+	case CODE_NODE_DO:
+	{
+		evaluate_do_block((Code_Node_Do*)root->node, interp);
 	}break;
 	NoDefaultCase();
 
