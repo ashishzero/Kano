@@ -5,9 +5,9 @@
 	//	return n * factorial(n - 1);
 	//}
 
-	const adder : proc (var a: int, var b: int) -> int = proc (var a: int, var b: int) -> int {
+	const adder : proc (int, int) -> int = proc (var a: int, var b: int) -> int {
 		var result:= a + b;
-		return a + b;
+		return result;
 	}
 
 	var number0: float = 5;

@@ -64,7 +64,7 @@
 #define PLATFORM_OS_WINDOWS 0
 #endif
 
-#if defined(__amd64__) || defined(__amd64) || defined(__x86_64__) || defined(__x86_64) || defined(_M_AMD64) || \
+#if defined(__amd64__) || defined(__amd64) || defined(__x86_64__) || defined(__x86_64) || defined(_M_AMD64) ||         \
     defined(_M_X64)
 #define ARCH_X64 1
 #elif defined(i386) || defined(__i386) || defined(__i386__) || defined(_M_IX86) || defined(_X86_)
@@ -116,7 +116,7 @@
 
 #if defined(_MSC_VER)
 #define TriggerBreakpoint() __debugbreak()
-#elif ((!defined(__NACL__)) && \
+#elif ((!defined(__NACL__)) &&                                                                                         \
        ((defined(__GNUC__) || defined(__clang__)) && (defined(__i386__) || defined(__x86_64__))))
 #define TriggerBreakpoint() __asm__ __volatile__("int $3\n\t")
 #elif defined(__386__) && defined(__WATCOMC__)
@@ -147,34 +147,34 @@ extern void handle_assertion(const char *reason, const char *file, int line, con
 
 #if defined(BUILD_DEBUG) || defined(BUILD_DEVELOPER)
 #define DebugTriggerbreakpoint TriggerBreakpoint
-#define Assert(x)                                                             \
-    do                                                                        \
-    {                                                                         \
-        if (!(x))                                                             \
-            handle_assertion("Assert Failed", __FILE__, __LINE__, __PROCEDURE__); \
+#define Assert(x)                                                                                                      \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        if (!(x))                                                                                                      \
+            handle_assertion("Assert Failed", __FILE__, __LINE__, __PROCEDURE__);                                      \
     } while (0)
 #else
 #define DebugTriggerbreakpoint()
-#define Assert(x) \
-    do            \
-    {             \
-        0;        \
+#define Assert(x)                                                                                                      \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        0;                                                                                                             \
     } while (0)
 #endif
 
 #if defined(BUILD_DEBUG) || defined(BUILD_DEVELOPER)
 #define Unimplemented() handle_assertion("Unimplemented procedure", __FILE__, __LINE__, __PROCEDURE__);
 #define Unreachable() handle_assertion("Unreachable code path", __FILE__, __LINE__, __PROCEDURE__);
-#define NoDefaultCase()                                                     \
-    default:                                                                \
-        handle_assertion("No default case", __FILE__, __LINE__, __PROCEDURE__); \
+#define NoDefaultCase()                                                                                                \
+    default:                                                                                                           \
+        handle_assertion("No default case", __FILE__, __LINE__, __PROCEDURE__);                                        \
         break
 #else
 #define Unimplemented() TriggerBreakpoint();
 #define Unreachable() TriggerBreakpoint();
-#define NoDefaultCase()      \
-    default:                 \
-        TriggerBreakpoint(); \
+#define NoDefaultCase()                                                                                                \
+    default:                                                                                                           \
+        TriggerBreakpoint();                                                                                           \
         break
 #endif
 
@@ -195,7 +195,7 @@ extern void handle_assertion(const char *reason, const char *file, int line, con
 #define AlignPower2Down(x, p) ((x) & ~((p)-1))
 
 #define ByteSwap16(a) ((((a)&0x00FF) << 8) | (((a)&0xFF00) >> 8))
-#define ByteSwap32(a) \
+#define ByteSwap32(a)                                                                                                  \
     ((((a)&0x000000FF) << 24) | (((a)&0x0000FF00) << 8) | (((a)&0x00FF0000) >> 8) | (((a)&0xFF000000) >> 24))
 #define ByteSwap64(a)                                                                                                  \
     ((((a)&0x00000000000000FFULL) << 56) | (((a)&0x000000000000FF00ULL) << 40) | (((a)&0x0000000000FF0000ULL) << 24) | \
@@ -206,261 +206,368 @@ extern void handle_assertion(const char *reason, const char *file, int line, con
 #define MegaBytes(n) (KiloBytes(n) * 1024u)
 #define GigaBytes(n) (MegaBytes(n) * 1024u)
 
-struct String {
-	int64_t length;
-	uint8_t *data;
+struct String
+{
+    int64_t  length;
+    uint8_t *data;
 
-	String() : data(0), length(0) {
-	}
-	template <int64_t _Length>
-	constexpr String(const char(&a)[_Length]) : data((uint8_t *)a), length(_Length - 1) {
-	}
-	String(const uint8_t *_Data, int64_t _Length) : data((uint8_t *)_Data), length(_Length) {
-	}
-	const uint8_t &operator[](const int64_t index) const {
-		Assert(index < length);
-		return data[index];
-	}
-	uint8_t &operator[](const int64_t index) {
-		Assert(index < length);
-		return data[index];
-	}
+    String() : data(0), length(0)
+    {
+    }
+    template <int64_t _Length> constexpr String(const char (&a)[_Length]) : data((uint8_t *)a), length(_Length - 1)
+    {
+    }
+    String(const uint8_t *_Data, int64_t _Length) : data((uint8_t *)_Data), length(_Length)
+    {
+    }
+    const uint8_t &operator[](const int64_t index) const
+    {
+        Assert(index < length);
+        return data[index];
+    }
+    uint8_t &operator[](const int64_t index)
+    {
+        Assert(index < length);
+        return data[index];
+    }
 
-	inline bool operator==(String b) {
-		if (length != b.length) return false;
-		return memcmp(data, b.data, length) == 0;
-	}
-	inline bool operator!=(String b) {
-		return !(*this == b);
-	}
+    inline bool operator==(String b)
+    {
+        if (length != b.length)
+            return false;
+        return memcmp(data, b.data, length) == 0;
+    }
+    inline bool operator!=(String b)
+    {
+        return !(*this == b);
+    }
 };
 
 #define _zConcatInternal(x, y) x##y
 #define _zConcat(x, y) _zConcatInternal(x, y)
 
-template <typename T>
-struct Exit_Scope {
-	T lambda;
-	Exit_Scope(T lambda) : lambda(lambda) {
-	}
-	~Exit_Scope() {
-		lambda();
-	}
+template <typename T> struct Exit_Scope
+{
+    T lambda;
+    Exit_Scope(T lambda) : lambda(lambda)
+    {
+    }
+    ~Exit_Scope()
+    {
+        lambda();
+    }
 };
-struct Exit_Scope_Help {
-	template <typename T>
-	Exit_Scope<T> operator+(T t) {
-		return t;
-	}
+struct Exit_Scope_Help
+{
+    template <typename T> Exit_Scope<T> operator+(T t)
+    {
+        return t;
+    }
 };
 #define Defer const auto &_zConcat(defer__, __LINE__) = Exit_Scope_Help() + [&]()
 
-template <typename T>
-struct Array_View {
-	int64_t count = 0;
-	T *data = nullptr;
+template <typename T> struct Array_View
+{
+    int64_t count = 0;
+    T *     data  = nullptr;
 
-	Array_View() = default;
-	Array_View(T *p, int64_t n) : count(n), data(p) {}
+    Array_View()  = default;
+    Array_View(T *p, int64_t n) : count(n), data(p)
+    {
+    }
 
-	template <int64_t _Count>
-	constexpr Array_View(const T(&a)[_Count]) : count(_Count), data((T *)a) {}
+    template <int64_t _Count> constexpr Array_View(const T (&a)[_Count]) : count(_Count), data((T *)a)
+    {
+    }
 
-	T &operator[](int64_t index) const { Assert(index < count); return data[index]; }
-	T *begin() { return data; }
-	T *end() { return data + count; }
-	const T *begin() const { return data; }
-	const T *end() const { return data + count; }
+    T &operator[](int64_t index) const
+    {
+        Assert(index < count);
+        return data[index];
+    }
+    T *begin()
+    {
+        return data;
+    }
+    T *end()
+    {
+        return data + count;
+    }
+    const T *begin() const
+    {
+        return data;
+    }
+    const T *end() const
+    {
+        return data + count;
+    }
 };
 
-inline void *operator new(size_t size, void *ptr) { return ptr; }
-
-template <typename T>
-struct Array {
-	int64_t count = 0;
-	T *data = nullptr;
-	int64_t capacity = 0;
-
-	operator Array_View<T>() { return Array_View<T>(data, count); }
-	operator const Array_View<T>() const { return Array_View<T>(data, count); }
-
-	T &operator[](int64_t i) { Assert(i >= 0 && i < count); return data[i]; }
-	const T &operator[](int64_t i) const { Assert(i >= 0 && i < count); return data[i]; }
-	T *begin() { return data; }
-	T *end() { return data + count; }
-	const T *begin() const { return data; }
-	const T *end() const { return data + count; }
-
-	int64_t _get_grow_capacity(int64_t size) const {
-		auto new_capacity = capacity ? (capacity + capacity / 2) : 8;
-		return new_capacity > size ? new_capacity : size;
-	}
-
-	void reserve(int64_t new_capacity) {
-		if (new_capacity <= capacity)
-			return;
-		T *_data = (T *)realloc(data, new_capacity * sizeof(T));
-		if (_data) {
-			data = _data;
-			capacity = new_capacity;
-		}
-	}
-
-	T *first() { Assert(count); return data; }
-	const T *first() const { Assert(count); return data; }
-	T *last() { Assert(count); return data + count - 1; }
-	const T *last() const { Assert(count); return data + count - 1; }
-
-	template <typename... Args> void emplace(const Args &...args) {
-		if (count == capacity) {
-			auto n = _get_grow_capacity(capacity + 1);
-			reserve(n);
-		}
-		data[count] = T(args...);
-		count += 1;
-	}
-
-	T *add() {
-		if (count == capacity) {
-			auto c = _get_grow_capacity(capacity + 1);
-			reserve(c);
-		}
-		count += 1;
-		void *ptr = data + (count - 1);
-		return new(ptr) T;
-	}
-
-	T *addn(uint32_t n) {
-		if (count + n > capacity) {
-			auto c = _get_grow_capacity(count + n);
-			reserve(c);
-		}
-		T *ptr = data + count;
-		count += n;
-		return ptr;
-	}
-
-	void add(const T &d) {
-		T *m = add();
-		*m = d;
-	}
-
-	void copy(Array_View<T> src) {
-		if (src.count + count >= capacity) {
-			auto c = _get_grow_capacity(src.count + count + 1);
-			reserve(c);
-		}
-		memcpy(data + count, src.data, src.count * sizeof(T));
-		count += src.count;
-	}
-
-	void remove_last() {
-		Assert(count > 0);
-		count -= 1;
-	}
-
-	void remove(int64_t index) {
-		Assert(index < count);
-		memmove(data + index, data + index + 1, (count - index - 1) * sizeof(T));
-		count -= 1;
-	}
-
-	void remove_unordered(int64_t index) {
-		Assert(index < count);
-		data[index] = data[count - 1];
-		count -= 1;
-	}
-
-	void insert(int64_t index, const T &v) {
-		Assert(index < count + 1);
-		add();
-		for (auto move_index = count - 1; move_index > index; --move_index) {
-			data[move_index] = data[move_index - 1];
-		}
-		data[index] = v;
-	}
-
-	void insert_unordered(int64_t index, const T &v) {
-		Assert(index < count + 1);
-		add();
-		data[count - 1] = data[index];
-		data[index] = v;
-	}
-
-	int64_t find(const T &v) const {
-		for (int64_t index = 0; index < count; ++index) {
-			auto elem = data + index;
-			if (*elem == v) {
-				return index;
-			}
-		}
-		return -1;
-	}
-
-	template <typename SearchFunc, typename... Args>
-	int64_t find(SearchFunc func, const Args &...args) const {
-		for (int64_t index = 0; index < count; ++index) {
-			if (func(data[index], args...)) {
-				return index;
-			}
-		}
-		return -1;
-	}
-
-	void reset() {
-		count = 0;
-	}
-};
-
-template <typename T> inline void array_free(Array<T> *a) {
-	if (a->data)
-		free(a->data, &a->allocator);
+inline void *operator new(size_t size, void *ptr)
+{
+    return ptr;
 }
 
-template <typename T, uint32_t N>
-struct Bucket_Array {
-	struct Bucket {
-		T data[N];
-		Bucket *next = nullptr;
-	};
+template <typename T> struct Array
+{
+    int64_t count    = 0;
+    T *     data     = nullptr;
+    int64_t capacity = 0;
 
-	Bucket first;
-	Bucket *last;
-	uint32_t index;
+            operator Array_View<T>()
+    {
+        return Array_View<T>(data, count);
+    }
+    operator const Array_View<T>() const
+    {
+        return Array_View<T>(data, count);
+    }
 
-	Bucket_Array() {
-		last = &first;
-		index = 0;
-	}
+    T &operator[](int64_t i)
+    {
+        Assert(i >= 0 && i < count);
+        return data[i];
+    }
+    const T &operator[](int64_t i) const
+    {
+        Assert(i >= 0 && i < count);
+        return data[i];
+    }
+    T *begin()
+    {
+        return data;
+    }
+    T *end()
+    {
+        return data + count;
+    }
+    const T *begin() const
+    {
+        return data;
+    }
+    const T *end() const
+    {
+        return data + count;
+    }
 
-	void add(T d) {
-		if (index == N) {
-			Bucket *buk = new Bucket;
-			index = 0;
-			last->next = buk;
-			last = buk;
-		}
+    int64_t _get_grow_capacity(int64_t size) const
+    {
+        auto new_capacity = capacity ? (capacity + capacity / 2) : 8;
+        return new_capacity > size ? new_capacity : size;
+    }
 
-		last->data[index++] = d;
-	}
+    void reserve(int64_t new_capacity)
+    {
+        if (new_capacity <= capacity)
+            return;
+        T *_data = (T *)realloc(data, new_capacity * sizeof(T));
+        if (_data)
+        {
+            data     = _data;
+            capacity = new_capacity;
+        }
+    }
 
-	constexpr uint32_t bucket_size() {
-		return N;
-	}
+    T *first()
+    {
+        Assert(count);
+        return data;
+    }
+    const T *first() const
+    {
+        Assert(count);
+        return data;
+    }
+    T *last()
+    {
+        Assert(count);
+        return data + count - 1;
+    }
+    const T *last() const
+    {
+        Assert(count);
+        return data + count - 1;
+    }
+
+    template <typename... Args> void emplace(const Args &...args)
+    {
+        if (count == capacity)
+        {
+            auto n = _get_grow_capacity(capacity + 1);
+            reserve(n);
+        }
+        data[count] = T(args...);
+        count += 1;
+    }
+
+    T *add()
+    {
+        if (count == capacity)
+        {
+            auto c = _get_grow_capacity(capacity + 1);
+            reserve(c);
+        }
+        count += 1;
+        void *ptr = data + (count - 1);
+        return new (ptr) T;
+    }
+
+    T *addn(uint32_t n)
+    {
+        if (count + n > capacity)
+        {
+            auto c = _get_grow_capacity(count + n);
+            reserve(c);
+        }
+        T *ptr = data + count;
+        count += n;
+        return ptr;
+    }
+
+    void add(const T &d)
+    {
+        T *m = add();
+        *m   = d;
+    }
+
+    void copy(Array_View<T> src)
+    {
+        if (src.count + count >= capacity)
+        {
+            auto c = _get_grow_capacity(src.count + count + 1);
+            reserve(c);
+        }
+        memcpy(data + count, src.data, src.count * sizeof(T));
+        count += src.count;
+    }
+
+    void remove_last()
+    {
+        Assert(count > 0);
+        count -= 1;
+    }
+
+    void remove(int64_t index)
+    {
+        Assert(index < count);
+        memmove(data + index, data + index + 1, (count - index - 1) * sizeof(T));
+        count -= 1;
+    }
+
+    void remove_unordered(int64_t index)
+    {
+        Assert(index < count);
+        data[index] = data[count - 1];
+        count -= 1;
+    }
+
+    void insert(int64_t index, const T &v)
+    {
+        Assert(index < count + 1);
+        add();
+        for (auto move_index = count - 1; move_index > index; --move_index)
+        {
+            data[move_index] = data[move_index - 1];
+        }
+        data[index] = v;
+    }
+
+    void insert_unordered(int64_t index, const T &v)
+    {
+        Assert(index < count + 1);
+        add();
+        data[count - 1] = data[index];
+        data[index]     = v;
+    }
+
+    int64_t find(const T &v) const
+    {
+        for (int64_t index = 0; index < count; ++index)
+        {
+            auto elem = data + index;
+            if (*elem == v)
+            {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    template <typename SearchFunc, typename... Args> int64_t find(SearchFunc func, const Args &...args) const
+    {
+        for (int64_t index = 0; index < count; ++index)
+        {
+            if (func(data[index], args...))
+            {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    void reset()
+    {
+        count = 0;
+    }
 };
 
-template <typename T, uint32_t N> inline void bucket_array_free(Bucket_Array<T, N> *a) {
-	auto buck = a->first.next;
-	while (buck) {
-		auto fr_buck = buck;
-		buck = buck->next;
-		free(fr_buck);
-	}
+template <typename T> inline void array_free(Array<T> *a)
+{
+    if (a->data)
+        free(a->data, &a->allocator);
 }
 
-#define ForBucketArray(pBucket, pBucketArray) \
-	for (auto pBucket = &(pBucketArray).first; pBucket; pBucket = pBucket->next)
+template <typename T, uint32_t N> struct Bucket_Array
+{
+    struct Bucket
+    {
+        T       data[N];
+        Bucket *next = nullptr;
+    };
 
-#define ForBucket(nIndex, pBucket, pBukcetArray)	\
-	auto nMaxIter = (pBucket)->next ? (pBukcetArray).bucket_size() : (pBukcetArray).index; \
-	for (uint32_t nIndex = 0; nIndex < nMaxIter; ++nIndex)
+    Bucket   first;
+    Bucket * last;
+    uint32_t index;
+
+    Bucket_Array()
+    {
+        last  = &first;
+        index = 0;
+    }
+
+    void add(T d)
+    {
+        if (index == N)
+        {
+            Bucket *buk = new Bucket;
+            index       = 0;
+            last->next  = buk;
+            last        = buk;
+        }
+
+        last->data[index++] = d;
+    }
+
+    constexpr uint32_t bucket_size()
+    {
+        return N;
+    }
+};
+
+template <typename T, uint32_t N> inline void bucket_array_free(Bucket_Array<T, N> *a)
+{
+    auto buck = a->first.next;
+    while (buck)
+    {
+        auto fr_buck = buck;
+        buck         = buck->next;
+        free(fr_buck);
+    }
+}
+
+#define ForBucketArray(pBucket, pBucketArray)                                                                          \
+    for (auto pBucket = &(pBucketArray).first; pBucket; pBucket = pBucket->next)
+
+#define ForBucket(nIndex, pBucket, pBukcetArray)                                                                       \
+    auto nMaxIter = (pBucket)->next ? (pBukcetArray).bucket_size() : (pBukcetArray).index;                             \
+    for (uint32_t nIndex = 0; nIndex < nMaxIter; ++nIndex)

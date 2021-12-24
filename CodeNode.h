@@ -1,278 +1,383 @@
 #pragma once
 #include "SyntaxNode.h"
 
-enum Code_Type_Kind {
-	CODE_TYPE_NULL,
-	CODE_TYPE_INTEGER,
-	CODE_TYPE_REAL,
-	CODE_TYPE_BOOL,
-	CODE_TYPE_POINTER,
+enum Code_Type_Kind
+{
+    CODE_TYPE_NULL,
+    CODE_TYPE_INTEGER,
+    CODE_TYPE_REAL,
+    CODE_TYPE_BOOL,
+    CODE_TYPE_POINTER,
+    CODE_TYPE_PROCEDURE,
 
-	_CODE_TYPE_COUNT
+    _CODE_TYPE_COUNT
 };
 
-struct Code_Type {
-	Code_Type_Kind kind = CODE_TYPE_NULL;
-	uint32_t runtime_size = 0;
+struct Code_Type
+{
+    Code_Type_Kind kind         = CODE_TYPE_NULL;
+    uint32_t       runtime_size = 0;
 };
 
-struct Code_Type_Integer : public Code_Type {
-	Code_Type_Integer() { kind = CODE_TYPE_INTEGER; runtime_size = sizeof(int32_t); }
+struct Code_Type_Integer : public Code_Type
+{
+    Code_Type_Integer()
+    {
+        kind         = CODE_TYPE_INTEGER;
+        runtime_size = sizeof(int32_t);
+    }
 };
 
-struct Code_Type_Real : public Code_Type {
-	Code_Type_Real() { kind = CODE_TYPE_REAL; runtime_size = sizeof(float); }
+struct Code_Type_Real : public Code_Type
+{
+    Code_Type_Real()
+    {
+        kind         = CODE_TYPE_REAL;
+        runtime_size = sizeof(float);
+    }
 };
 
-struct Code_Type_Bool : public Code_Type {
-	Code_Type_Bool() { kind = CODE_TYPE_BOOL; runtime_size = sizeof(bool); }
+struct Code_Type_Bool : public Code_Type
+{
+    Code_Type_Bool()
+    {
+        kind         = CODE_TYPE_BOOL;
+        runtime_size = sizeof(bool);
+    }
 };
 
-struct Code_Type_Pointer : public Code_Type {
-	Code_Type_Pointer() { kind = CODE_TYPE_POINTER; runtime_size = sizeof(void *); }
+struct Code_Type_Pointer : public Code_Type
+{
+    Code_Type_Pointer()
+    {
+        kind         = CODE_TYPE_POINTER;
+        runtime_size = sizeof(void *);
+    }
 
-	Code_Type *base_type = nullptr;
+    Code_Type *base_type = nullptr;
+};
+
+struct Code_Type_Procedure : public Code_Type
+{
+    Code_Type_Procedure()
+    {
+        kind         = CODE_TYPE_PROCEDURE;
+        runtime_size = sizeof(void *);
+    }
+
+    Code_Type **arguments      = nullptr;
+    uint64_t    argument_count = 0;
+    Code_Type * return_type    = nullptr;
 };
 
 //
 //
 //
 
-struct Symbol {
-	String          name;
-	Code_Type *     type     = nullptr;
-	uint32_t        flags    = 0;
-	uint32_t        address  = UINT32_MAX;
-	Syntax_Location location = {};
+struct Symbol
+{
+    String          name;
+    Code_Type *     type     = nullptr;
+    uint8_t *       address  = nullptr;
+    uint32_t        flags    = 0;
+    Syntax_Location location = {};
 };
 
-constexpr uint32_t SYMBOL_INDEX_BUCKET_SIZE = 16;
-constexpr uint32_t SYMBOL_INDEX_MASK = SYMBOL_INDEX_BUCKET_SIZE - 1;
-constexpr uint32_t SYMBOL_INDEX_SHIFT = 4;
-constexpr uint32_t SYMBOL_TABLE_BUCKET_COUNT = 128;
-constexpr uint32_t HASH_SEED = 0x2564;
+constexpr uint32_t SYMBOL_INDEX_BUCKET_SIZE  = 16;
+constexpr uint32_t SYMBOL_INDEX_MASK         = SYMBOL_INDEX_BUCKET_SIZE - 1;
+constexpr uint32_t SYMBOL_INDEX_SHIFT        = 4;
+constexpr uint32_t SYMBOL_TABLE_BUCKET_COUNT = 64;
+constexpr uint32_t HASH_SEED                 = 0x2564;
 
-struct Symbol_Index {
-	uint32_t hash[SYMBOL_INDEX_BUCKET_SIZE] = {};
-	uint32_t index[SYMBOL_INDEX_BUCKET_SIZE] = {};
-	Symbol_Index *next = nullptr;
+struct Symbol_Index
+{
+    uint32_t      hash[SYMBOL_INDEX_BUCKET_SIZE]  = {};
+    uint32_t      index[SYMBOL_INDEX_BUCKET_SIZE] = {};
+    Symbol_Index *next                            = nullptr;
 };
 
-struct Symbol_Lookup {
-	Symbol_Index  buckets[SYMBOL_TABLE_BUCKET_COUNT];
+struct Symbol_Lookup
+{
+    Symbol_Index buckets[SYMBOL_TABLE_BUCKET_COUNT];
 };
 
-struct Symbol_Table {
-	Symbol_Lookup lookup;
-	Array<Symbol> buffer;
-	Symbol_Table *parent = nullptr;
+struct Symbol_Table
+{
+    Symbol_Lookup lookup;
+    Array<Symbol> buffer;
+    Symbol_Table *parent = nullptr;
 };
 
 //
 //
 //
 
-enum Code_Node_Kind {
-	CODE_NODE_NULL,
-	CODE_NODE_LITERAL,
-	CODE_NODE_ADDRESS,
-	CODE_NODE_TYPE_CAST,
-	CODE_NODE_UNARY_OPERATOR,
-	CODE_NODE_BINARY_OPERATOR,
-	CODE_NODE_EXPRESSION,
-	CODE_NODE_ASSIGNMENT_VALUE,
-	CODE_NODE_ASSIGNMENT,
-	CODE_NODE_STATEMENT,
-	CODE_NODE_IF,
-	CODE_NODE_FOR,
-	CODE_NODE_WHILE,
-	CODE_NODE_DO,
-	CODE_NODE_BLOCK,
+enum Code_Node_Kind
+{
+    CODE_NODE_NULL,
+    CODE_NODE_LITERAL,
+    CODE_NODE_ADDRESS,
+    CODE_NODE_TYPE_CAST,
+    CODE_NODE_UNARY_OPERATOR,
+    CODE_NODE_BINARY_OPERATOR,
+    CODE_NODE_EXPRESSION,
+    CODE_NODE_ASSIGNMENT,
+    CODE_NODE_RETURN,
+    CODE_NODE_STATEMENT,
+    CODE_NODE_IF,
+    CODE_NODE_FOR,
+    CODE_NODE_WHILE,
+    CODE_NODE_DO,
+    CODE_NODE_BLOCK,
 
-	_CODE_NODE_COUNT,
+    _CODE_NODE_COUNT,
 };
 
-struct Code_Node {
-	Code_Node_Kind  kind = CODE_NODE_NULL;
-	uint32_t        flags = 0;
-	Code_Type       *type = nullptr;
+struct Code_Node
+{
+    Code_Node_Kind kind  = CODE_NODE_NULL;
+    uint32_t       flags = 0;
+    Code_Type *    type  = nullptr;
 };
 
-struct Code_Value_Integer {
-	int32_t value;
+struct Code_Value_Integer
+{
+    int32_t value;
 };
 
-struct Code_Value_Real {
-	float value;
+struct Code_Value_Real
+{
+    float value;
 };
 
-struct Code_Value_Bool {
-	bool value;
+struct Code_Value_Bool
+{
+    bool value;
 };
 
 union Code_Value {
-	Code_Value_Integer integer;
-	Code_Value_Real    real;
-	Code_Value_Bool    boolean;
+    Code_Value_Integer integer;
+    Code_Value_Real    real;
+    Code_Value_Bool    boolean;
 
-	Code_Value() = default;
+    Code_Value() = default;
 };
 
-struct Code_Node_Literal : public Code_Node {
-	Code_Node_Literal() { kind = CODE_NODE_LITERAL; }
+struct Code_Node_Literal : public Code_Node
+{
+    Code_Node_Literal()
+    {
+        kind = CODE_NODE_LITERAL;
+    }
 
-	Code_Value data;
+    Code_Value data;
 };
 
-struct Code_Node_Address : public Code_Node {
-	Code_Node_Address() { kind = CODE_NODE_ADDRESS; }
+struct Code_Node_Address : public Code_Node
+{
+    Code_Node_Address()
+    {
+        kind = CODE_NODE_ADDRESS;
+    }
 
-	uint32_t offset = UINT32_MAX;
+    uint8_t *offset = (uint8_t *)UINT64_MAX;
 };
 
-struct Code_Node_Type_Cast : public Code_Node {
-	Code_Node_Type_Cast() { kind = CODE_NODE_TYPE_CAST; }
+struct Code_Node_Type_Cast : public Code_Node
+{
+    Code_Node_Type_Cast()
+    {
+        kind = CODE_NODE_TYPE_CAST;
+    }
 
-	Code_Node *child          = nullptr;
+    Code_Node *child = nullptr;
 };
 
-enum Unary_Operator_Kind {
-	UNARY_OPERATOR_PLUS,
-	UNARY_OPERATOR_MINUS,
-	UNARY_OPERATOR_BITWISE_NOT,
-	UNARY_OPERATOR_LOGICAL_NOT,
-	UNARY_OPERATOR_POINTER_TO,
-	UNARY_OPERATOR_DEREFERENCE,
+enum Unary_Operator_Kind
+{
+    UNARY_OPERATOR_PLUS,
+    UNARY_OPERATOR_MINUS,
+    UNARY_OPERATOR_BITWISE_NOT,
+    UNARY_OPERATOR_LOGICAL_NOT,
+    UNARY_OPERATOR_POINTER_TO,
+    UNARY_OPERATOR_DEREFERENCE,
 
-	_UNARY_OPERATOR_COUNT
+    _UNARY_OPERATOR_COUNT
 };
 
-struct Unary_Operator {
-	Code_Type *parameter;
-	Code_Type *output;
+struct Unary_Operator
+{
+    Code_Type *parameter;
+    Code_Type *output;
 };
 
-struct Code_Node_Unary_Operator : public Code_Node {
-	Code_Node_Unary_Operator() { kind = CODE_NODE_UNARY_OPERATOR; }
+struct Code_Node_Unary_Operator : public Code_Node
+{
+    Code_Node_Unary_Operator()
+    {
+        kind = CODE_NODE_UNARY_OPERATOR;
+    }
 
-	Unary_Operator_Kind op_kind;
+    Unary_Operator_Kind op_kind;
 
-	Code_Node *child = nullptr;
+    Code_Node *         child = nullptr;
 };
 
-enum Binary_Operator_Kind {
-	BINARY_OPERATOR_ADDITION,
-	BINARY_OPERATOR_SUBTRACTION,
-	BINARY_OPERATOR_MULTIPLICATION,
-	BINARY_OPERATOR_DIVISION,
-	BINARY_OPERATOR_REMAINDER,
-	BINARY_OPERATOR_BITWISE_SHIFT_RIGHT,
-	BINARY_OPERATOR_BITWISE_SHIFT_LEFT,
-	BINARY_OPERATOR_BITWISE_AND,
-	BINARY_OPERATOR_BITWISE_XOR,
-	BINARY_OPERATOR_BITWISE_OR,
-	BINARY_OPERATOR_RELATIONAL_GREATER,
-	BINARY_OPERATOR_RELATIONAL_LESS,
-	BINARY_OPERATOR_RELATIONAL_GREATER_EQUAL,
-	BINARY_OPERATOR_RELATIONAL_LESS_EQUAL,
-	BINARY_OPERATOR_COMPARE_EQUAL,
-	BINARY_OPERATOR_COMPARE_NOT_EQUAL,
-	BINARY_OPERATOR_COMPOUND_ADDITION,
-	BINARY_OPERATOR_COMPOUND_SUBTRACTION,
-	BINARY_OPERATOR_COMPOUND_MULTIPLICATION,
-	BINARY_OPERATOR_COMPOUND_DIVISION,
-	BINARY_OPERATOR_COMPOUND_REMAINDER,
-	BINARY_OPERATOR_COMPOUND_BITWISE_SHIFT_RIGHT,
-	BINARY_OPERATOR_COMPOUND_BITWISE_SHIFT_LEFT,
-	BINARY_OPERATOR_COMPOUND_BITWISE_AND,
-	BINARY_OPERATOR_COMPOUND_BITWISE_XOR,
-	BINARY_OPERATOR_COMPOUND_BITWISE_OR,
+enum Binary_Operator_Kind
+{
+    BINARY_OPERATOR_ADDITION,
+    BINARY_OPERATOR_SUBTRACTION,
+    BINARY_OPERATOR_MULTIPLICATION,
+    BINARY_OPERATOR_DIVISION,
+    BINARY_OPERATOR_REMAINDER,
+    BINARY_OPERATOR_BITWISE_SHIFT_RIGHT,
+    BINARY_OPERATOR_BITWISE_SHIFT_LEFT,
+    BINARY_OPERATOR_BITWISE_AND,
+    BINARY_OPERATOR_BITWISE_XOR,
+    BINARY_OPERATOR_BITWISE_OR,
+    BINARY_OPERATOR_RELATIONAL_GREATER,
+    BINARY_OPERATOR_RELATIONAL_LESS,
+    BINARY_OPERATOR_RELATIONAL_GREATER_EQUAL,
+    BINARY_OPERATOR_RELATIONAL_LESS_EQUAL,
+    BINARY_OPERATOR_COMPARE_EQUAL,
+    BINARY_OPERATOR_COMPARE_NOT_EQUAL,
+    BINARY_OPERATOR_COMPOUND_ADDITION,
+    BINARY_OPERATOR_COMPOUND_SUBTRACTION,
+    BINARY_OPERATOR_COMPOUND_MULTIPLICATION,
+    BINARY_OPERATOR_COMPOUND_DIVISION,
+    BINARY_OPERATOR_COMPOUND_REMAINDER,
+    BINARY_OPERATOR_COMPOUND_BITWISE_SHIFT_RIGHT,
+    BINARY_OPERATOR_COMPOUND_BITWISE_SHIFT_LEFT,
+    BINARY_OPERATOR_COMPOUND_BITWISE_AND,
+    BINARY_OPERATOR_COMPOUND_BITWISE_XOR,
+    BINARY_OPERATOR_COMPOUND_BITWISE_OR,
 
-	_BINARY_OPERATOR_COUNT
+    _BINARY_OPERATOR_COUNT
 };
 
-struct Binary_Operator {
-	Code_Type *parameters[2];
-	Code_Type *output;
-	bool compound = false;
+struct Binary_Operator
+{
+    Code_Type *parameters[2];
+    Code_Type *output;
+    bool       compound = false;
 };
 
-struct Code_Node_Binary_Operator : public Code_Node {
-	Code_Node_Binary_Operator() { kind = CODE_NODE_BINARY_OPERATOR; }
+struct Code_Node_Binary_Operator : public Code_Node
+{
+    Code_Node_Binary_Operator()
+    {
+        kind = CODE_NODE_BINARY_OPERATOR;
+    }
 
-	Binary_Operator_Kind op_kind;
+    Binary_Operator_Kind op_kind;
 
-	Code_Node *left = nullptr;
-	Code_Node *right = nullptr;
+    Code_Node *          left  = nullptr;
+    Code_Node *          right = nullptr;
 };
 
-struct Code_Node_Expression : public Code_Node {
-	Code_Node_Expression() { kind = CODE_NODE_EXPRESSION; }
+struct Code_Node_Expression : public Code_Node
+{
+    Code_Node_Expression()
+    {
+        kind = CODE_NODE_EXPRESSION;
+    }
 
-	Code_Node *child = nullptr;
+    Code_Node *child = nullptr;
 };
 
-struct Code_Node_Assignment_Value : public Code_Node {
-	Code_Node_Assignment_Value() { kind = CODE_NODE_ASSIGNMENT_VALUE; }
+struct Code_Node_Assignment : public Code_Node
+{
+    Code_Node_Assignment()
+    {
+        kind = CODE_NODE_ASSIGNMENT;
+    }
 
-	Code_Node *child = nullptr;
+    Code_Node_Expression *destination = nullptr;
+    Code_Node_Expression *value       = nullptr;
 };
 
-struct Code_Node_Assignment : public Code_Node {
-	Code_Node_Assignment() { kind = CODE_NODE_ASSIGNMENT; }
+struct Code_Node_Return : public Code_Node
+{
+    Code_Node_Return()
+    {
+        kind = CODE_NODE_RETURN;
+    }
 
-	Code_Node_Expression *destination = nullptr;
-	Code_Node_Assignment_Value *value = nullptr;
+    Code_Node *expression = nullptr;
 };
 
-struct Code_Node_Statement : public Code_Node {
-	Code_Node_Statement() { kind = CODE_NODE_STATEMENT; }
+struct Code_Node_Statement : public Code_Node
+{
+    Code_Node_Statement()
+    {
+        kind = CODE_NODE_STATEMENT;
+    }
 
-	Code_Node *node           = nullptr;
-	Code_Node_Statement *next = nullptr;
+    Code_Node *          node = nullptr;
+    Code_Node_Statement *next = nullptr;
 };
 
-struct Code_Node_If : public Code_Node {
-	Code_Node_If() { kind = CODE_NODE_IF; }
+struct Code_Node_If : public Code_Node
+{
+    Code_Node_If()
+    {
+        kind = CODE_NODE_IF;
+    }
 
-	Code_Node_Expression *condition      = nullptr;
-	Code_Node_Statement *true_statement  = nullptr;
-	Code_Node_Statement *false_statement = nullptr;
+    Code_Node_Expression *condition       = nullptr;
+    Code_Node_Statement * true_statement  = nullptr;
+    Code_Node_Statement * false_statement = nullptr;
 };
 
-struct Code_Node_For : public Code_Node {
-	Code_Node_For() { kind = CODE_NODE_FOR; }
+struct Code_Node_For : public Code_Node
+{
+    Code_Node_For()
+    {
+        kind = CODE_NODE_FOR;
+    }
 
-	Code_Node_Statement *initialization = nullptr;
-	Code_Node_Expression *condition     = nullptr;
-	Code_Node_Expression *increment     = nullptr;
+    Code_Node_Statement * initialization = nullptr;
+    Code_Node_Expression *condition      = nullptr;
+    Code_Node_Expression *increment      = nullptr;
 
-	Code_Node_Statement *body = nullptr;
+    Code_Node_Statement * body           = nullptr;
 
-	Symbol_Table symbols;
+    Symbol_Table          symbols;
 };
 
-struct Code_Node_While : public Code_Node {
-	Code_Node_While() { kind = CODE_NODE_WHILE; }
+struct Code_Node_While : public Code_Node
+{
+    Code_Node_While()
+    {
+        kind = CODE_NODE_WHILE;
+    }
 
-	Code_Node_Expression *condition = nullptr;
+    Code_Node_Expression *condition = nullptr;
 
-	Code_Node_Statement *body = nullptr;
+    Code_Node_Statement * body      = nullptr;
 };
 
-struct Code_Node_Do : public Code_Node {
-	Code_Node_Do() { kind = CODE_NODE_DO; }
+struct Code_Node_Do : public Code_Node
+{
+    Code_Node_Do()
+    {
+        kind = CODE_NODE_DO;
+    }
 
-	Code_Node_Statement *body = nullptr;
+    Code_Node_Statement * body      = nullptr;
 
-	Code_Node_Expression *condition = nullptr;
+    Code_Node_Expression *condition = nullptr;
 };
 
-struct Code_Node_Block : public Code_Node {
-	Code_Node_Block() { kind = CODE_NODE_BLOCK; }
+struct Code_Node_Block : public Code_Node
+{
+    Code_Node_Block()
+    {
+        kind = CODE_NODE_BLOCK;
+    }
 
-	Code_Node_Statement *statement_head = nullptr;
-	uint64_t statement_count            = 0;
+    Code_Node_Statement *statement_head  = nullptr;
+    uint64_t             statement_count = 0;
 
-	Symbol_Table symbols;
+    Symbol_Table         symbols;
 };
