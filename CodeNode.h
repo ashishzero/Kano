@@ -155,10 +155,15 @@ struct Code_Value_Bool
     bool value;
 };
 
+struct Code_Value_Pointer {
+	uint64_t value;
+};
+
 union Code_Value {
     Code_Value_Integer integer;
     Code_Value_Real    real;
     Code_Value_Bool    boolean;
+    Code_Value_Pointer pointer;
 
     Code_Value() = default;
 };

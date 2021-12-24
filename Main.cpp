@@ -1346,7 +1346,9 @@ int main()
         fclose(fp);
     }
 
-    // evaluate_node_block(code);
+    Interp interp;
+    interp_init(&interp, 1024 * 1024 * 4);
+	evaluate_node_block(code,&interp);
 
     return 0;
 }
