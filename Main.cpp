@@ -479,14 +479,21 @@ Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver *resolv
             {
                 auto code_param = code_resolve_root_expression(resolver, symbols, param->expression);
 
-                if (code_type_are_same(proc->arguments[param_index], code_param->type))
+                if (!code_type_are_same(proc->arguments[param_index], code_param->type))
                 {
-                    node->paraments[param_index] = code_param;
+                    auto cast = code_implicit_cast(code_param->child, proc->arguments[param_index]);
+
+                    if (cast)
+                    {
+                        code_param->child = cast;
+                    }
+                    else
+                    {
+                        Unimplemented();
+                    }
                 }
-                else
-                {
-                    Unimplemented();
-                }
+
+                node->paraments[param_index] = code_param;
             }
 
             node->stack_top = resolver->vstack;
@@ -822,7 +829,8 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
 
         Code_Type *           type             = nullptr;
 
-        auto                  ResolveProcedure = [&resolver, &type, &procedure_body](Syntax_Node_Procedure *proc) {
+        auto                  ResolveProcedure = 
+            [&resolver, &type, &procedure_body, symbols, symbol](Syntax_Node_Procedure *proc) {
             auto proc_type            = new Code_Type_Procedure;
 
             proc_type->argument_count = proc->argument_count;
@@ -834,7 +842,7 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
             }
 
             auto proc_symbols    = new Symbol_Table;
-            proc_symbols->parent = &resolver->symbols;
+            proc_symbols->parent = symbols;
 
             auto stack_top = resolver->vstack;
 
@@ -852,6 +860,8 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
             }
 
             type = proc_type;
+            if (!symbol->type)
+                symbol->type = proc_type;
 
             resolver->return_stack.add(proc_type->return_type);
             procedure_body = code_resolve_block(resolver, proc_symbols, proc->body);

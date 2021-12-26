@@ -362,6 +362,18 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
     }
     break;
 
+    case CODE_NODE_PROCEDURE_CALL: {
+        auto node = (Code_Node_Procedure_Call *)root;
+        fprintf(fp, "Procedure-Call()\n");
+        print_code(node->procedure, fp, child_indent, "Procedure-Id");
+
+        for (uint64_t index = 0; index < node->parameter_count; ++index)
+        {
+            print_code(node->paraments[index], fp, child_indent);
+        }
+    }
+    break;
+
     case CODE_NODE_IF: {
         auto node = (Code_Node_If *)root;
         fprintf(fp, "If()\n");

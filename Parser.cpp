@@ -559,6 +559,12 @@ Syntax_Node_Procedure *parse_procedure(Parser *parser)
         {
             proc->return_type = parse_type(parser);
         }
+
+        if (!parser_peek_token(parser, TOKEN_KIND_OPEN_CURLY_BRACKET))
+        {
+            auto token = lexer_current_token(&parser->lexer);
+            parser_error(parser, token, "Expected body in procedure call");
+        }
     }
 
     proc->body = parse_block(parser);
