@@ -146,6 +146,24 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
     }
     break;
 
+    case SYNTAX_NODE_PROCEDURE_PARAMETER: {
+        auto node = (Syntax_Node_Procedure_Parameter *)root;
+        fprintf(fp, "Procedure-Parameter()\n");
+        print_syntax(node->expression, fp, child_indent, "Expression");
+    }
+    break;
+
+    case SYNTAX_NODE_PROCEDURE_CALL: {
+        auto node = (Syntax_Node_Procedure_Call *)root;
+        fprintf(fp, "Procedure-Call()\n");
+        
+        for (auto param = node->parameters; param; param = param->next)
+        {
+            print_syntax(param, fp, child_indent, "Param");
+        }
+    }
+    break;
+
     case SYNTAX_NODE_IF: {
         auto node = (Syntax_Node_If *)root;
         fprintf(fp, "If()\n");

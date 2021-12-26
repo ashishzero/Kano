@@ -6,6 +6,12 @@
 
 #include <stdlib.h>
 
+void handle_assertion(const char *reason, const char *file, int line, const char *proc)
+{
+    fprintf(stderr, "%s. File: %s(%d)\n", reason, file, line);
+    DebugTriggerbreakpoint();
+}
+
 String read_entire_file(const char *file)
 {
     FILE *f = fopen(file, "rb");
@@ -407,14 +413,15 @@ Code_Node_Address *code_resolve_identifier(Code_Type_Resolver *resolver, Symbol_
 {
     auto symbol = symbol_table_get(symbols, root->name);
 
-    Assert(symbol->type->kind != CODE_TYPE_PROCEDURE);
-
     if (symbol)
     {
         auto address    = new Code_Node_Address;
         address->offset = symbol->address;
         address->flags  = symbol->flags;
-        address->flags |= SYMBOL_BIT_LVALUE;
+        
+        if (!(symbol->flags & SYMBOL_BIT_CONSTANT))
+            address->flags |= SYMBOL_BIT_LVALUE;
+
         address->type = symbol->type;
         return address;
     }
@@ -450,6 +457,53 @@ Code_Node_Return *code_resolve_return(Code_Type_Resolver *resolver, Symbol_Table
     return node;
 }
 
+Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Procedure_Call *root)
+{
+    auto procedure = code_resolve_root_expression(resolver, symbols, root->procedure);
+    
+    if (procedure->type->kind == CODE_TYPE_PROCEDURE)
+    {
+        auto proc = (Code_Type_Procedure *)procedure->type;
+
+        if (proc->argument_count == root->parameter_count)
+        {
+            auto node       = new Code_Node_Procedure_Call;
+            node->procedure = procedure;
+            node->type      = proc->return_type;
+
+            node->parameter_count = root->parameter_count;
+            node->paraments       = new Code_Node_Expression *[node->parameter_count];
+
+            uint32_t param_index = 0;
+            for (auto param = root->parameters; param; param = param->next, ++param_index)
+            {
+                auto code_param = code_resolve_root_expression(resolver, symbols, param->expression);
+
+                if (code_type_are_same(proc->arguments[param_index], code_param->type))
+                {
+                    node->paraments[param_index] = code_param;
+                }
+                else
+                {
+                    Unimplemented();
+                }
+            }
+
+            node->stack_top = resolver->vstack;
+
+            return node;
+        }
+        else
+        {
+            Unimplemented();
+        }
+    }
+
+    Unimplemented();
+
+    return nullptr;
+}
+
 Code_Node *code_resolve_expression(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node *root)
 {
     switch (root->kind)
@@ -471,6 +525,9 @@ Code_Node *code_resolve_expression(Code_Type_Resolver *resolver, Symbol_Table *s
 
     case SYNTAX_NODE_RETURN:
         return code_resolve_return(resolver, symbols, (Syntax_Node_Return *)root);
+
+    case SYNTAX_NODE_PROCEDURE_CALL:
+        return code_resolve_procedure_call(resolver, symbols, (Syntax_Node_Procedure_Call *)root);
 
         NoDefaultCase();
     }
@@ -779,6 +836,13 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
             auto proc_symbols    = new Symbol_Table;
             proc_symbols->parent = &resolver->symbols;
 
+            auto stack_top = resolver->vstack;
+
+            if (proc_type->return_type)
+                resolver->vstack = proc_type->return_type->runtime_size;
+            else
+                resolver->vstack = 0;
+
             uint64_t arg_index   = 0;
             for (auto arg = proc->arguments; arg; arg = arg->next, ++arg_index)
             {
@@ -792,6 +856,8 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
             resolver->return_stack.add(proc_type->return_type);
             procedure_body = code_resolve_block(resolver, proc_symbols, proc->body);
             resolver->return_stack.count -= 1;
+
+            resolver->vstack = stack_top;
         };
 
         if (infer_type)

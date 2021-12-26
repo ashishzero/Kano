@@ -124,6 +124,7 @@ enum Code_Node_Kind
     CODE_NODE_ASSIGNMENT,
     CODE_NODE_RETURN,
     CODE_NODE_STATEMENT,
+    CODE_NODE_PROCEDURE_CALL,
     CODE_NODE_IF,
     CODE_NODE_FOR,
     CODE_NODE_WHILE,
@@ -320,6 +321,20 @@ struct Code_Node_Statement : public Code_Node
 
     Code_Node *          node = nullptr;
     Code_Node_Statement *next = nullptr;
+};
+
+struct Code_Node_Procedure_Call : public Code_Node
+{
+    Code_Node_Procedure_Call()
+    {
+        kind = CODE_NODE_PROCEDURE_CALL;
+    }
+
+    Code_Node *procedure = nullptr;
+    uint64_t parameter_count = 0;
+    Code_Node_Expression **paraments = nullptr;
+
+    uint64_t stack_top = 0;
 };
 
 struct Code_Node_If : public Code_Node

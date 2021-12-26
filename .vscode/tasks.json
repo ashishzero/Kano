@@ -1,0 +1,11 @@
+{
+    "tasks": [
+        {
+            "type": "cppbuild",
+            "label": "C/C++: g++ build active file",
+            "command": "./build.sh",
+            "options": { "cwd": "${workspaceFolder}" },
+        }
+    ],
+    "version": "2.0.0"
+}

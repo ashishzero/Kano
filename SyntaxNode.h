@@ -32,6 +32,8 @@ enum Syntax_Node_Kind
     SYNTAX_NODE_RETURN,
     SYNTAX_NODE_ASSIGNMENT,
     SYNTAX_NODE_EXPRESSION,
+    SYNTAX_NODE_PROCEDURE_PARAMETER,
+    SYNTAX_NODE_PROCEDURE_CALL,
     SYNTAX_NODE_IF,
     SYNTAX_NODE_FOR,
     SYNTAX_NODE_WHILE,
@@ -53,6 +55,8 @@ struct Syntax_Node_Procedure_Prototype;
 struct Syntax_Node_Type;
 struct Syntax_Node_Assignment;
 struct Syntax_Node_Expression;
+struct Syntax_Node_Procedure_Parameter;
+struct Syntax_Node_Procedure_Call;
 struct Syntax_Node_If;
 struct Syntax_Node_For;
 struct Syntax_Node_While;
@@ -194,6 +198,29 @@ struct Syntax_Node_Expression : public Syntax_Node
     }
 
     Syntax_Node *child = nullptr;
+};
+
+struct Syntax_Node_Procedure_Parameter : public Syntax_Node
+{
+    Syntax_Node_Procedure_Parameter()
+    {
+        kind = SYNTAX_NODE_PROCEDURE_PARAMETER;
+    }
+
+    Syntax_Node_Expression *expression = nullptr;
+    Syntax_Node_Procedure_Parameter *next = nullptr;
+};
+
+struct Syntax_Node_Procedure_Call : public Syntax_Node
+{
+    Syntax_Node_Procedure_Call()
+    {
+        kind = SYNTAX_NODE_PROCEDURE_CALL;
+    }
+
+    Syntax_Node_Expression *procedure = nullptr;
+    uint64_t parameter_count = 0;
+    Syntax_Node_Procedure_Parameter *parameters = nullptr;
 };
 
 struct Syntax_Node_If : public Syntax_Node

@@ -45,6 +45,8 @@ static void     parser_init_precedence()
     //
     //
 
+    BinaryOperatorPrecedence[TOKEN_KIND_OPEN_BRACKET] = 65;
+
     BinaryOperatorPrecedence[TOKEN_KIND_ASTERISK]                     = 60;
     BinaryOperatorPrecedence[TOKEN_KIND_DIVISION]                     = 60;
     BinaryOperatorPrecedence[TOKEN_KIND_REMAINDER]                    = 60;
@@ -278,6 +280,40 @@ Syntax_Node *parse_subexpression(Parser *parser, uint32_t prec)
     return nullptr;
 }
 
+struct Procedure_Call
+{
+    uint64_t count;
+    Syntax_Node_Procedure_Parameter *head;
+};
+
+Procedure_Call parse_procedure_parameters(Parser *parser)
+{
+    uint64_t count = 0;
+
+    Syntax_Node_Procedure_Parameter stub_head;
+    Syntax_Node_Procedure_Parameter *parent = &stub_head;
+
+    while (parser_should_continue(parser))
+    {
+        if (parser_peek_token(parser, TOKEN_KIND_CLOSE_BRACKET))
+            break;
+        
+        auto param = parser_new_syntax_node<Syntax_Node_Procedure_Parameter>(parser);
+        param->expression = parse_root_expression(parser);
+
+        parent->next = param;
+        parent = param;
+
+        count += 1;
+    }
+
+    Procedure_Call call;
+    call.count = count;
+    call.head = stub_head.next;
+
+    return call;
+}
+
 Syntax_Node *parse_expression(Parser *parser, uint32_t prec)
 {
     auto left = parse_subexpression(parser, prec);
@@ -336,6 +372,28 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec)
         auto op_prec = BinaryOperatorPrecedence[token->kind];
         if (op_prec <= prec)
             break;
+
+        if (parser_peek_token(parser, TOKEN_KIND_OPEN_BRACKET)) 
+        {
+            auto node = parser_new_syntax_node<Syntax_Node_Procedure_Call>(parser);
+            parser_accept_token(parser, TOKEN_KIND_OPEN_BRACKET);
+
+            auto parameters = parse_procedure_parameters(parser);
+            parser_expect_token(parser, TOKEN_KIND_CLOSE_BRACKET);
+
+            parser_finish_syntax_node(parser, node);
+
+            auto procedure = parser_new_syntax_node<Syntax_Node_Expression>(parser);
+            parser_finish_syntax_node(parser, procedure);
+            procedure->location = left->location;
+            procedure->child = left;
+            
+            node->procedure = procedure;
+            node->parameter_count = parameters.count;
+            node->parameters = parameters.head;
+            left = node;
+            continue;
+        }
 
         for (uint32_t index = 0; index < ArrayCount(BinaryOpTokens); ++index)
         {
