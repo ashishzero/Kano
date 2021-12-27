@@ -45,6 +45,7 @@ static void     parser_init_precedence()
     //
     //
 
+    BinaryOperatorPrecedence[TOKEN_KIND_PERIOD]                       = 65;
     BinaryOperatorPrecedence[TOKEN_KIND_OPEN_BRACKET]                 = 65;
 
     BinaryOperatorPrecedence[TOKEN_KIND_ASTERISK]                     = 60;
@@ -81,6 +82,8 @@ static void     parser_init_precedence()
     BinaryOperatorPrecedence[TOKEN_KIND_COMPOUND_BITWISE_AND]         = 15;
     BinaryOperatorPrecedence[TOKEN_KIND_COMPOUND_BITWISE_XOR]         = 15;
     BinaryOperatorPrecedence[TOKEN_KIND_COMPOUND_BITWISE_OR]          = 15;
+
+    BinaryOperatorPrecedence[TOKEN_KIND_EQUALS]                       = 15;
 }
 
 //
@@ -323,6 +326,12 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec)
 
     while (parser_should_continue(parser))
     {
+        auto token   = lexer_current_token(&parser->lexer);
+
+        auto op_prec = BinaryOperatorPrecedence[token->kind];
+        if (op_prec <= prec)
+            break;
+
         // assignment
         if (parser_accept_token(parser, TOKEN_KIND_EQUALS))
         {
@@ -338,40 +347,33 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec)
             return assignment;
         }
 
-        static const Token_Kind BinaryOpTokens[] = {
-            TOKEN_KIND_PLUS,
-            TOKEN_KIND_MINUS,
-            TOKEN_KIND_ASTERISK,
-            TOKEN_KIND_DIVISION,
-            TOKEN_KIND_REMAINDER,
-            TOKEN_KIND_BITWISE_SHIFT_RIGHT,
-            TOKEN_KIND_BITWISE_SHIFT_LEFT,
-            TOKEN_KIND_BITWISE_AND,
-            TOKEN_KIND_BITWISE_XOR,
-            TOKEN_KIND_BITWISE_OR,
-            TOKEN_KIND_RELATIONAL_GREATER,
-            TOKEN_KIND_RELATIONAL_LESS,
-            TOKEN_KIND_RELATIONAL_GREATER_EQUAL,
-            TOKEN_KIND_RELATIONAL_LESS_EQUAL,
-            TOKEN_KIND_COMPARE_EQUAL,
-            TOKEN_KIND_COMPARE_NOT_EQUAL,
-            TOKEN_KIND_COMPOUND_PLUS,
-            TOKEN_KIND_COMPOUND_MINUS,
-            TOKEN_KIND_COMPOUND_MULTIPLY,
-            TOKEN_KIND_COMPOUND_DIVIDE,
-            TOKEN_KIND_COMPOUND_REMAINDER,
-            TOKEN_KIND_COMPOUND_BITWISE_SHIFT_RIGHT,
-            TOKEN_KIND_COMPOUND_BITWISE_SHIFT_LEFT,
-            TOKEN_KIND_COMPOUND_BITWISE_AND,
-            TOKEN_KIND_COMPOUND_BITWISE_XOR,
-            TOKEN_KIND_COMPOUND_BITWISE_OR,
-        };
-
-        auto token   = lexer_current_token(&parser->lexer);
-
-        auto op_prec = BinaryOperatorPrecedence[token->kind];
-        if (op_prec <= prec)
-            break;
+        static const Token_Kind BinaryOpTokens[] = {TOKEN_KIND_PLUS,
+                                                    TOKEN_KIND_MINUS,
+                                                    TOKEN_KIND_ASTERISK,
+                                                    TOKEN_KIND_DIVISION,
+                                                    TOKEN_KIND_REMAINDER,
+                                                    TOKEN_KIND_BITWISE_SHIFT_RIGHT,
+                                                    TOKEN_KIND_BITWISE_SHIFT_LEFT,
+                                                    TOKEN_KIND_BITWISE_AND,
+                                                    TOKEN_KIND_BITWISE_XOR,
+                                                    TOKEN_KIND_BITWISE_OR,
+                                                    TOKEN_KIND_RELATIONAL_GREATER,
+                                                    TOKEN_KIND_RELATIONAL_LESS,
+                                                    TOKEN_KIND_RELATIONAL_GREATER_EQUAL,
+                                                    TOKEN_KIND_RELATIONAL_LESS_EQUAL,
+                                                    TOKEN_KIND_COMPARE_EQUAL,
+                                                    TOKEN_KIND_COMPARE_NOT_EQUAL,
+                                                    TOKEN_KIND_COMPOUND_PLUS,
+                                                    TOKEN_KIND_COMPOUND_MINUS,
+                                                    TOKEN_KIND_COMPOUND_MULTIPLY,
+                                                    TOKEN_KIND_COMPOUND_DIVIDE,
+                                                    TOKEN_KIND_COMPOUND_REMAINDER,
+                                                    TOKEN_KIND_COMPOUND_BITWISE_SHIFT_RIGHT,
+                                                    TOKEN_KIND_COMPOUND_BITWISE_SHIFT_LEFT,
+                                                    TOKEN_KIND_COMPOUND_BITWISE_AND,
+                                                    TOKEN_KIND_COMPOUND_BITWISE_XOR,
+                                                    TOKEN_KIND_COMPOUND_BITWISE_OR,
+                                                    TOKEN_KIND_PERIOD};
 
         if (parser_peek_token(parser, TOKEN_KIND_OPEN_BRACKET))
         {
@@ -395,6 +397,8 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec)
             continue;
         }
 
+        bool found_binary_operator = false;
+
         for (uint32_t index = 0; index < ArrayCount(BinaryOpTokens); ++index)
         {
             Token_Kind token = BinaryOpTokens[index];
@@ -402,13 +406,17 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec)
             {
                 auto node = parser_new_syntax_node<Syntax_Node_Binary_Operator>(parser);
                 parser_finish_syntax_node(parser, node);
-                node->op    = token;
-                node->left  = left;
-                node->right = parse_expression(parser, op_prec);
-                left        = node;
+                node->op              = token;
+                node->left            = left;
+                node->right           = parse_expression(parser, op_prec);
+                left                  = node;
+                found_binary_operator = true;
                 break;
             }
         }
+
+        if (!found_binary_operator)
+            break;
     }
 
     return left;

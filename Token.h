@@ -10,6 +10,7 @@ enum Token_Kind
     TOKEN_KIND_COMMA,
     TOKEN_KIND_DASH_ARROW,
     TOKEN_KIND_DEREFERENCE,
+    TOKEN_KIND_PERIOD,
     TOKEN_KIND_EQUALS,
     TOKEN_KIND_OPEN_BRACKET,
     TOKEN_KIND_CLOSE_BRACKET,
@@ -114,7 +115,8 @@ static inline String token_kind_string(Token_Kind kind)
 
                                ";",           ":",
                                ",",           "->",
-                               "?",           "=",
+                               "?",           ".",
+                               "=",
 
                                "(",           ")",
                                "{",           "}",

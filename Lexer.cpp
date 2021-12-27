@@ -348,6 +348,10 @@ void lexer_next(Lexer *lexer)
             lexer->cursor++;
             lexer_make_token(lexer, TOKEN_KIND_DEREFERENCE);
             return;
+        case '.':
+            lexer->cursor++;
+            lexer_make_token(lexer, TOKEN_KIND_PERIOD);
+            return;
         case '=':
             lexer->cursor++;
             lexer_make_token(lexer, TOKEN_KIND_EQUALS);

@@ -357,15 +357,15 @@ Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Symbol_Tab
 Code_Node_Address *code_resolve_identifier(Code_Type_Resolver *resolver, Symbol_Table *symbols,
                                            Syntax_Node_Identifier *root);
 Code_Node *        code_resolve_expression(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node *root);
-Code_Node_Unary_Operator * code_resolve_unary_operator(Code_Type_Resolver *resolver, Symbol_Table *symbols,
-                                                       Syntax_Node_Unary_Operator *root);
-Code_Node_Binary_Operator *code_resolve_binary_operator(Code_Type_Resolver *resolver, Symbol_Table *symbols,
-                                                        Syntax_Node_Binary_Operator *root);
-Code_Node_Expression *     code_resolve_root_expression(Code_Type_Resolver *resolver, Symbol_Table *symbols,
-                                                        Syntax_Node_Expression *root);
+Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolver, Symbol_Table *symbols,
+                                                      Syntax_Node_Unary_Operator *root);
+Code_Node *               code_resolve_binary_operator(Code_Type_Resolver *resolver, Symbol_Table *symbols,
+                                                       Syntax_Node_Binary_Operator *root);
+Code_Node_Expression *    code_resolve_root_expression(Code_Type_Resolver *resolver, Symbol_Table *symbols,
+                                                       Syntax_Node_Expression *root);
 
-Code_Node_Assignment *     code_resolve_assignment(Code_Type_Resolver *resolver, Symbol_Table *symbols,
-                                                   Syntax_Node_Assignment *root);
+Code_Node_Assignment *    code_resolve_assignment(Code_Type_Resolver *resolver, Symbol_Table *symbols,
+                                                  Syntax_Node_Assignment *root);
 Code_Type *           code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Type *root);
 
 Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Symbol_Table *symbols,
@@ -635,64 +635,151 @@ Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolv
     return nullptr;
 }
 
-Code_Node_Binary_Operator *code_resolve_binary_operator(Code_Type_Resolver *resolver, Symbol_Table *symbols,
-                                                        Syntax_Node_Binary_Operator *root)
+Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Symbol_Table *symbols,
+                                        Syntax_Node_Binary_Operator *root)
 {
-    auto  left      = code_resolve_expression(resolver, symbols, root->left);
-    auto  right     = code_resolve_expression(resolver, symbols, root->right);
+    auto left = code_resolve_expression(resolver, symbols, root->left);
 
-    auto  op_kind   = token_to_binary_operator(root->op);
-
-    auto &operators = resolver->binary_operators[op_kind];
-
-    ForBucketArray(bucket, operators)
+    if (root->op == TOKEN_KIND_PERIOD)
     {
-        ForBucket(index, bucket, operators)
+        if (left->kind != CODE_NODE_ADDRESS)
         {
-            auto op          = &bucket->data[index];
+            Unimplemented();
+        }
 
-            bool left_match  = false;
-            bool right_match = false;
+        Code_Type_Struct *type        = nullptr;
 
-            if (code_type_are_same(op->parameters[0], left->type))
+        auto              parent_type = left->type;
+
+        for (int depth = 0; depth < 2; ++depth)
+        {
+            if (parent_type->kind == CODE_TYPE_STRUCT)
             {
-                left_match = true;
+                type = (Code_Type_Struct *)parent_type;
+                break;
+            }
+            else if (parent_type->kind == CODE_TYPE_POINTER)
+            {
+                auto ptr    = (Code_Type_Pointer *)parent_type;
+                parent_type = ptr->base_type;
             }
             else
             {
-                auto cast_left = code_implicit_cast(left, op->parameters[0]);
-                if (cast_left)
+                Unimplemented();
+            }
+        }
+
+        if (type)
+        {
+            auto symbol = symbol_table_get(symbols, type->name);
+            if (symbol)
+            {
+                if (symbol->type->kind == CODE_TYPE_STRUCT)
                 {
-                    left       = cast_left;
+                    Assert(symbol->address.kind == Symbol_Address::CODE);
+                    auto block = (Code_Node_Block *)symbol->address.memory;
+
+                    if (root->right->kind == SYNTAX_NODE_IDENTIFIER)
+                    {
+                        auto iden   = (Syntax_Node_Identifier *)root->right;
+
+                        auto member = symbol_table_get(&block->symbols, iden->name, false);
+                        if (member)
+                        {
+                            Assert(member->address.kind == Symbol_Address::STACK);
+
+                            auto code_node   = (Code_Node_Address *)left;
+                            code_node->flags = left->flags;
+                            code_node->type  = member->type;
+
+                            auto memory      = (uint8_t *)code_node->address.memory;
+                            memory += (uint64_t)member->address.memory;
+                            code_node->address.memory = memory;
+
+                            return code_node;
+                        }
+                        else
+                        {
+                            Unimplemented();
+                        }
+                    }
+                    else
+                    {
+                        Unimplemented();
+                    }
+                }
+                else
+                {
+                    Unimplemented();
+                }
+            }
+            else
+            {
+                Unimplemented();
+            }
+        }
+        else
+        {
+            Unimplemented();
+        }
+    }
+    else
+    {
+        auto  right     = code_resolve_expression(resolver, symbols, root->right);
+
+        auto  op_kind   = token_to_binary_operator(root->op);
+
+        auto &operators = resolver->binary_operators[op_kind];
+
+        ForBucketArray(bucket, operators)
+        {
+            ForBucket(index, bucket, operators)
+            {
+                auto op          = &bucket->data[index];
+
+                bool left_match  = false;
+                bool right_match = false;
+
+                if (code_type_are_same(op->parameters[0], left->type))
+                {
                     left_match = true;
                 }
-            }
-
-            if (code_type_are_same(op->parameters[1], right->type))
-            {
-                right_match = true;
-            }
-            else
-            {
-                auto cast_right = code_implicit_cast(right, op->parameters[1]);
-                if (cast_right)
+                else
                 {
-                    right       = cast_right;
+                    auto cast_left = code_implicit_cast(left, op->parameters[0]);
+                    if (cast_left)
+                    {
+                        left       = cast_left;
+                        left_match = true;
+                    }
+                }
+
+                if (code_type_are_same(op->parameters[1], right->type))
+                {
                     right_match = true;
                 }
-            }
+                else
+                {
+                    auto cast_right = code_implicit_cast(right, op->parameters[1]);
+                    if (cast_right)
+                    {
+                        right       = cast_right;
+                        right_match = true;
+                    }
+                }
 
-            if (left_match && right_match && (!op->compound || (op->compound && (left->flags & SYMBOL_BIT_LVALUE))))
-            {
-                auto node     = new Code_Node_Binary_Operator;
+                if (left_match && right_match && (!op->compound || (op->compound && (left->flags & SYMBOL_BIT_LVALUE))))
+                {
+                    auto node     = new Code_Node_Binary_Operator;
 
-                node->type    = op->output;
-                node->left    = left;
-                node->right   = right;
-                node->flags   = left->flags & right->flags;
-                node->op_kind = op_kind;
+                    node->type    = op->output;
+                    node->left    = left;
+                    node->right   = right;
+                    node->flags   = left->flags & right->flags;
+                    node->op_kind = op_kind;
 
-                return node;
+                    return node;
+                }
             }
         }
     }
