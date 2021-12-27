@@ -827,7 +827,7 @@ Syntax_Node_Block *parse_block(Parser *parser)
                 break;
         }
 
-        block->statement_head  = statement_stub_head.next;
+        block->statements  = statement_stub_head.next;
         block->statement_count = statement_count;
 
         parser_finish_syntax_node(parser, block);
@@ -835,6 +835,20 @@ Syntax_Node_Block *parse_block(Parser *parser)
     }
 
     return nullptr;
+}
+
+Syntax_Node_Global_Scope *parse_global_scope(Parser *parser)
+{
+    auto global = parser_new_syntax_node<Syntax_Node_Global_Scope>(parser);
+
+    while (parser_should_continue(parser))
+    {
+        auto decl = parse_declaration(parser);
+        global->declarations.add(decl);
+    }
+
+    parser_finish_syntax_node(parser, global);
+    return global;
 }
 
 //

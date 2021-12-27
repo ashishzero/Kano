@@ -43,6 +43,7 @@ enum Syntax_Node_Kind
     SYNTAX_NODE_DECLARATION,
     SYNTAX_NODE_STATEMENT,
     SYNTAX_NODE_BLOCK,
+    SYNTAX_NODE_GLOBAL_SCOPE
 };
 
 struct Syntax_Node;
@@ -66,6 +67,7 @@ struct Syntax_Node_Procedure;
 struct Syntax_Node_Declaration;
 struct Syntax_Node_Statement;
 struct Syntax_Node_Block;
+struct Syntax_Node_Global_Scope;
 
 struct Syntax_Node
 {
@@ -327,6 +329,16 @@ struct Syntax_Node_Block : public Syntax_Node
         kind = SYNTAX_NODE_BLOCK;
     }
 
-    Syntax_Node_Statement *statement_head  = nullptr;
+    Syntax_Node_Statement *statements  = nullptr;
     uint64_t               statement_count = 0;
+};
+
+struct Syntax_Node_Global_Scope : public Syntax_Node
+{
+    Syntax_Node_Global_Scope()
+    {
+        kind = SYNTAX_NODE_GLOBAL_SCOPE;
+    }
+
+    Array<Syntax_Node_Declaration *> declarations;
 };

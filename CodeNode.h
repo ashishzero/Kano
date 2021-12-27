@@ -74,11 +74,39 @@ struct Code_Type_Procedure : public Code_Type
 //
 //
 
+struct Symbol_Address
+{
+    enum Kind
+    {
+        STACK  = 0,
+        GLOBAL = 1,
+        CODE,
+    };
+    Kind  kind;
+    void *memory;
+};
+
+inline Symbol_Address symbol_address_offset(uint32_t offset, Symbol_Address::Kind kind)
+{
+    Symbol_Address address;
+    address.kind   = kind;
+    address.memory = (void *)((uint64_t)offset);
+    return address;
+}
+
+inline Symbol_Address symbol_address_code(struct Code_Node_Block *block)
+{
+    Symbol_Address code;
+    code.kind   = Symbol_Address::CODE;
+    code.memory = (void *)block;
+    return code;
+}
+
 struct Symbol
 {
     String          name;
     Code_Type *     type     = nullptr;
-    uint8_t *       address  = nullptr;
+    Symbol_Address  address  = {Symbol_Address::CODE, 0};
     uint32_t        flags    = 0;
     Syntax_Location location = {};
 };
@@ -156,8 +184,9 @@ struct Code_Value_Bool
     bool value;
 };
 
-struct Code_Value_Pointer {
-	uint64_t value;
+struct Code_Value_Pointer
+{
+    uint64_t value;
 };
 
 union Code_Value {
@@ -186,7 +215,7 @@ struct Code_Node_Address : public Code_Node
         kind = CODE_NODE_ADDRESS;
     }
 
-    uint8_t *offset = (uint8_t *)UINT64_MAX;
+    Symbol_Address address;
 };
 
 struct Code_Node_Type_Cast : public Code_Node
@@ -330,11 +359,11 @@ struct Code_Node_Procedure_Call : public Code_Node
         kind = CODE_NODE_PROCEDURE_CALL;
     }
 
-    Code_Node *procedure = nullptr;
-    uint64_t parameter_count = 0;
-    Code_Node_Expression **paraments = nullptr;
+    Code_Node *            procedure       = nullptr;
+    uint64_t               parameter_count = 0;
+    Code_Node_Expression **paraments       = nullptr;
 
-    uint64_t stack_top = 0;
+    uint64_t               stack_top       = 0;
 };
 
 struct Code_Node_If : public Code_Node

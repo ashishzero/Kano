@@ -246,7 +246,9 @@ static const Symbol *symbol_table_get(Symbol_Table *root_table, String name, boo
 struct Code_Type_Resolver
 {
     Symbol_Table                     symbols;
-    uint64_t                         vstack = 0;
+
+    uint32_t                         virtual_address[2];
+    Symbol_Address::Kind             address_kind;
 
     Array<Code_Type *>               return_stack;
 
@@ -371,7 +373,9 @@ Code_Node_Block *     code_resolve_block(Code_Type_Resolver *resolver, Symbol_Ta
 
 Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Literal *root)
 {
-    auto node = new Code_Node_Literal;
+    auto node   = new Code_Node_Literal;
+
+    node->flags = SYMBOL_BIT_CONST_EXPR;
 
     switch (root->value.kind)
     {
@@ -415,10 +419,10 @@ Code_Node_Address *code_resolve_identifier(Code_Type_Resolver *resolver, Symbol_
 
     if (symbol)
     {
-        auto address    = new Code_Node_Address;
-        address->offset = symbol->address;
-        address->flags  = symbol->flags;
-        
+        auto address     = new Code_Node_Address;
+        address->address = symbol->address;
+        address->flags   = symbol->flags;
+
         if (!(symbol->flags & SYMBOL_BIT_CONSTANT))
             address->flags |= SYMBOL_BIT_LVALUE;
 
@@ -457,24 +461,25 @@ Code_Node_Return *code_resolve_return(Code_Type_Resolver *resolver, Symbol_Table
     return node;
 }
 
-Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Procedure_Call *root)
+Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver *resolver, Symbol_Table *symbols,
+                                                      Syntax_Node_Procedure_Call *root)
 {
     auto procedure = code_resolve_root_expression(resolver, symbols, root->procedure);
-    
+
     if (procedure->type->kind == CODE_TYPE_PROCEDURE)
     {
         auto proc = (Code_Type_Procedure *)procedure->type;
 
         if (proc->argument_count == root->parameter_count)
         {
-            auto node       = new Code_Node_Procedure_Call;
-            node->procedure = procedure;
-            node->type      = proc->return_type;
+            auto node             = new Code_Node_Procedure_Call;
+            node->procedure       = procedure;
+            node->type            = proc->return_type;
 
             node->parameter_count = root->parameter_count;
             node->paraments       = new Code_Node_Expression *[node->parameter_count];
 
-            uint32_t param_index = 0;
+            uint32_t param_index  = 0;
             for (auto param = root->parameters; param; param = param->next, ++param_index)
             {
                 auto code_param = code_resolve_root_expression(resolver, symbols, param->expression);
@@ -496,7 +501,7 @@ Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver *resolv
                 node->paraments[param_index] = code_param;
             }
 
-            node->stack_top = resolver->vstack;
+            node->stack_top = resolver->virtual_address[Symbol_Address::STACK];
 
             return node;
         }
@@ -576,6 +581,10 @@ Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolv
                 node->type    = op->output;
                 node->child   = child;
                 node->op_kind = op_kind;
+
+                if (child->flags & SYMBOL_BIT_CONST_EXPR)
+                    node->flags |= SYMBOL_BIT_CONST_EXPR;
+
                 return node;
             }
         }
@@ -592,6 +601,9 @@ Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolv
         node->child     = child;
         node->op_kind   = op_kind;
 
+        if (child->flags & SYMBOL_BIT_CONST_EXPR)
+            node->flags |= SYMBOL_BIT_CONST_EXPR;
+
         return node;
     }
 
@@ -603,6 +615,9 @@ Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolv
         node->type    = type;
         node->child   = child;
         node->op_kind = op_kind;
+
+        if (child->flags & SYMBOL_BIT_CONST_EXPR)
+            node->flags |= SYMBOL_BIT_CONST_EXPR;
 
         return node;
     }
@@ -666,7 +681,7 @@ Code_Node_Binary_Operator *code_resolve_binary_operator(Code_Type_Resolver *reso
                 node->type    = op->output;
                 node->left    = left;
                 node->right   = right;
-                node->flags   = left->flags | right->flags;
+                node->flags   = left->flags & right->flags;
                 node->op_kind = op_kind;
 
                 return node;
@@ -822,15 +837,14 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
             Unimplemented();
         }
 
-        bool                  infer_type       = symbol->type == nullptr;
+        bool                  infer_type     = symbol->type == nullptr;
 
-        Code_Node_Block *     procedure_body   = nullptr;
-        Code_Node_Expression *expression       = nullptr;
+        Code_Node_Block *     procedure_body = nullptr;
+        Code_Node_Expression *expression     = nullptr;
 
-        Code_Type *           type             = nullptr;
+        Code_Type *           type           = nullptr;
 
-        auto                  ResolveProcedure = 
-            [&resolver, &type, &procedure_body, symbols, symbol](Syntax_Node_Procedure *proc) {
+        auto ResolveProcedure = [&resolver, &type, &procedure_body, symbols, symbol](Syntax_Node_Procedure *proc) {
             auto proc_type            = new Code_Type_Procedure;
 
             proc_type->argument_count = proc->argument_count;
@@ -844,14 +858,17 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
             auto proc_symbols    = new Symbol_Table;
             proc_symbols->parent = symbols;
 
-            auto stack_top = resolver->vstack;
+            auto stack_top       = resolver->virtual_address[Symbol_Address::STACK];
+            auto address_kind    = resolver->address_kind;
 
             if (proc_type->return_type)
-                resolver->vstack = proc_type->return_type->runtime_size;
+                resolver->virtual_address[Symbol_Address::STACK] = proc_type->return_type->runtime_size;
             else
-                resolver->vstack = 0;
+                resolver->virtual_address[Symbol_Address::STACK] = 0;
 
-            uint64_t arg_index   = 0;
+            resolver->address_kind = Symbol_Address::STACK;
+
+            uint64_t arg_index     = 0;
             for (auto arg = proc->arguments; arg; arg = arg->next, ++arg_index)
             {
                 auto assign = code_resolve_declaration(resolver, proc_symbols, arg->declaration,
@@ -867,7 +884,8 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
             procedure_body = code_resolve_block(resolver, proc_symbols, proc->body);
             resolver->return_stack.count -= 1;
 
-            resolver->vstack = stack_top;
+            resolver->virtual_address[Symbol_Address::STACK] = stack_top;
+            resolver->address_kind                           = address_kind;
         };
 
         if (infer_type)
@@ -932,16 +950,20 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
 
         if (symbol->type->kind != CODE_TYPE_PROCEDURE)
         {
-            uint64_t size    = symbol->type->runtime_size;
-            resolver->vstack = AlignPower2Up(resolver->vstack, size);
-            symbol->address  = (uint8_t *)resolver->vstack;
-            resolver->vstack += size;
+            auto     address = resolver->virtual_address[resolver->address_kind];
+
+            uint32_t size    = symbol->type->runtime_size;
+            address          = AlignPower2Up(address, size);
+            symbol->address  = symbol_address_offset(address, resolver->address_kind);
+            address += size;
+
+            resolver->virtual_address[resolver->address_kind] = address;
 
             if (root->initializer)
             {
-                auto address    = new Code_Node_Address;
-                address->offset = symbol->address;
-                address->flags  = symbol->flags;
+                auto address     = new Code_Node_Address;
+                address->address = symbol->address;
+                address->flags   = symbol->flags;
                 address->flags |= SYMBOL_BIT_LVALUE;
                 address->type           = symbol->type;
 
@@ -956,6 +978,11 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
                 assignment->value       = expression;
                 assignment->flags |= destination->flags;
 
+                if (root->flags & SYMBOL_BIT_CONSTANT && expression->flags & SYMBOL_BIT_CONST_EXPR)
+                {
+                    address->flags |= SYMBOL_BIT_CONST_EXPR;
+                }
+
                 return assignment;
             }
 
@@ -965,18 +992,22 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
         {
             if (root->flags & SYMBOL_BIT_CONSTANT)
             {
-                symbol->address = (uint8_t *)procedure_body;
+                symbol->address = symbol_address_code(procedure_body);
             }
             else
             {
-                uint64_t size    = symbol->type->runtime_size;
-                resolver->vstack = AlignPower2Up(resolver->vstack, size);
-                symbol->address  = (uint8_t *)resolver->vstack;
-                resolver->vstack += size;
+                auto     address_offset = resolver->virtual_address[resolver->address_kind];
 
-                auto address    = new Code_Node_Address;
-                address->offset = symbol->address;
-                address->flags  = symbol->flags;
+                uint32_t size           = symbol->type->runtime_size;
+                address_offset          = AlignPower2Up(address_offset, size);
+                symbol->address         = symbol_address_offset(address_offset, resolver->address_kind);
+                address_offset += size;
+
+                resolver->virtual_address[resolver->address_kind] = address_offset;
+
+                auto address                                      = new Code_Node_Address;
+                address->address                                  = symbol->address;
+                address->flags                                    = symbol->flags;
                 address->flags |= SYMBOL_BIT_LVALUE;
                 address->type           = symbol->type;
 
@@ -988,7 +1019,7 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
                 auto source             = new Code_Node_Address;
                 source->type            = symbol->type;
                 source->flags           = symbol->flags;
-                source->offset          = (uint8_t *)procedure_body;
+                source->address         = symbol_address_code(procedure_body);
 
                 auto value              = new Code_Node_Expression;
                 value->flags            = source->flags;
@@ -1070,7 +1101,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
         auto for_code            = new Code_Node_For;
         for_code->symbols.parent = symbols;
 
-        auto stack_top           = resolver->vstack;
+        auto stack_top           = resolver->virtual_address[Symbol_Address::STACK];
 
         for_code->initialization = code_resolve_statement(resolver, &for_code->symbols, for_node->initialization);
 
@@ -1094,10 +1125,10 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
         for_code->increment = code_resolve_root_expression(resolver, &for_code->symbols, for_node->increment);
         for_code->body      = code_resolve_statement(resolver, &for_code->symbols, for_node->body);
 
-        resolver->vstack    = stack_top;
+        resolver->virtual_address[Symbol_Address::STACK] = stack_top;
 
-        Code_Node_Statement *statement = new Code_Node_Statement;
-        statement->node                = for_code;
+        Code_Node_Statement *statement                   = new Code_Node_Statement;
+        statement->node                                  = for_code;
         return statement;
     }
     break;
@@ -1215,10 +1246,10 @@ Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Symbol_Table *
     Code_Node_Statement  statement_stub_head;
     Code_Node_Statement *parent_statement = &statement_stub_head;
 
-    auto                 stack_top        = resolver->vstack;
+    auto                 stack_top        = resolver->virtual_address[Symbol_Address::STACK];
 
     uint32_t             statement_count  = 0;
-    for (auto statement = root->statement_head; statement; statement = statement->next)
+    for (auto statement = root->statements; statement; statement = statement->next)
     {
         auto code_statement = code_resolve_statement(resolver, &block->symbols, statement);
         if (code_statement)
@@ -1229,12 +1260,36 @@ Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Symbol_Table *
         }
     }
 
-    resolver->vstack       = stack_top;
+    resolver->virtual_address[Symbol_Address::STACK] = stack_top;
 
-    block->statement_head  = statement_stub_head.next;
-    block->statement_count = statement_count;
+    block->statement_head                            = statement_stub_head.next;
+    block->statement_count                           = statement_count;
 
     return block;
+}
+
+Array_View<Code_Node_Assignment *> code_resolve_global_scope(Code_Type_Resolver *resolver, Symbol_Table *parent_symbols,
+                                                             Syntax_Node_Global_Scope *global)
+{
+    Array<Code_Node_Assignment *> global_exe;
+
+    for (auto decl : global->declarations)
+    {
+        auto assign = code_resolve_declaration(resolver, parent_symbols, decl);
+        if (assign)
+        {
+            if ((assign->value->flags & SYMBOL_BIT_CONST_EXPR))
+            {
+                global_exe.add(assign);
+            }
+            else
+            {
+                Unimplemented();
+            }
+        }
+    }
+
+    return global_exe;
 }
 
 int main()
@@ -1246,7 +1301,7 @@ int main()
     Parser parser;
     parser_init(&parser, content, builder);
 
-    auto node = parse_block(&parser);
+    auto node = parse_global_scope(&parser);
 
     if (parser.error_count)
     {
@@ -1414,17 +1469,63 @@ int main()
         resolver.binary_operators[BINARY_OPERATOR_COMPARE_NOT_EQUAL].add(binary_operator_real);
     }
 
-    auto code = code_resolve_block(&resolver, &resolver.symbols, node);
+    auto exprs = code_resolve_global_scope(&resolver, &resolver.symbols, node);
 
     {
         auto fp = fopen("code.txt", "wb");
-        print_code(code, fp);
+
+        for (auto expr : exprs)
+            print_code(expr, fp);
+
         fclose(fp);
     }
 
     Interp interp;
     interp_init(&interp, 1024 * 1024 * 4);
-	evaluate_node_block(code,&interp);
+
+    for (auto expr : exprs)
+        evaluate_code_node_assignment(expr, &interp);
+
+    auto main_proc = symbol_table_get(&resolver.symbols, "main", false);
+    if (main_proc)
+    {
+        if (main_proc->flags & SYMBOL_BIT_CONSTANT && main_proc->address.kind == Symbol_Address::CODE)
+        {
+            auto type = main_proc->type;
+            if (type->kind == CODE_TYPE_PROCEDURE)
+            {
+                auto proc_type = (Code_Type_Procedure *)type;
+                if (proc_type->argument_count == 0 && !proc_type->return_type)
+                {
+                    auto proc = (Code_Node_Block *)main_proc->address.memory;
+
+                    {
+                        auto fp = fopen("code.txt", "ab");
+                        print_code(proc, fp);
+                        fclose(fp);
+                    }
+
+                    evaluate_node_block(proc, &interp);
+                }
+                else
+                {
+                    fprintf(stderr, "The \"main\" procedure must not take any arguments and should return nothing!\n");
+                }
+            }
+            else
+            {
+                fprintf(stderr, "The \"main\" symbol must be a procedure!\n");
+            }
+        }
+        else
+        {
+            fprintf(stderr, "The \"main\" procedure must be constant!\n");
+        }
+    }
+    else
+    {
+        fprintf(stderr, "\"main\" procedure not defined!\n");
+    }
 
     return 0;
 }

@@ -261,9 +261,19 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
     case SYNTAX_NODE_BLOCK: {
         auto node = (Syntax_Node_Block *)root;
         fprintf(fp, "Block()\n");
-        for (auto statement = node->statement_head; statement; statement = statement->next)
+        for (auto statement = node->statements; statement; statement = statement->next)
         {
             print_syntax(statement, fp, child_indent);
+        }
+    }
+    break;
+
+    case SYNTAX_NODE_GLOBAL_SCOPE: {
+        auto node = (Syntax_Node_Global_Scope *)root;
+        fprintf(fp, "Global()\n");
+        for (auto decl : node->declarations)
+        {
+            print_syntax(decl, fp, child_indent);
         }
     }
     break;
@@ -314,7 +324,11 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
 
     case CODE_NODE_ADDRESS: {
         auto node = (Code_Node_Address *)root;
-        fprintf(fp, "Address(%p)\n", node->offset);
+
+        const char *SymbolAddressNames[] = {"stack", "global", "code"};
+        Assert(node->address.kind < ArrayCount(SymbolAddressNames));
+
+        fprintf(fp, "Address(%s:%p)\n", SymbolAddressNames[node->address.kind], node->address.memory);
     }
     break;
 
