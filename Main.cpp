@@ -845,36 +845,34 @@ Code_Node_Assignment *code_resolve_assignment(Code_Type_Resolver *resolver, Symb
 
 Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Type *root)
 {
-    Code_Type *type = new Code_Type;
-
-    switch (root->token_type)
+    switch (root->id)
     {
-    case TOKEN_KIND_INT: {
+    case Syntax_Node_Type::INT: {
         auto symbol = symbol_table_get(&resolver->symbols, "int");
         return symbol->type;
     }
     break;
 
-    case TOKEN_KIND_FLOAT: {
+    case Syntax_Node_Type::FLOAT: {
         auto symbol = symbol_table_get(&resolver->symbols, "float");
         return symbol->type;
     }
     break;
 
-    case TOKEN_KIND_BOOL: {
+    case Syntax_Node_Type::BOOL: {
         auto symbol = symbol_table_get(&resolver->symbols, "bool");
         return symbol->type;
     }
     break;
 
-    case TOKEN_KIND_ASTERISK: {
+    case Syntax_Node_Type::POINTER: {
         auto type       = new Code_Type_Pointer;
         type->base_type = code_resolve_type(resolver, symbols, (Syntax_Node_Type *)root->type);
         return type;
     }
     break;
 
-    case TOKEN_KIND_PROC: {
+    case Syntax_Node_Type::PROCEDURE: {
         auto node            = (Syntax_Node_Procedure_Prototype *)root->type;
 
         auto type            = new Code_Type_Procedure;
@@ -897,7 +895,7 @@ Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols
     }
     break;
 
-    case TOKEN_KIND_IDENTIFIER: {
+    case Syntax_Node_Type::IDENTIFIER: {
         auto node   = (Syntax_Node_Identifier *)root->type;
 
         auto symbol = symbol_table_get(symbols, node->name);
@@ -913,12 +911,55 @@ Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols
     }
     break;
 
+    case Syntax_Node_Type::ARRAY_VIEW: {
+        auto node = (Syntax_Node_Array_View *)root->type;
+
+        auto type = new Code_Type_Array_View;
+        type->element_type = code_resolve_type(resolver, symbols, node->element_type);
+        return type;
+    }
+    break;
+
+    case Syntax_Node_Type::STATIC_ARRAY: {
+        auto node = (Syntax_Node_Static_Array *)root->type;
+
+        auto type = new Code_Type_Static_Array;
+        type->element_type = code_resolve_type(resolver, symbols, node->element_type);
+        type->alignment = type->element_type->alignment;
+
+        auto expr = code_resolve_root_expression(resolver, symbols, node->expression);
+
+        if (expr->flags & SYMBOL_BIT_CONST_EXPR)
+        {
+            if (expr->type->kind == CODE_TYPE_INTEGER)
+            {
+                Assert(expr->child->kind == CODE_NODE_LITERAL);
+
+                auto literal = (Code_Node_Literal *)expr->child;
+
+                type->element_count = literal->data.integer.value;
+                type->runtime_size = type->element_count * type->element_type->runtime_size;
+
+                return type;
+            }
+            else
+            {
+                Unimplemented();
+            }
+        }
+        else
+        {
+            Unimplemented();
+        }
+    }
+    break;
+
     default: {
         Unimplemented();
     }
     }
 
-    return type;
+    return nullptr;
 }
 
 Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Symbol_Table *symbols,

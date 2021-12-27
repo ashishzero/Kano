@@ -42,6 +42,8 @@ enum Syntax_Node_Kind
     SYNTAX_NODE_PROCEDURE,
     SYNTAX_NODE_DECLARATION,
     SYNTAX_NODE_STRUCT,
+    SYNTAX_NODE_ARRAY_VIEW,
+    SYNTAX_NODE_STATIC_ARRAY,
     SYNTAX_NODE_STATEMENT,
     SYNTAX_NODE_BLOCK,
     SYNTAX_NODE_GLOBAL_SCOPE
@@ -67,6 +69,8 @@ struct Syntax_Node_Procedure_Argument;
 struct Syntax_Node_Procedure;
 struct Syntax_Node_Declaration;
 struct Syntax_Node_Struct;
+struct Syntax_Node_Array_View;
+struct Syntax_Node_Static_Array;
 struct Syntax_Node_Statement;
 struct Syntax_Node_Block;
 struct Syntax_Node_Global_Scope;
@@ -169,7 +173,20 @@ struct Syntax_Node_Type : public Syntax_Node
         kind = SYNTAX_NODE_TYPE;
     }
 
-    Token_Kind   token_type = TOKEN_KIND_ERROR;
+    enum Id
+    {
+        ERROR,
+        INT,
+        FLOAT,
+        BOOL,
+        POINTER,
+        PROCEDURE,
+        IDENTIFIER,
+        ARRAY_VIEW,
+        STATIC_ARRAY,
+    };
+
+    Id id = ERROR;
     Syntax_Node *type       = nullptr;
 };
 
@@ -328,6 +345,27 @@ struct Syntax_Node_Struct : public Syntax_Node
 
     uint64_t                      member_count = 0;
     Syntax_Node_Declaration_List *members      = nullptr;
+};
+
+struct Syntax_Node_Array_View : public Syntax_Node
+{
+    Syntax_Node_Array_View()
+    {
+        kind = SYNTAX_NODE_ARRAY_VIEW;
+    }
+
+    Syntax_Node_Type *element_type = nullptr;
+};
+
+struct Syntax_Node_Static_Array : public Syntax_Node
+{
+    Syntax_Node_Static_Array()
+    {
+        kind = SYNTAX_NODE_STATIC_ARRAY;
+    }
+
+    Syntax_Node_Expression *expression = nullptr;
+    Syntax_Node_Type *element_type = nullptr;
 };
 
 struct Syntax_Node_Statement : public Syntax_Node

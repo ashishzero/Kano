@@ -10,6 +10,8 @@ enum Code_Type_Kind
     CODE_TYPE_POINTER,
     CODE_TYPE_PROCEDURE,
     CODE_TYPE_STRUCT,
+    CODE_TYPE_ARRAY_VIEW,
+    CODE_TYPE_STATIC_ARRAY,
 
     _CODE_TYPE_COUNT
 };
@@ -96,6 +98,29 @@ struct Code_Type_Struct : public Code_Type
     Member * members;
 
     uint64_t id;
+};
+
+struct Code_Type_Array_View : public Code_Type
+{
+    Code_Type_Array_View()
+    {
+        kind = CODE_TYPE_ARRAY_VIEW;
+        runtime_size = sizeof(Array_View<void *>);
+        alignment = sizeof(int64_t);
+    }
+
+    Code_Type *element_type = nullptr;
+};
+
+struct Code_Type_Static_Array : public Code_Type
+{
+    Code_Type_Static_Array()
+    {
+        kind = CODE_TYPE_STATIC_ARRAY;
+    }
+
+    Code_Type *element_type = nullptr;
+    uint64_t element_count  = 0;
 };
 
 //

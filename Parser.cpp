@@ -641,24 +641,24 @@ Syntax_Node_Type *parse_type(Parser *parser)
 
     if (parser_accept_token(parser, TOKEN_KIND_INT))
     {
-        type->token_type = TOKEN_KIND_INT;
+        type->id = Syntax_Node_Type::INT;
     }
     else if (parser_accept_token(parser, TOKEN_KIND_FLOAT))
     {
-        type->token_type = TOKEN_KIND_FLOAT;
+        type->id = Syntax_Node_Type::FLOAT;
     }
     else if (parser_accept_token(parser, TOKEN_KIND_BOOL))
     {
-        type->token_type = TOKEN_KIND_BOOL;
+        type->id = Syntax_Node_Type::BOOL;
     }
     else if (parser_accept_token(parser, TOKEN_KIND_ASTERISK))
     {
-        type->token_type = TOKEN_KIND_ASTERISK;
+        type->id = Syntax_Node_Type::POINTER;
         type->type       = parse_type(parser);
     }
     else if (parser_peek_token(parser, TOKEN_KIND_PROC))
     {
-        type->token_type = TOKEN_KIND_PROC;
+        type->id = Syntax_Node_Type::PROCEDURE;
         type->type       = parse_procedure_prototype(parser);
     }
     else if (parser_peek_token(parser, TOKEN_KIND_IDENTIFIER))
@@ -672,8 +672,39 @@ Syntax_Node_Type *parse_type(Parser *parser)
         name.data        = parser->value.string.data;
         identifier->name = string_builder_copy(parser->builder, name);
 
-        type->token_type = TOKEN_KIND_IDENTIFIER;
+        type->id = Syntax_Node_Type::IDENTIFIER;
         type->type       = identifier;
+    }
+    else if (parser_accept_token(parser, TOKEN_KIND_OPEN_SQUARE_BRACKET))
+    {
+        if (parser_accept_token(parser, TOKEN_KIND_CLOSE_SQUARE_BRACKET)) 
+        {
+            type->id = Syntax_Node_Type::ARRAY_VIEW;
+
+            auto node = parser_new_syntax_node<Syntax_Node_Array_View>(parser);
+            node->location = type->location;
+
+            node->element_type = parse_type(parser);
+
+            parser_finish_syntax_node(parser, node);
+
+            type->type = node;
+        }
+        else
+        {
+            type->id = Syntax_Node_Type::STATIC_ARRAY;
+            
+            auto node = parser_new_syntax_node<Syntax_Node_Static_Array>(parser);
+            node->location = type->location;
+            node->expression = parse_root_expression(parser);
+            parser_expect_token(parser, TOKEN_KIND_CLOSE_SQUARE_BRACKET);
+
+            node->element_type = parse_type(parser);
+
+            parser_finish_syntax_node(parser, node);
+
+            type->type = node;
+        }
     }
     else
     {

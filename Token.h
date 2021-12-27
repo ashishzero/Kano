@@ -16,6 +16,8 @@ enum Token_Kind
     TOKEN_KIND_CLOSE_BRACKET,
     TOKEN_KIND_OPEN_CURLY_BRACKET,
     TOKEN_KIND_CLOSE_CURLY_BRACKET,
+    TOKEN_KIND_OPEN_SQUARE_BRACKET,
+    TOKEN_KIND_CLOSE_SQUARE_BRACKET,
 
     TOKEN_KIND_PLUS,
     TOKEN_KIND_MINUS,
@@ -120,6 +122,7 @@ static inline String token_kind_string(Token_Kind kind)
 
                                "(",           ")",
                                "{",           "}",
+                               "[",           "]",
 
                                "+",           "-",
                                "*",           "/",

@@ -372,6 +372,14 @@ void lexer_next(Lexer *lexer)
             lexer->cursor++;
             lexer_make_token(lexer, TOKEN_KIND_CLOSE_CURLY_BRACKET);
             return;
+        case '[':
+            lexer->cursor++;
+            lexer_make_token(lexer, TOKEN_KIND_OPEN_SQUARE_BRACKET);
+            return;
+        case ']':
+            lexer->cursor++;
+            lexer_make_token(lexer, TOKEN_KIND_CLOSE_SQUARE_BRACKET);
+            return;
         case '+':
             lexer->cursor++;
             lexer_make_token(lexer, TOKEN_KIND_PLUS);

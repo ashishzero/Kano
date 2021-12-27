@@ -1,13 +1,6 @@
 #include "Printer.h"
 #include "Token.h"
 
-static inline String code_type_kind_string(Code_Type_Kind kind)
-{
-    static String strings[] = {"-null-", "integer", "real", "bool", "*", "proc", "struct"};
-    static_assert(ArrayCount(strings) == _CODE_TYPE_COUNT);
-    return strings[kind];
-}
-
 static inline String unary_operator_kind_string(Unary_Operator_Kind kind)
 {
     static String strings[] = {"+", "-", "~", "!", "*", "?"};
@@ -114,8 +107,10 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
     case SYNTAX_NODE_TYPE: {
         auto        node      = (Syntax_Node_Type *)root;
 
-        const char *type_name = (char *)token_kind_string(node->token_type).data;
-        fprintf(fp, "Type(%s)\n", type_name);
+        const char *TypeIdNames[] = {"error" ,"int", "float", "bool", "pointer", "procedure", "identifier", "array-view", "static-array"};
+        Assert(node->id < ArrayCount(TypeIdNames));
+
+        fprintf(fp, "Type(%s)\n", TypeIdNames[node->id]);
 
         if (node->type)
         {
@@ -235,6 +230,21 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
         {
             print_syntax(decl->declaration, fp, child_indent);
         }
+    }
+    break;
+
+    case SYNTAX_NODE_ARRAY_VIEW: {
+        auto node = (Syntax_Node_Array_View *)root;
+        fprintf(fp, "Array-View()\n");
+        print_syntax(node->element_type, fp, child_indent, "Type");
+    }
+    break;
+
+    case SYNTAX_NODE_STATIC_ARRAY: {
+        auto node = (Syntax_Node_Static_Array *)root;
+        fprintf(fp, "Static-Array()\n");
+        print_syntax(node->expression, fp, child_indent, "Count");
+        print_syntax(node->element_type, fp, child_indent, "Type");
     }
     break;
 
