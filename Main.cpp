@@ -850,19 +850,19 @@ Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols
     switch (root->token_type)
     {
     case TOKEN_KIND_INT: {
-        auto symbol = symbol_table_get(symbols, "int");
+        auto symbol = symbol_table_get(&resolver->symbols, "int");
         return symbol->type;
     }
     break;
 
     case TOKEN_KIND_FLOAT: {
-        auto symbol = symbol_table_get(symbols, "float");
+        auto symbol = symbol_table_get(&resolver->symbols, "float");
         return symbol->type;
     }
     break;
 
     case TOKEN_KIND_BOOL: {
-        auto symbol = symbol_table_get(symbols, "bool");
+        auto symbol = symbol_table_get(&resolver->symbols, "bool");
         return symbol->type;
     }
     break;
