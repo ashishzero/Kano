@@ -435,13 +435,14 @@ void lexer_next(Lexer *lexer)
             content.data                            = (uint8_t *)string;
             content.length                          = (lexer->cursor - content.data);
 
-            static const String     KeyWords[]      = {"var",  "const", "true", "false", "int", "float", "bool",  "if",
-                                              "then", "else",  "for",  "while", "do",  "proc",  "return"};
+            static const String     KeyWords[]      = {"var",  "const", "true", "false", "int", "float", "bool",   "if",
+                                              "then", "else",  "for",  "while", "do",  "proc",  "struct", "return"};
 
             static const Token_Kind KeyWordTokens[] = {
-                TOKEN_KIND_VAR,   TOKEN_KIND_CONST, TOKEN_KIND_TRUE, TOKEN_KIND_FALSE, TOKEN_KIND_INT,
-                TOKEN_KIND_FLOAT, TOKEN_KIND_BOOL,  TOKEN_KIND_IF,   TOKEN_KIND_THEN,  TOKEN_KIND_ELSE,
-                TOKEN_KIND_FOR,   TOKEN_KIND_WHILE, TOKEN_KIND_DO,   TOKEN_KIND_PROC,  TOKEN_KIND_RETURN};
+                TOKEN_KIND_VAR,  TOKEN_KIND_CONST, TOKEN_KIND_TRUE,   TOKEN_KIND_FALSE,
+                TOKEN_KIND_INT,  TOKEN_KIND_FLOAT, TOKEN_KIND_BOOL,   TOKEN_KIND_IF,
+                TOKEN_KIND_THEN, TOKEN_KIND_ELSE,  TOKEN_KIND_FOR,    TOKEN_KIND_WHILE,
+                TOKEN_KIND_DO,   TOKEN_KIND_PROC,  TOKEN_KIND_STRUCT, TOKEN_KIND_RETURN};
 
             static_assert(ArrayCount(KeyWords) == ArrayCount(KeyWordTokens));
 

@@ -75,6 +75,7 @@ enum Token_Kind
     TOKEN_KIND_DO,
 
     TOKEN_KIND_PROC,
+    TOKEN_KIND_STRUCT,
     TOKEN_KIND_RETURN,
 
     TOKEN_KIND_IDENTIFIER,
@@ -159,7 +160,8 @@ static inline String token_kind_string(Token_Kind kind)
                                "for",         "while",
                                "do",
 
-                               "proc",        "return",
+                               "proc",        "struct",
+                               "return",
 
                                "identifier",
 

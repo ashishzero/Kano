@@ -45,7 +45,7 @@ static void     parser_init_precedence()
     //
     //
 
-    BinaryOperatorPrecedence[TOKEN_KIND_OPEN_BRACKET] = 65;
+    BinaryOperatorPrecedence[TOKEN_KIND_OPEN_BRACKET]                 = 65;
 
     BinaryOperatorPrecedence[TOKEN_KIND_ASTERISK]                     = 60;
     BinaryOperatorPrecedence[TOKEN_KIND_DIVISION]                     = 60;
@@ -282,34 +282,34 @@ Syntax_Node *parse_subexpression(Parser *parser, uint32_t prec)
 
 struct Procedure_Call
 {
-    uint64_t count;
+    uint64_t                         count;
     Syntax_Node_Procedure_Parameter *head;
 };
 
 Procedure_Call parse_procedure_parameters(Parser *parser)
 {
-    uint64_t count = 0;
+    uint64_t                         count = 0;
 
-    Syntax_Node_Procedure_Parameter stub_head;
+    Syntax_Node_Procedure_Parameter  stub_head;
     Syntax_Node_Procedure_Parameter *parent = &stub_head;
 
     while (parser_should_continue(parser))
     {
         if (parser_peek_token(parser, TOKEN_KIND_CLOSE_BRACKET))
             break;
-        
-        auto param = parser_new_syntax_node<Syntax_Node_Procedure_Parameter>(parser);
+
+        auto param        = parser_new_syntax_node<Syntax_Node_Procedure_Parameter>(parser);
         param->expression = parse_root_expression(parser);
 
-        parent->next = param;
-        parent = param;
+        parent->next      = param;
+        parent            = param;
 
         count += 1;
     }
 
     Procedure_Call call;
     call.count = count;
-    call.head = stub_head.next;
+    call.head  = stub_head.next;
 
     return call;
 }
@@ -373,7 +373,7 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec)
         if (op_prec <= prec)
             break;
 
-        if (parser_peek_token(parser, TOKEN_KIND_OPEN_BRACKET)) 
+        if (parser_peek_token(parser, TOKEN_KIND_OPEN_BRACKET))
         {
             auto node = parser_new_syntax_node<Syntax_Node_Procedure_Call>(parser);
             parser_accept_token(parser, TOKEN_KIND_OPEN_BRACKET);
@@ -385,13 +385,13 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec)
 
             auto procedure = parser_new_syntax_node<Syntax_Node_Expression>(parser);
             parser_finish_syntax_node(parser, procedure);
-            procedure->location = left->location;
-            procedure->child = left;
-            
-            node->procedure = procedure;
+            procedure->location   = left->location;
+            procedure->child      = left;
+
+            node->procedure       = procedure;
             node->parameter_count = parameters.count;
-            node->parameters = parameters.head;
-            left = node;
+            node->parameters      = parameters.head;
+            left                  = node;
             continue;
         }
 
@@ -573,6 +573,60 @@ Syntax_Node_Procedure *parse_procedure(Parser *parser)
     return proc;
 }
 
+Syntax_Node_Struct *parse_struct(Parser *parser)
+{
+    auto struct_node = parser_new_syntax_node<Syntax_Node_Struct>(parser);
+
+    if (parser_expect_token(parser, TOKEN_KIND_STRUCT))
+    {
+        if (parser_expect_token(parser, TOKEN_KIND_OPEN_CURLY_BRACKET))
+        {
+            uint64_t                     member_count = 0;
+            Syntax_Node_Declaration_List stub_head;
+            stub_head.next                       = nullptr;
+            Syntax_Node_Declaration_List *parent = &stub_head;
+
+            while (parser_should_continue(parser))
+            {
+                if (parser_peek_token(parser, TOKEN_KIND_CLOSE_CURLY_BRACKET))
+                    break;
+
+                auto site = lexer_current_token(&parser->lexer);
+
+                auto decl = parse_declaration(parser);
+
+                if (!decl->initializer || decl->initializer->kind == SYNTAX_NODE_EXPRESSION)
+                {
+                    parser_expect_token(parser, TOKEN_KIND_SEMICOLON);
+                }
+
+                if (decl->flags & SYMBOL_BIT_CONSTANT)
+                {
+                    parser_error(parser, site, "Struct member declaration can not be a constant declaration");
+                    break;
+                }
+
+                auto member         = new Syntax_Node_Declaration_List;
+                member->declaration = decl;
+                member->next        = nullptr;
+
+                parent->next        = member;
+                parent              = member;
+
+                member_count += 1;
+            }
+
+            parser_expect_token(parser, TOKEN_KIND_CLOSE_CURLY_BRACKET);
+
+            struct_node->member_count = member_count;
+            struct_node->members      = stub_head.next;
+        }
+    }
+
+    parser_finish_syntax_node(parser, struct_node);
+    return struct_node;
+}
+
 Syntax_Node_Type *parse_type(Parser *parser)
 {
     auto type = parser_new_syntax_node<Syntax_Node_Type>(parser);
@@ -598,6 +652,20 @@ Syntax_Node_Type *parse_type(Parser *parser)
     {
         type->token_type = TOKEN_KIND_PROC;
         type->type       = parse_procedure_prototype(parser);
+    }
+    else if (parser_peek_token(parser, TOKEN_KIND_IDENTIFIER))
+    {
+        auto identifier = parser_new_syntax_node<Syntax_Node_Identifier>(parser);
+        parser_accept_token(parser, TOKEN_KIND_IDENTIFIER);
+        parser_finish_syntax_node(parser, identifier);
+
+        String name;
+        name.length      = parser->value.string.length;
+        name.data        = parser->value.string.data;
+        identifier->name = string_builder_copy(parser->builder, name);
+
+        type->token_type = TOKEN_KIND_IDENTIFIER;
+        type->type       = identifier;
     }
     else
     {
@@ -655,13 +723,28 @@ Syntax_Node_Declaration *parse_declaration(Parser *parser)
         {
             declaration->initializer = parse_procedure(parser);
         }
+        else if (parser_peek_token(parser, TOKEN_KIND_STRUCT))
+        {
+            if (declaration->flags & SYMBOL_BIT_CONSTANT && !declaration->type)
+            {
+                declaration->initializer = parse_struct(parser);
+            }
+            else
+            {
+                if (declaration->type)
+                    parser_error(parser, lexer_current_token(&parser->lexer),
+                                 "Struct declaration can't be explicitely typed");
+                else
+                    parser_error(parser, lexer_current_token(&parser->lexer), "Struct declaration must be constant");
+            }
+        }
         else
         {
             declaration->initializer = parse_root_expression(parser);
         }
     }
 
-    if (declaration->flags & TOKEN_KIND_CONST && !declaration->initializer)
+    if (declaration->flags & SYMBOL_BIT_CONSTANT && !declaration->initializer)
     {
         auto token = lexer_current_token(&parser->lexer);
         parser_error(parser, token, "Constant expression must be initialized during declaration");
@@ -827,7 +910,7 @@ Syntax_Node_Block *parse_block(Parser *parser)
                 break;
         }
 
-        block->statements  = statement_stub_head.next;
+        block->statements      = statement_stub_head.next;
         block->statement_count = statement_count;
 
         parser_finish_syntax_node(parser, block);
@@ -839,13 +922,29 @@ Syntax_Node_Block *parse_block(Parser *parser)
 
 Syntax_Node_Global_Scope *parse_global_scope(Parser *parser)
 {
-    auto global = parser_new_syntax_node<Syntax_Node_Global_Scope>(parser);
+    auto                         global     = parser_new_syntax_node<Syntax_Node_Global_Scope>(parser);
+
+    uint64_t                     decl_count = 0;
+    Syntax_Node_Declaration_List stub_head;
+    stub_head.next                       = nullptr;
+    Syntax_Node_Declaration_List *parent = &stub_head;
 
     while (parser_should_continue(parser))
     {
-        auto decl = parse_declaration(parser);
-        global->declarations.add(decl);
+        auto decl_node    = parse_declaration(parser);
+
+        auto decl         = new Syntax_Node_Declaration_List;
+        decl->declaration = decl_node;
+        decl->next        = nullptr;
+
+        parent->next      = decl;
+        parent            = decl;
+
+        decl_count += 1;
     }
+
+    global->declarations      = stub_head.next;
+    global->declaration_count = decl_count;
 
     parser_finish_syntax_node(parser, global);
     return global;

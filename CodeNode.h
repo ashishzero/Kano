@@ -9,6 +9,7 @@ enum Code_Type_Kind
     CODE_TYPE_BOOL,
     CODE_TYPE_POINTER,
     CODE_TYPE_PROCEDURE,
+    CODE_TYPE_STRUCT,
 
     _CODE_TYPE_COUNT
 };
@@ -17,6 +18,7 @@ struct Code_Type
 {
     Code_Type_Kind kind         = CODE_TYPE_NULL;
     uint32_t       runtime_size = 0;
+    uint32_t       alignment    = 0;
 };
 
 struct Code_Type_Integer : public Code_Type
@@ -25,6 +27,7 @@ struct Code_Type_Integer : public Code_Type
     {
         kind         = CODE_TYPE_INTEGER;
         runtime_size = sizeof(int32_t);
+        alignment    = sizeof(int32_t);
     }
 };
 
@@ -34,6 +37,7 @@ struct Code_Type_Real : public Code_Type
     {
         kind         = CODE_TYPE_REAL;
         runtime_size = sizeof(float);
+        alignment    = sizeof(float);
     }
 };
 
@@ -43,6 +47,7 @@ struct Code_Type_Bool : public Code_Type
     {
         kind         = CODE_TYPE_BOOL;
         runtime_size = sizeof(bool);
+        alignment    = sizeof(bool);
     }
 };
 
@@ -52,6 +57,7 @@ struct Code_Type_Pointer : public Code_Type
     {
         kind         = CODE_TYPE_POINTER;
         runtime_size = sizeof(void *);
+        alignment    = sizeof(void *);
     }
 
     Code_Type *base_type = nullptr;
@@ -63,11 +69,33 @@ struct Code_Type_Procedure : public Code_Type
     {
         kind         = CODE_TYPE_PROCEDURE;
         runtime_size = sizeof(void *);
+        alignment    = sizeof(void *);
     }
 
     Code_Type **arguments      = nullptr;
     uint64_t    argument_count = 0;
     Code_Type * return_type    = nullptr;
+};
+
+struct Code_Type_Struct : public Code_Type
+{
+    Code_Type_Struct()
+    {
+        kind = CODE_TYPE_STRUCT;
+    }
+
+    struct Member
+    {
+        String     name;
+        Code_Type *type;
+        uint32_t   offset;
+    };
+
+    String   name;
+    uint64_t member_count;
+    Member * members;
+
+    uint64_t id;
 };
 
 //

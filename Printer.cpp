@@ -3,7 +3,7 @@
 
 static inline String code_type_kind_string(Code_Type_Kind kind)
 {
-    static String strings[] = {"-null-", "integer", "real", "bool", "*", "proc"};
+    static String strings[] = {"-null-", "integer", "real", "bool", "*", "proc", "struct"};
     static_assert(ArrayCount(strings) == _CODE_TYPE_COUNT);
     return strings[kind];
 }
@@ -228,6 +228,16 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
     }
     break;
 
+    case SYNTAX_NODE_STRUCT: {
+        auto node = (Syntax_Node_Struct *)root;
+        fprintf(fp, "Struct()\n");
+        for (auto decl = node->members; decl; decl = decl->next)
+        {
+            print_syntax(decl->declaration, fp, child_indent);
+        }
+    }
+    break;
+
     case SYNTAX_NODE_DECLARATION: {
         auto node = (Syntax_Node_Declaration *)root;
         if (node->flags & SYMBOL_BIT_CONSTANT)
@@ -271,9 +281,9 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
     case SYNTAX_NODE_GLOBAL_SCOPE: {
         auto node = (Syntax_Node_Global_Scope *)root;
         fprintf(fp, "Global()\n");
-        for (auto decl : node->declarations)
+        for (auto decl = node->declarations; decl; decl = decl->next)
         {
-            print_syntax(decl, fp, child_indent);
+            print_syntax(decl->declaration, fp, child_indent);
         }
     }
     break;

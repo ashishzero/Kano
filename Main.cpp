@@ -297,7 +297,7 @@ static bool code_type_are_same(Code_Type *a, Code_Type *b)
     if (a == b)
         return true;
 
-    if (a->kind == b->kind && a->runtime_size == b->runtime_size)
+    if (a->kind == b->kind && a->runtime_size == b->runtime_size && a->alignment == b->alignment)
     {
         switch (a->kind)
         {
@@ -336,6 +336,14 @@ static bool code_type_are_same(Code_Type *a, Code_Type *b)
             }
 
             return true;
+        }
+        break;
+
+        case CODE_TYPE_STRUCT: {
+            auto a_struct = (Code_Type_Struct *)a;
+            auto b_struct = (Code_Type_Struct *)b;
+
+            return a_struct->id == b_struct->id;
         }
         break;
         }
@@ -802,6 +810,22 @@ Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols
     }
     break;
 
+    case TOKEN_KIND_IDENTIFIER: {
+        auto node   = (Syntax_Node_Identifier *)root->type;
+
+        auto symbol = symbol_table_get(symbols, node->name);
+        if (symbol)
+        {
+            Assert(symbol->type->kind == CODE_TYPE_STRUCT && symbol->address.kind == Symbol_Address::CODE);
+            return symbol->type;
+        }
+        else
+        {
+            Unimplemented();
+        }
+    }
+    break;
+
     default: {
         Unimplemented();
     }
@@ -888,6 +912,56 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
             resolver->address_kind                           = address_kind;
         };
 
+        auto ResolveStruct = [&type, resolver, symbols, symbol](Syntax_Node_Struct *struct_node) {
+            auto struct_type                                 = new Code_Type_Struct;
+
+            struct_type->name                                = symbol->name;
+            struct_type->member_count                        = struct_node->member_count;
+            struct_type->members                             = new Code_Type_Struct::Member[struct_type->member_count];
+
+            auto stack_top                                   = resolver->virtual_address[Symbol_Address::STACK];
+            auto address_kind                                = resolver->address_kind;
+            resolver->address_kind                           = Symbol_Address::STACK;
+            resolver->virtual_address[Symbol_Address::STACK] = 0;
+
+            auto block                                       = new Code_Node_Block;
+            auto struct_symbols                              = &block->symbols;
+            struct_symbols->parent                           = symbols;
+
+            struct_type->id                                  = (uint64_t)block;
+
+            symbol->type                                     = struct_type;
+            symbol->address                                  = symbol_address_code(block);
+
+            uint32_t alignment                               = 0;
+            auto     dst_member                              = struct_type->members;
+
+            for (auto member = struct_node->members; member; member = member->next)
+            {
+                if (code_resolve_declaration(resolver, struct_symbols, member->declaration, &dst_member->type))
+                {
+                    Unimplemented();
+                }
+
+                dst_member->name   = member->declaration->identifier;
+                dst_member->offset = resolver->virtual_address[Symbol_Address::STACK] - dst_member->type->runtime_size;
+
+                if (alignment == 0)
+                    alignment = dst_member->type->alignment;
+
+                dst_member += 1;
+            }
+
+            auto runtime_size                                = resolver->virtual_address[Symbol_Address::STACK];
+            runtime_size                                     = AlignPower2Up(runtime_size, alignment);
+
+            struct_type->runtime_size                        = runtime_size;
+            struct_type->alignment                           = alignment;
+
+            resolver->virtual_address[Symbol_Address::STACK] = stack_top;
+            resolver->address_kind                           = address_kind;
+        };
+
         if (infer_type)
         {
             Assert(root->initializer);
@@ -895,6 +969,15 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
             if (root->initializer->kind == SYNTAX_NODE_PROCEDURE)
             {
                 ResolveProcedure((Syntax_Node_Procedure *)root->initializer);
+            }
+            else if (root->initializer->kind == SYNTAX_NODE_STRUCT)
+            {
+                ResolveStruct((Syntax_Node_Struct *)root->initializer);
+
+                if (out_type)
+                    *out_type = symbol->type;
+
+                return nullptr;
             }
             else
             {
@@ -953,7 +1036,7 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
             auto     address = resolver->virtual_address[resolver->address_kind];
 
             uint32_t size    = symbol->type->runtime_size;
-            address          = AlignPower2Up(address, size);
+            address          = AlignPower2Up(address, symbol->type->alignment);
             symbol->address  = symbol_address_offset(address, resolver->address_kind);
             address += size;
 
@@ -999,7 +1082,7 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
                 auto     address_offset = resolver->virtual_address[resolver->address_kind];
 
                 uint32_t size           = symbol->type->runtime_size;
-                address_offset          = AlignPower2Up(address_offset, size);
+                address_offset          = AlignPower2Up(address_offset, symbol->type->alignment);
                 symbol->address         = symbol_address_offset(address_offset, resolver->address_kind);
                 address_offset += size;
 
@@ -1273,9 +1356,9 @@ Array_View<Code_Node_Assignment *> code_resolve_global_scope(Code_Type_Resolver 
 {
     Array<Code_Node_Assignment *> global_exe;
 
-    for (auto decl : global->declarations)
+    for (auto decl = global->declarations; decl; decl = decl->next)
     {
-        auto assign = code_resolve_declaration(resolver, parent_symbols, decl);
+        auto assign = code_resolve_declaration(resolver, parent_symbols, decl->declaration);
         if (assign)
         {
             if ((assign->value->flags & SYMBOL_BIT_CONST_EXPR))

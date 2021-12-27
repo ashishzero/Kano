@@ -41,6 +41,7 @@ enum Syntax_Node_Kind
     SYNTAX_NODE_PROCEDURE_ARGUMENT,
     SYNTAX_NODE_PROCEDURE,
     SYNTAX_NODE_DECLARATION,
+    SYNTAX_NODE_STRUCT,
     SYNTAX_NODE_STATEMENT,
     SYNTAX_NODE_BLOCK,
     SYNTAX_NODE_GLOBAL_SCOPE
@@ -65,6 +66,7 @@ struct Syntax_Node_Do;
 struct Syntax_Node_Procedure_Argument;
 struct Syntax_Node_Procedure;
 struct Syntax_Node_Declaration;
+struct Syntax_Node_Struct;
 struct Syntax_Node_Statement;
 struct Syntax_Node_Block;
 struct Syntax_Node_Global_Scope;
@@ -209,8 +211,8 @@ struct Syntax_Node_Procedure_Parameter : public Syntax_Node
         kind = SYNTAX_NODE_PROCEDURE_PARAMETER;
     }
 
-    Syntax_Node_Expression *expression = nullptr;
-    Syntax_Node_Procedure_Parameter *next = nullptr;
+    Syntax_Node_Expression *         expression = nullptr;
+    Syntax_Node_Procedure_Parameter *next       = nullptr;
 };
 
 struct Syntax_Node_Procedure_Call : public Syntax_Node
@@ -220,9 +222,9 @@ struct Syntax_Node_Procedure_Call : public Syntax_Node
         kind = SYNTAX_NODE_PROCEDURE_CALL;
     }
 
-    Syntax_Node_Expression *procedure = nullptr;
-    uint64_t parameter_count = 0;
-    Syntax_Node_Procedure_Parameter *parameters = nullptr;
+    Syntax_Node_Expression *         procedure       = nullptr;
+    uint64_t                         parameter_count = 0;
+    Syntax_Node_Procedure_Parameter *parameters      = nullptr;
 };
 
 struct Syntax_Node_If : public Syntax_Node
@@ -311,6 +313,23 @@ struct Syntax_Node_Declaration : public Syntax_Node
     Syntax_Node *     initializer = nullptr;
 };
 
+struct Syntax_Node_Declaration_List
+{
+    Syntax_Node_Declaration *     declaration;
+    Syntax_Node_Declaration_List *next;
+};
+
+struct Syntax_Node_Struct : public Syntax_Node
+{
+    Syntax_Node_Struct()
+    {
+        kind = SYNTAX_NODE_STRUCT;
+    }
+
+    uint64_t                      member_count = 0;
+    Syntax_Node_Declaration_List *members      = nullptr;
+};
+
 struct Syntax_Node_Statement : public Syntax_Node
 {
     Syntax_Node_Statement()
@@ -329,7 +348,7 @@ struct Syntax_Node_Block : public Syntax_Node
         kind = SYNTAX_NODE_BLOCK;
     }
 
-    Syntax_Node_Statement *statements  = nullptr;
+    Syntax_Node_Statement *statements      = nullptr;
     uint64_t               statement_count = 0;
 };
 
@@ -340,5 +359,6 @@ struct Syntax_Node_Global_Scope : public Syntax_Node
         kind = SYNTAX_NODE_GLOBAL_SCOPE;
     }
 
-    Array<Syntax_Node_Declaration *> declarations;
+    uint64_t                      declaration_count = 0;
+    Syntax_Node_Declaration_List *declarations      = nullptr;
 };
