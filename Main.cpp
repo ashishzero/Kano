@@ -524,6 +524,53 @@ Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver *resolv
     return nullptr;
 }
 
+Code_Node_Address *code_resolve_subscript(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Subscript *root)
+{
+    auto expression = code_resolve_root_expression(resolver, symbols, root->expression);
+    auto subscript  = code_resolve_root_expression(resolver, symbols, root->subscript);
+
+    if (expression->type->kind == CODE_TYPE_ARRAY_VIEW ||
+        expression->type->kind == CODE_TYPE_STATIC_ARRAY)
+    {
+        if (subscript->type->kind == CODE_TYPE_INTEGER)
+        {
+            auto node        = new Code_Node_Subscript;
+            node->expression = expression;
+            node->subscript  = subscript;
+
+            node->flags = expression->flags | SYMBOL_BIT_LVALUE;
+
+            if (expression->type->kind == CODE_TYPE_ARRAY_VIEW)
+            {
+                auto type = (Code_Type_Array_View *)expression->type;
+                node->type = type->element_type;
+            }
+            else if (expression->type->kind == CODE_TYPE_STATIC_ARRAY)
+            {
+                auto type = (Code_Type_Static_Array *)expression->type;
+                node->type = type->element_type;
+            }
+
+            auto address   = new Code_Node_Address;
+            address->type  = node->type;
+            address->flags = node->flags;
+            address->child = node;
+
+            return address; 
+        }
+        else
+        {
+            Unimplemented();
+        }
+    }
+    else
+    {
+        Unimplemented();
+    }
+
+    return nullptr;
+}
+
 Code_Node *code_resolve_expression(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node *root)
 {
     switch (root->kind)
@@ -548,6 +595,9 @@ Code_Node *code_resolve_expression(Code_Type_Resolver *resolver, Symbol_Table *s
 
     case SYNTAX_NODE_PROCEDURE_CALL:
         return code_resolve_procedure_call(resolver, symbols, (Syntax_Node_Procedure_Call *)root);
+
+    case SYNTAX_NODE_SUBSCRIPT:
+    return code_resolve_subscript(resolver, symbols, (Syntax_Node_Subscript *)root);
 
         NoDefaultCase();
     }

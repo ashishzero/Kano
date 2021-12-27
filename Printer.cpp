@@ -159,6 +159,14 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
     }
     break;
 
+    case SYNTAX_NODE_SUBSCRIPT: {
+        auto node = (Syntax_Node_Subscript *)root;
+        fprintf(fp, "Subscript()\n");
+        print_syntax(node->expression, fp, child_indent, "Expression");
+        print_syntax(node->subscript, fp, child_indent, "Subscript");
+    }
+    break;
+
     case SYNTAX_NODE_IF: {
         auto node = (Syntax_Node_If *)root;
         fprintf(fp, "If()\n");

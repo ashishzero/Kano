@@ -47,6 +47,7 @@ static void     parser_init_precedence()
 
     BinaryOperatorPrecedence[TOKEN_KIND_PERIOD]                       = 65;
     BinaryOperatorPrecedence[TOKEN_KIND_OPEN_BRACKET]                 = 65;
+    BinaryOperatorPrecedence[TOKEN_KIND_OPEN_SQUARE_BRACKET]          = 65;
 
     BinaryOperatorPrecedence[TOKEN_KIND_ASTERISK]                     = 60;
     BinaryOperatorPrecedence[TOKEN_KIND_DIVISION]                     = 60;
@@ -347,6 +348,49 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec)
             return assignment;
         }
 
+        if (parser_peek_token(parser, TOKEN_KIND_OPEN_BRACKET))
+        {
+            auto node = parser_new_syntax_node<Syntax_Node_Procedure_Call>(parser);
+            parser_accept_token(parser, TOKEN_KIND_OPEN_BRACKET);
+
+            auto parameters = parse_procedure_parameters(parser);
+            parser_expect_token(parser, TOKEN_KIND_CLOSE_BRACKET);
+
+            parser_finish_syntax_node(parser, node);
+
+            auto procedure = parser_new_syntax_node<Syntax_Node_Expression>(parser);
+            parser_finish_syntax_node(parser, procedure);
+            procedure->location   = left->location;
+            procedure->child      = left;
+
+            node->procedure       = procedure;
+            node->parameter_count = parameters.count;
+            node->parameters      = parameters.head;
+            left                  = node;
+            continue;
+        }
+
+        if (parser_peek_token(parser, TOKEN_KIND_OPEN_SQUARE_BRACKET))
+        {
+            auto node = parser_new_syntax_node<Syntax_Node_Subscript>(parser);
+            parser_accept_token(parser, TOKEN_KIND_OPEN_SQUARE_BRACKET);
+
+            auto subscript = parse_root_expression(parser);
+            parser_expect_token(parser, TOKEN_KIND_CLOSE_SQUARE_BRACKET);
+
+            parser_finish_syntax_node(parser, node);
+
+            auto expression      = parser_new_syntax_node<Syntax_Node_Expression>(parser);
+            parser_finish_syntax_node(parser, expression);
+            expression->location = left->location;
+            expression->child    = left;
+
+            node->expression = expression; 
+            node->subscript  = subscript;
+            left             = node;
+            continue;
+        }
+
         static const Token_Kind BinaryOpTokens[] = {TOKEN_KIND_PLUS,
                                                     TOKEN_KIND_MINUS,
                                                     TOKEN_KIND_ASTERISK,
@@ -374,28 +418,6 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec)
                                                     TOKEN_KIND_COMPOUND_BITWISE_XOR,
                                                     TOKEN_KIND_COMPOUND_BITWISE_OR,
                                                     TOKEN_KIND_PERIOD};
-
-        if (parser_peek_token(parser, TOKEN_KIND_OPEN_BRACKET))
-        {
-            auto node = parser_new_syntax_node<Syntax_Node_Procedure_Call>(parser);
-            parser_accept_token(parser, TOKEN_KIND_OPEN_BRACKET);
-
-            auto parameters = parse_procedure_parameters(parser);
-            parser_expect_token(parser, TOKEN_KIND_CLOSE_BRACKET);
-
-            parser_finish_syntax_node(parser, node);
-
-            auto procedure = parser_new_syntax_node<Syntax_Node_Expression>(parser);
-            parser_finish_syntax_node(parser, procedure);
-            procedure->location   = left->location;
-            procedure->child      = left;
-
-            node->procedure       = procedure;
-            node->parameter_count = parameters.count;
-            node->parameters      = parameters.head;
-            left                  = node;
-            continue;
-        }
 
         bool found_binary_operator = false;
 
@@ -693,7 +715,7 @@ Syntax_Node_Type *parse_type(Parser *parser)
         else
         {
             type->id = Syntax_Node_Type::STATIC_ARRAY;
-            
+
             auto node = parser_new_syntax_node<Syntax_Node_Static_Array>(parser);
             node->location = type->location;
             node->expression = parse_root_expression(parser);

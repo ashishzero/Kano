@@ -206,6 +206,7 @@ enum Code_Node_Kind
     CODE_NODE_RETURN,
     CODE_NODE_STATEMENT,
     CODE_NODE_PROCEDURE_CALL,
+    CODE_NODE_SUBSCRIPT,
     CODE_NODE_IF,
     CODE_NODE_FOR,
     CODE_NODE_WHILE,
@@ -267,6 +268,8 @@ struct Code_Node_Address : public Code_Node
     {
         kind = CODE_NODE_ADDRESS;
     }
+
+    Code_Node *child = nullptr; // If child is null, then address is valid
 
     Symbol_Address address;
 };
@@ -417,6 +420,17 @@ struct Code_Node_Procedure_Call : public Code_Node
     Code_Node_Expression **paraments       = nullptr;
 
     uint64_t               stack_top       = 0;
+};
+
+struct Code_Node_Subscript : public Code_Node
+{
+    Code_Node_Subscript()
+    {
+        kind = CODE_NODE_SUBSCRIPT;
+    }
+
+    Code_Node_Expression *expression = nullptr;
+    Code_Node_Expression *subscript  = nullptr;
 };
 
 struct Code_Node_If : public Code_Node

@@ -34,6 +34,7 @@ enum Syntax_Node_Kind
     SYNTAX_NODE_EXPRESSION,
     SYNTAX_NODE_PROCEDURE_PARAMETER,
     SYNTAX_NODE_PROCEDURE_CALL,
+    SYNTAX_NODE_SUBSCRIPT,
     SYNTAX_NODE_IF,
     SYNTAX_NODE_FOR,
     SYNTAX_NODE_WHILE,
@@ -242,6 +243,17 @@ struct Syntax_Node_Procedure_Call : public Syntax_Node
     Syntax_Node_Expression *         procedure       = nullptr;
     uint64_t                         parameter_count = 0;
     Syntax_Node_Procedure_Parameter *parameters      = nullptr;
+};
+
+struct Syntax_Node_Subscript : public Syntax_Node
+{
+    Syntax_Node_Subscript()
+    {
+        kind = SYNTAX_NODE_SUBSCRIPT;
+    }
+
+    Syntax_Node_Expression * expression = nullptr;
+    Syntax_Node_Expression * subscript  = nullptr;
 };
 
 struct Syntax_Node_If : public Syntax_Node
