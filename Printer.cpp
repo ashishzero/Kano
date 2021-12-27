@@ -356,7 +356,18 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
         const char *SymbolAddressNames[] = {"stack", "global", "code"};
         Assert(node->address.kind < ArrayCount(SymbolAddressNames));
 
-        fprintf(fp, "Address(%s:%p)\n", SymbolAddressNames[node->address.kind], node->address.memory);
+        if (node->child)
+        {
+            fprintf(fp, "Address(+%zx)\n", node->offset);
+            print_code(node->child, fp, child_indent, "Child");
+        }
+        else
+        {
+            fprintf(fp, "Address(%s:%zx + %zx)\n", 
+                SymbolAddressNames[node->address.kind], 
+                (uint64_t)node->address.memory,
+                node->offset);
+        }
     }
     break;
 
@@ -413,6 +424,14 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
         {
             print_code(node->paraments[index], fp, child_indent);
         }
+    }
+    break;
+
+    case CODE_NODE_SUBSCRIPT: {
+        auto node = (Code_Node_Subscript *)root;
+        fprintf(fp, "Subscript()\n");
+        print_code(node->expression, fp, child_indent, "Expression");
+        print_code(node->subscript, fp, child_indent, "Subscript");
     }
     break;
 

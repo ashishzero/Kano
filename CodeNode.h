@@ -272,6 +272,8 @@ struct Code_Node_Address : public Code_Node
     Code_Node *child = nullptr; // If child is null, then address is valid
 
     Symbol_Address address;
+
+    uint64_t offset = 0;
 };
 
 struct Code_Node_Type_Cast : public Code_Node

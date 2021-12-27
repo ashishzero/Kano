@@ -697,21 +697,27 @@ Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Symbol_Tab
             Unimplemented();
         }
 
-        Code_Type_Struct *type        = nullptr;
+        if (root->right->kind != SYNTAX_NODE_IDENTIFIER)
+        {
+            Unimplemented();
+        }
 
-        auto              parent_type = left->type;
+        bool valid_type = false;
+        auto base_type = left->type;
 
         for (int depth = 0; depth < 2; ++depth)
         {
-            if (parent_type->kind == CODE_TYPE_STRUCT)
+            if (base_type->kind == CODE_TYPE_STRUCT || 
+            base_type->kind == CODE_TYPE_ARRAY_VIEW || 
+            base_type->kind == CODE_TYPE_STATIC_ARRAY)
             {
-                type = (Code_Type_Struct *)parent_type;
+                valid_type = true;
                 break;
             }
-            else if (parent_type->kind == CODE_TYPE_POINTER)
+            else if (base_type->kind == CODE_TYPE_POINTER)
             {
-                auto ptr    = (Code_Type_Pointer *)parent_type;
-                parent_type = ptr->base_type;
+                auto ptr  = (Code_Type_Pointer *)base_type;
+                base_type = ptr->base_type;
             }
             else
             {
@@ -719,53 +725,86 @@ Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Symbol_Tab
             }
         }
 
-        if (type)
+        if (valid_type)
         {
-            auto symbol = symbol_table_get(symbols, type->name);
-            if (symbol)
+            auto iden   = (Syntax_Node_Identifier *)root->right;
+
+            switch (base_type->kind)
             {
-                if (symbol->type->kind == CODE_TYPE_STRUCT)
-                {
-                    Assert(symbol->address.kind == Symbol_Address::CODE);
+                case CODE_TYPE_STRUCT: {
+                    auto type = (Code_Type_Struct *)base_type;
+                    auto symbol = symbol_table_get(symbols, type->name);
+                    Assert(symbol && symbol->type->kind == CODE_TYPE_STRUCT && symbol->address.kind == Symbol_Address::CODE);
+
                     auto block = (Code_Node_Block *)symbol->address.memory;
 
-                    if (root->right->kind == SYNTAX_NODE_IDENTIFIER)
+                    auto member = symbol_table_get(&block->symbols, iden->name, false);
+
+                    if (member)
                     {
-                        auto iden   = (Syntax_Node_Identifier *)root->right;
+                        Assert(member->address.kind == Symbol_Address::STACK);
 
-                        auto member = symbol_table_get(&block->symbols, iden->name, false);
-                        if (member)
-                        {
-                            Assert(member->address.kind == Symbol_Address::STACK);
+                        auto code_node     = (Code_Node_Address *)left;
+                        code_node->type    = member->type;
+                        code_node->offset += (uint64_t)member->address.memory;
 
-                            auto code_node   = (Code_Node_Address *)left;
-                            code_node->flags = left->flags;
-                            code_node->type  = member->type;
-
-                            auto memory      = (uint8_t *)code_node->address.memory;
-                            memory += (uint64_t)member->address.memory;
-                            code_node->address.memory = memory;
-
-                            return code_node;
-                        }
-                        else
-                        {
-                            Unimplemented();
-                        }
+                        return code_node;
                     }
                     else
                     {
                         Unimplemented();
                     }
                 }
-                else
-                {
-                    Unimplemented();
+                break;
+
+                case CODE_TYPE_STATIC_ARRAY: {
+                    auto code_node = (Code_Node_Address *)left;
+
+                    if (iden->name == "data")
+                    {
+                        auto type           = (Code_Type_Static_Array *)base_type;                  
+                        auto ptr_type       = new Code_Type_Pointer;
+                        ptr_type->base_type = type->element_type;
+                        code_node->type     = ptr_type;
+                        return code_node;
+                    }
+                    else if (iden->name == "count")
+                    {
+                        auto type                = (Code_Type_Static_Array *)base_type;
+                        auto node                = new Code_Node_Literal;
+                        node->type               = symbol_table_get(&resolver->symbols, "int")->type;
+                        node->data.integer.value = type->element_count;
+                        return node;
+                    }
+                    else
+                    {
+                        Unimplemented();
+                    }
                 }
-            }
-            else
-            {
-                Unimplemented();
+                break;
+
+                case CODE_TYPE_ARRAY_VIEW: {
+                    auto code_node = (Code_Node_Address *)left;
+
+                    if (iden->name == "count")
+                    {
+                        code_node->type = symbol_table_get(&resolver->symbols, "int")->type;
+                        code_node->offset += 0;
+                    }
+                    else if (iden->name == "data")
+                    {
+                        auto type       = (Code_Type_Array_View *)base_type;
+                        code_node->type = type->element_type;
+                        code_node->offset += sizeof(int64_t);
+                    }
+                    else
+                    {
+                        Unimplemented();
+                    }
+
+                    return code_node;
+                }
+                break;
             }
         }
         else
@@ -773,6 +812,7 @@ Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Symbol_Tab
             Unimplemented();
         }
     }
+
     else
     {
         auto  right     = code_resolve_expression(resolver, symbols, root->right);
