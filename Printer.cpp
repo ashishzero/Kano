@@ -358,12 +358,12 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
 
         if (node->child)
         {
-            fprintf(fp, "Address(+%zx)\n", node->offset);
+            fprintf(fp, "Address(+0x%zx)\n", node->offset);
             print_code(node->child, fp, child_indent, "Child");
         }
         else
         {
-            fprintf(fp, "Address(%s:%zx + %zx)\n", 
+            fprintf(fp, "Address(%s:0x%zx + 0x%zx)\n", 
                 SymbolAddressNames[node->address.kind], 
                 (uint64_t)node->address.memory,
                 node->offset);
