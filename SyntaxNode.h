@@ -29,6 +29,8 @@ enum Syntax_Node_Kind
     SYNTAX_NODE_PROCEDURE_PROTOTYPE_ARGUMENT,
     SYNTAX_NODE_PROCEDURE_PROTOTYPE,
     SYNTAX_NODE_TYPE,
+    SYNTAX_NODE_SIZE_OF,
+    SYNTAX_NODE_TYPE_OF,
     SYNTAX_NODE_TYPE_CAST,
     SYNTAX_NODE_RETURN,
     SYNTAX_NODE_ASSIGNMENT,
@@ -59,6 +61,8 @@ struct Syntax_Node_Binary_Operator;
 struct Syntax_Node_Procedure_Prototype_Argument;
 struct Syntax_Node_Procedure_Prototype;
 struct Syntax_Node_Type;
+struct Syntax_Node_Size_Of;
+struct Syntax_Node_Type_Of;
 struct Syntax_Node_Type_Cast;
 struct Syntax_Node_Assignment;
 struct Syntax_Node_Expression;
@@ -187,12 +191,33 @@ struct Syntax_Node_Type : public Syntax_Node
         POINTER,
         PROCEDURE,
         IDENTIFIER,
+        TYPE_OF,
         ARRAY_VIEW,
         STATIC_ARRAY,
     };
 
     Id id = ERROR;
     Syntax_Node *type       = nullptr;
+};
+
+struct Syntax_Node_Size_Of : public Syntax_Node
+{
+    Syntax_Node_Size_Of()
+    {
+        kind = SYNTAX_NODE_SIZE_OF;
+    }
+
+    Syntax_Node_Type *type = nullptr;
+};
+
+struct Syntax_Node_Type_Of : public Syntax_Node
+{
+    Syntax_Node_Type_Of()
+    {
+        kind = SYNTAX_NODE_TYPE_OF;
+    }
+
+    Syntax_Node_Expression *expression = nullptr;
 };
 
 struct Syntax_Node_Type_Cast : public Syntax_Node

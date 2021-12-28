@@ -29,6 +29,8 @@ const main := proc() {
 	color[0].z = 0;
 	color[0].w = 1;
 
+	var color_size := size_of(type_of(color));
+
 	var color_p : *Vec4 = null;
 
 	var count := color.count;
@@ -63,8 +65,11 @@ const main := proc() {
 	var sum:= 0;
 
 	for var i:= 0; i < 100; i = i + 1 {
+		//print("i: %\n", i);
 		sum = sum + i;
 	}
+
+	//print("sum: %, number1: %\n", sum, number1);
 
 	while sum {
 		sum = sum - 1;

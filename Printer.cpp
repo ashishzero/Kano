@@ -110,7 +110,7 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
     case SYNTAX_NODE_TYPE: {
         auto        node      = (Syntax_Node_Type *)root;
 
-        const char *TypeIdNames[] = {"error" , "void", "int", "float", "bool", "pointer", "procedure", "identifier", "array-view", "static-array"};
+        const char *TypeIdNames[] = {"error" , "void", "int", "float", "bool", "pointer", "procedure", "identifier", "type_of", "array-view", "static-array"};
         Assert(node->id < ArrayCount(TypeIdNames));
 
         fprintf(fp, "Type(%s)\n", TypeIdNames[node->id]);
@@ -119,6 +119,20 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
         {
             print_syntax(node->type, fp, child_indent);
         }
+    }
+    break;
+
+    case SYNTAX_NODE_SIZE_OF: {
+        auto node = (Syntax_Node_Size_Of *)root;
+        fprintf(fp, "Size-Of()\n");
+        print_syntax(node->type, fp, child_indent, "Type-Argument");
+    }
+    break;
+
+    case SYNTAX_NODE_TYPE_OF: {
+        auto node = (Syntax_Node_Type_Of *)root;
+        fprintf(fp, "Type-Of()\n");
+        print_syntax(node->expression, fp, child_indent, "Type-Expression");
     }
     break;
 

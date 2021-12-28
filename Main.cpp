@@ -621,6 +621,17 @@ Code_Node_Type_Cast *code_resolve_type_cast(Code_Type_Resolver *resolver, Symbol
     return cast;
 }
 
+Code_Node_Literal *code_resolve_size_of(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Size_Of *root)
+{
+    auto type  = code_resolve_type(resolver, symbols, root->type);
+
+    auto node                = new Code_Node_Literal;
+    node->type               = symbol_table_get(&resolver->symbols, "int")->type;
+    node->data.integer.value = type->runtime_size;
+
+    return node;
+}
+
 Code_Node *code_resolve_expression(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node *root)
 {
     switch (root->kind)
@@ -651,6 +662,9 @@ Code_Node *code_resolve_expression(Code_Type_Resolver *resolver, Symbol_Table *s
 
     case SYNTAX_NODE_SUBSCRIPT:
         return code_resolve_subscript(resolver, symbols, (Syntax_Node_Subscript *)root);
+
+    case SYNTAX_NODE_SIZE_OF:
+        return code_resolve_size_of(resolver, symbols, (Syntax_Node_Size_Of *)root);
 
         NoDefaultCase();
     }
@@ -1062,6 +1076,13 @@ Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols
         {
             Unimplemented();
         }
+    }
+    break;
+
+    case Syntax_Node_Type::TYPE_OF: {
+        auto node = (Syntax_Node_Type_Of *)root->type;
+        auto expression = code_resolve_root_expression(resolver, symbols, node->expression);
+        return expression->type;
     }
     break;
 
@@ -1755,9 +1776,7 @@ int main()
     {
         Unary_Operator unary_operator_real;
         unary_operator_real.parameter = CompilerTypes[CODE_TYPE_REAL];
-        ;
         unary_operator_real.output = CompilerTypes[CODE_TYPE_REAL];
-        ;
         resolver.unary_operators[UNARY_OPERATOR_PLUS].add(unary_operator_real);
         resolver.unary_operators[UNARY_OPERATOR_MINUS].add(unary_operator_real);
     }

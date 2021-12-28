@@ -267,6 +267,18 @@ Syntax_Node *parse_subexpression(Parser *parser, uint32_t prec)
         return node;
     }
 
+    if (parser_accept_token(parser, TOKEN_KIND_SIZE_OF))
+    {
+        auto node = parser_new_syntax_node<Syntax_Node_Size_Of>(parser);
+        if (parser_expect_token(parser, TOKEN_KIND_OPEN_BRACKET))
+        {
+            node->type = parse_type(parser);
+            parser_expect_token(parser, TOKEN_KIND_CLOSE_BRACKET);
+        }
+        parser_finish_syntax_node(parser, node);
+        return node;
+    }
+
     if (parser_accept_token(parser, TOKEN_KIND_CAST))
     {
         auto node  = parser_new_syntax_node<Syntax_Node_Type_Cast>(parser);
@@ -694,19 +706,23 @@ Syntax_Node_Type *parse_type(Parser *parser)
 
     if (parser_accept_token(parser, TOKEN_KIND_INT))
     {
-        type->id = Syntax_Node_Type::INT;
+        type->id       = Syntax_Node_Type::INT;
+        type->location = parser->location;
     }
     else if (parser_accept_token(parser, TOKEN_KIND_FLOAT))
     {
         type->id = Syntax_Node_Type::FLOAT;
+        type->location = parser->location;
     }
     else if (parser_accept_token(parser, TOKEN_KIND_BOOL))
     {
         type->id = Syntax_Node_Type::BOOL;
+        type->location = parser->location;
     }
     else if (parser_accept_token(parser, TOKEN_KIND_ASTERISK))
     {
         type->id = Syntax_Node_Type::POINTER;
+        type->location = parser->location;
 
         if (parser_accept_token(parser, TOKEN_KIND_VOID))
         {
@@ -723,13 +739,14 @@ Syntax_Node_Type *parse_type(Parser *parser)
     else if (parser_peek_token(parser, TOKEN_KIND_PROC))
     {
         type->id = Syntax_Node_Type::PROCEDURE;
+        type->location = parser->location;
         type->type       = parse_procedure_prototype(parser);
     }
-    else if (parser_peek_token(parser, TOKEN_KIND_IDENTIFIER))
+    else if (parser_accept_token(parser, TOKEN_KIND_IDENTIFIER))
     {
         auto identifier = parser_new_syntax_node<Syntax_Node_Identifier>(parser);
-        parser_accept_token(parser, TOKEN_KIND_IDENTIFIER);
         parser_finish_syntax_node(parser, identifier);
+        type->location = identifier->location;
 
         String name;
         name.length      = parser->value.string.length;
@@ -738,6 +755,19 @@ Syntax_Node_Type *parse_type(Parser *parser)
 
         type->id = Syntax_Node_Type::IDENTIFIER;
         type->type       = identifier;
+    }
+    else if (parser_accept_token(parser, TOKEN_KIND_TYPE_OF))
+    {
+        auto node = parser_new_syntax_node<Syntax_Node_Type_Of>(parser);
+        if (parser_expect_token(parser, TOKEN_KIND_OPEN_BRACKET))
+        {
+            node->expression = parse_root_expression(parser);
+            parser_expect_token(parser, TOKEN_KIND_CLOSE_BRACKET);
+        }
+        parser_finish_syntax_node(parser, node);
+        type->location = node->location;
+        type->id = Syntax_Node_Type::TYPE_OF;
+        type->type     = node;
     }
     else if (parser_accept_token(parser, TOKEN_KIND_OPEN_SQUARE_BRACKET))
     {
