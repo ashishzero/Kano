@@ -1,4 +1,9 @@
 
+const Node := struct {
+	var value: int;
+	var next: *Node;
+}
+
 const Vec4 := struct {
 	var x: float;
 	var y: float;

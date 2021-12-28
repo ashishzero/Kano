@@ -495,6 +495,9 @@ Syntax_Node_Expression *parse_root_expression(Parser *parser)
     }
 
     parser_finish_syntax_node(parser, expression);
+
+    expression->location = expression->child->location;
+
     return expression;
 }
 
@@ -779,11 +782,10 @@ Syntax_Node_Type *parse_type(Parser *parser)
 
 Syntax_Node_Declaration *parse_declaration(Parser *parser)
 {
-    auto declaration = parser_new_syntax_node<Syntax_Node_Declaration>(parser);
-
+    uint32_t flags = 0;
     if (parser_accept_token(parser, TOKEN_KIND_CONST))
     {
-        declaration->flags |= SYMBOL_BIT_CONSTANT;
+        flags |= SYMBOL_BIT_CONSTANT;
     }
     else if (!parser_accept_token(parser, TOKEN_KIND_VAR))
     {
@@ -791,6 +793,9 @@ Syntax_Node_Declaration *parse_declaration(Parser *parser)
         parser_error(parser, token, "Expected declaration 'var' or 'const'\n");
         parser->parsing = false;
     }
+
+    auto declaration   = parser_new_syntax_node<Syntax_Node_Declaration>(parser);
+    declaration->flags = flags;
 
     if (parser_expect_token(parser, TOKEN_KIND_IDENTIFIER))
     {
@@ -986,6 +991,9 @@ Syntax_Node_Statement *parse_statement(Parser *parser)
     }
 
     parser_finish_syntax_node(parser, statement);
+
+    statement->location = statement->node->location;
+
     return statement;
 }
 

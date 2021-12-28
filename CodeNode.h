@@ -406,6 +406,8 @@ struct Code_Node_Statement : public Code_Node
         kind = CODE_NODE_STATEMENT;
     }
 
+    uint64_t source_row    = -1;
+
     Code_Node *          node = nullptr;
     Code_Node_Statement *next = nullptr;
 };

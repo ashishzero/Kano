@@ -292,7 +292,7 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
 
     case SYNTAX_NODE_STATEMENT: {
         auto node = (Syntax_Node_Statement *)root;
-        fprintf(fp, "Statement()\n");
+        fprintf(fp, "Statement(%zu)\n", node->location.start_row);
         print_syntax(node->node, fp, child_indent);
     }
     break;
@@ -425,7 +425,7 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
 
     case CODE_NODE_STATEMENT: {
         auto node = (Code_Node_Statement *)root;
-        fprintf(fp, "Statement()\n");
+        fprintf(fp, "Statement(%zu)\n", node->source_row);
         print_code(node->node, fp, child_indent);
     }
     break;

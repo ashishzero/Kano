@@ -1422,6 +1422,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
     case SYNTAX_NODE_EXPRESSION: {
         auto expression = code_resolve_root_expression(resolver, symbols, (Syntax_Node_Expression *)node);
         Code_Node_Statement *statement = new Code_Node_Statement;
+        statement->source_row          = node->location.start_row;
         statement->node                = expression;
         statement->type                = expression->type;
         return statement;
@@ -1457,6 +1458,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
         }
 
         Code_Node_Statement *statement = new Code_Node_Statement;
+        statement->source_row          = node->location.start_row;
         statement->node                = if_code;
         return statement;
     }
@@ -1495,6 +1497,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
         resolver->virtual_address[Symbol_Address::STACK] = stack_top;
 
         Code_Node_Statement *statement                   = new Code_Node_Statement;
+        statement->source_row                            = node->location.start_row;
         statement->node                                  = for_code;
         return statement;
     }
@@ -1524,6 +1527,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
         while_code->body               = code_resolve_statement(resolver, symbols, while_node->body);
 
         Code_Node_Statement *statement = new Code_Node_Statement;
+        statement->source_row          = node->location.start_row;
         statement->node                = while_code;
         return statement;
     }
@@ -1562,6 +1566,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
         do_code->condition             = condition;
 
         Code_Node_Statement *statement = new Code_Node_Statement;
+        statement->source_row          = node->location.start_row;
         statement->node                = do_code;
         return statement;
     }
@@ -1573,6 +1578,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
         if (initialization)
         {
             Code_Node_Statement *statement = new Code_Node_Statement;
+            statement->source_row          = node->location.start_row;
             statement->node                = initialization;
             return statement;
         }
@@ -1591,6 +1597,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
     case SYNTAX_NODE_BLOCK: {
         auto                 block     = code_resolve_block(resolver, symbols, (Syntax_Node_Block *)node);
         Code_Node_Statement *statement = new Code_Node_Statement;
+        statement->source_row          = node->location.start_row;
         statement->node                = block;
         statement->type                = nullptr;
         return statement;
