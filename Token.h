@@ -58,6 +58,7 @@ enum Token_Kind
 
     TOKEN_KIND_REAL,
     TOKEN_KIND_INTEGER,
+    TOKEN_KIND_STRING,
 
     TOKEN_KIND_VAR,
     TOKEN_KIND_CONST,
@@ -156,7 +157,7 @@ static inline String token_kind_string(Token_Kind kind)
                                ">=",          "<=",
                                "==",          "!=",
 
-                               "real number", "integer number",
+                               "real number", "integer number", "string",
 
                                "var",         "const",
 

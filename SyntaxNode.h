@@ -95,13 +95,17 @@ struct Literal
         INTEGER,
         REAL,
         BOOL,
+        STRING,
         NULL_POINTER
     };
 
     union Value {
-        int32_t integer = 0;
+        String  string = {};
+        int32_t integer;
         float   real;
         bool    boolean;
+
+        Value() = default;
     };
 
     Kind  kind = INTEGER;

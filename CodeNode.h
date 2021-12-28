@@ -74,8 +74,9 @@ struct Code_Type_Procedure : public Code_Type
         alignment    = sizeof(void *);
     }
 
-    Code_Type **arguments      = nullptr;
-    uint64_t    argument_count = 0;
+    Code_Type **arguments               = nullptr;
+    uint64_t    argument_count          = 0;
+
     Code_Type * return_type    = nullptr;
 };
 
@@ -244,7 +245,13 @@ struct Code_Value_Pointer
     uint64_t value;
 };
 
+struct Code_Value_String
+{
+    String value;
+};
+
 union Code_Value {
+    Code_Value_String  string = {};
     Code_Value_Integer integer;
     Code_Value_Real    real;
     Code_Value_Bool    boolean;

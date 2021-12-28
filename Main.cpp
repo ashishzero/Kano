@@ -433,6 +433,15 @@ Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Symbol_Tab
     }
     break;
 
+    case Literal::STRING: {
+        auto symbol = symbol_table_get(&resolver->symbols, "string");
+        Assert(symbol->flags & SYMBOL_BIT_TYPE);
+
+        node->type = symbol->type;
+        node->data.string.value = root->value.data.string;
+    }
+    break;
+
     case Literal::BOOL: {
         auto symbol = symbol_table_get(&resolver->symbols, "bool");
         Assert(symbol->flags & SYMBOL_BIT_TYPE);
@@ -524,7 +533,7 @@ Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver *resolv
             node->paraments       = new Code_Node_Expression *[node->parameter_count];
 
             uint32_t param_index  = 0;
-            for (auto param = root->parameters; param; param = param->next, ++param_index)
+            for (auto param = root->parameters; param ; param = param->next, ++param_index)
             {
                 auto code_param = code_resolve_root_expression(resolver, symbols, param->expression);
 
@@ -1764,11 +1773,52 @@ int main()
     }
 
     {
+        auto block = new Code_Node_Block;
+        block->symbols.parent = &resolver.symbols;
+
+        Symbol length;
+        length.name = "length";
+        length.address.kind   = Symbol_Address::STACK;
+        length.address.memory = 0;
+        length.type = symbol_table_get(&resolver.symbols, "int")->type;
+
+        Symbol data;
+        data.name = "data";
+        data.address.kind   = Symbol_Address::STACK;
+        data.address.memory = (uint8_t *)sizeof(int64_t);
+        data.type = symbol_table_get(&resolver.symbols, "*void")->type;
+
+        symbol_table_put(&block->symbols, length);
+        symbol_table_put(&block->symbols, data);
+
+        auto type          = new Code_Type_Struct;
+        type->alignment    = sizeof(int64_t);
+        type->runtime_size = sizeof(String);
+        type->name         = "string";
+        type->id           = (uint64_t)type;
+        type->member_count = 2;
+        type->members      = new Code_Type_Struct::Member[type->member_count];
+
+        type->members[0].name = length.name;
+        type->members[0].offset = (uint64_t)length.address.memory;
+        type->members[0].type = length.type;
+
+        type->members[1].name = data.name;
+        type->members[1].offset = (uint64_t)length.address.memory;
+        type->members[1].type = data.type;
+
+        Symbol sym;
+        sym.name    = "string";
+        sym.type    = type;
+        sym.flags   = SYMBOL_BIT_CONSTANT | SYMBOL_BIT_TYPE;
+        sym.address = symbol_address_code(block);
+        symbol_table_put(&resolver.symbols, sym);
+    }
+
+    {
         Unary_Operator unary_operator_int;
         unary_operator_int.parameter = CompilerTypes[CODE_TYPE_INTEGER];
-        ;
         unary_operator_int.output = CompilerTypes[CODE_TYPE_INTEGER];
-        ;
         resolver.unary_operators[UNARY_OPERATOR_PLUS].add(unary_operator_int);
         resolver.unary_operators[UNARY_OPERATOR_MINUS].add(unary_operator_int);
         resolver.unary_operators[UNARY_OPERATOR_BITWISE_NOT].add(unary_operator_int);

@@ -234,6 +234,32 @@ void lexer_next(Lexer *lexer)
             return;
         }
 
+        if (a == '"')
+        {
+            lexer->cursor++;
+            auto string = lexer->cursor;
+            while (lexer_continue(lexer))
+            {
+                if (lexer_advance_newline(lexer))
+                {
+                    lexer_error(lexer, "Expected '\"");
+                    return;
+                }
+                if (*lexer->cursor == '"')
+                {
+                    lexer->value.string.length = lexer->cursor - string;
+                    lexer->value.string.data   = string;
+                    lexer->cursor++;
+                    lexer_make_token(lexer, TOKEN_KIND_STRING);
+                    return;
+                }
+                lexer->cursor++;
+            }
+
+            lexer_error(lexer, "Expected '\"");
+            return;
+        }
+
         // three character tokens
         if (lexer->cursor + 2 < lexer->content.data + lexer->content.length)
         {

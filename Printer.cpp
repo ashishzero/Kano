@@ -56,6 +56,9 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
         case Literal::BOOL:
             fprintf(fp, "Literal(bool:%s)\n", node->value.data.boolean ? "true" : "false");
             break;
+        case Literal::STRING:
+            fprintf(fp, "Literal(string:%s)\n", node->value.data.string.data);
+            break;
         case Literal::NULL_POINTER:
             fprintf(fp, "Literal(null)\n");
             break;
@@ -372,6 +375,9 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
             break;
         case CODE_TYPE_POINTER:
             fprintf(fp, "Literal(*void:null)\n");
+            break;
+        case CODE_TYPE_STRUCT:
+            fprintf(fp, "Literal(struct:%s)\n", ((Code_Type_Struct *)node->type)->name.data);
             break;
             NoDefaultCase();
         }

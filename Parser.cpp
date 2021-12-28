@@ -231,6 +231,21 @@ Syntax_Node *parse_subexpression(Parser *parser, uint32_t prec)
         return node;
     }
 
+    if (parser_accept_token(parser, TOKEN_KIND_STRING))
+    {
+        String string;
+        string.length = parser->value.string.length;
+        string.data   = new uint8_t[string.length + 1];
+        memcpy(string.data, parser->value.string.data, string.length);
+        string.data[string.length] = 0;
+
+        auto node               = parser_new_syntax_node<Syntax_Node_Literal>(parser);
+        node->value.kind        = Literal::STRING;
+        node->value.data.string = string;
+        parser_finish_syntax_node(parser, node);
+        return node;
+    }
+
     if (parser_accept_token(parser, TOKEN_KIND_TRUE))
     {
         auto node                = parser_new_syntax_node<Syntax_Node_Literal>(parser);
