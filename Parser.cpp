@@ -259,6 +259,24 @@ Syntax_Node *parse_subexpression(Parser *parser, uint32_t prec)
         return node;
     }
 
+    if (parser_accept_token(parser, TOKEN_KIND_CAST))
+    {
+        auto node  = parser_new_syntax_node<Syntax_Node_Type_Cast>(parser);
+        if (parser_expect_token(parser, TOKEN_KIND_OPEN_BRACKET))
+        {
+            node->type = parse_type(parser);
+            if (parser_expect_token(parser, TOKEN_KIND_CLOSE_BRACKET))
+            {
+                auto expression = parser_new_syntax_node<Syntax_Node_Expression>(parser);
+                expression->child = parse_subexpression(parser, 0);
+                parser_finish_syntax_node(parser, expression);
+                node->expression = expression;
+            }
+        }
+        parser_finish_syntax_node(parser, node);
+        return node;
+    }
+
     static const Token_Kind UnaryOpTokens[] = {TOKEN_KIND_PLUS,        TOKEN_KIND_MINUS,    TOKEN_KIND_BITWISE_NOT,
                                                TOKEN_KIND_LOGICAL_NOT, TOKEN_KIND_ASTERISK, TOKEN_KIND_DEREFERENCE};
 
@@ -303,7 +321,15 @@ Procedure_Call parse_procedure_parameters(Parser *parser)
             break;
 
         auto param        = parser_new_syntax_node<Syntax_Node_Procedure_Parameter>(parser);
+
         param->expression = parse_root_expression(parser);
+
+        if (!param->expression->child)
+        {
+            auto site = lexer_current_token(&parser->lexer);
+            parser_error(parser, site, "Expected expression");
+            break;
+        }
 
         parent->next      = param;
         parent            = param;
@@ -458,12 +484,6 @@ Syntax_Node_Expression *parse_root_expression(Parser *parser)
     else
     {
         expression->child = parse_expression(parser, 0);
-    }
-
-    if (!expression->child)
-    {
-        expression->child = parser_new_syntax_node<Syntax_Node>(parser);
-        parser_finish_syntax_node(parser, expression->child);
     }
 
     parser_finish_syntax_node(parser, expression);

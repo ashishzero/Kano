@@ -119,6 +119,14 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
     }
     break;
 
+    case SYNTAX_NODE_TYPE_CAST: {
+        auto node = (Syntax_Node_Type_Cast *)root;
+        fprintf(fp, "TypeCast()\n");
+        print_syntax(node->type, fp, child_indent, "Type");
+        print_syntax(node->expression, fp, child_indent, "Expression");
+    }
+    break;
+
     case SYNTAX_NODE_RETURN: {
         auto node = (Syntax_Node_Return *)root;
         fprintf(fp, "Return()\n");
@@ -396,7 +404,8 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
     case CODE_NODE_EXPRESSION: {
         auto node = (Code_Node_Expression *)root;
         fprintf(fp, "Expression()\n");
-        print_code(node->child, fp, child_indent);
+        if (node->child)
+            print_code(node->child, fp, child_indent);
     }
     break;
 

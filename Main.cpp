@@ -256,7 +256,7 @@ struct Code_Type_Resolver
     Bucket_Array<Binary_Operator, 8> binary_operators[_BINARY_OPERATOR_COUNT];
 };
 
-static Code_Node_Type_Cast *code_implicit_cast(Code_Node *node, Code_Type *to_type)
+static Code_Node_Type_Cast *code_type_cast(Code_Node *node, Code_Type *to_type, bool explicit_cast = false)
 {
     bool cast_success = false;
 
@@ -265,12 +265,22 @@ static Code_Node_Type_Cast *code_implicit_cast(Code_Node *node, Code_Type *to_ty
     case CODE_TYPE_INTEGER: {
         auto from_type = node->type->kind;
         cast_success   = (from_type == CODE_TYPE_BOOL);
+
+        if (!cast_success && explicit_cast)
+        {
+            cast_success = (from_type == CODE_TYPE_REAL);
+        }
     }
     break;
 
     case CODE_TYPE_REAL: {
         auto from_type = node->type->kind;
         cast_success   = (from_type == CODE_TYPE_INTEGER);
+
+        if (!cast_success && explicit_cast)
+        {
+            cast_success = (from_type == CODE_TYPE_BOOL);
+        }
     }
     break;
 
@@ -279,6 +289,13 @@ static Code_Node_Type_Cast *code_implicit_cast(Code_Node *node, Code_Type *to_ty
         cast_success   = (from_type == CODE_TYPE_INTEGER || from_type == CODE_TYPE_REAL || from_type == CODE_TYPE_REAL);
     }
     break;
+    }
+
+    if (!cast_success && explicit_cast)
+    {
+        auto from_type = node->type->kind;
+        cast_success = (to_type->kind == CODE_TYPE_POINTER && from_type == CODE_TYPE_POINTER) ||
+        (to_type->kind == CODE_TYPE_PROCEDURE && from_type == CODE_TYPE_PROCEDURE);
     }
 
     if (cast_success)
@@ -494,7 +511,7 @@ Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver *resolv
 
                 if (!code_type_are_same(proc->arguments[param_index], code_param->type))
                 {
-                    auto cast = code_implicit_cast(code_param->child, proc->arguments[param_index]);
+                    auto cast = code_type_cast(code_param->child, proc->arguments[param_index]);
 
                     if (cast)
                     {
@@ -571,12 +588,30 @@ Code_Node_Address *code_resolve_subscript(Code_Type_Resolver *resolver, Symbol_T
     return nullptr;
 }
 
+Code_Node_Type_Cast *code_resolve_type_cast(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Type_Cast *root)
+{
+    auto expression = code_resolve_root_expression(resolver, symbols, root->expression);
+    auto type = code_resolve_type(resolver, symbols, root->type);
+
+    auto cast = code_type_cast(expression, type, true);
+    
+    if (!cast)
+    {
+        Unimplemented();
+    }
+
+    return cast;
+}
+
 Code_Node *code_resolve_expression(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node *root)
 {
     switch (root->kind)
     {
     case SYNTAX_NODE_LITERAL:
         return code_resolve_literal(resolver, symbols, (Syntax_Node_Literal *)root);
+
+    case SYNTAX_NODE_TYPE_CAST:
+        return code_resolve_type_cast(resolver, symbols, (Syntax_Node_Type_Cast *)root);
 
     case SYNTAX_NODE_IDENTIFIER:
         return code_resolve_identifier(resolver, symbols, (Syntax_Node_Identifier *)root);
@@ -597,7 +632,7 @@ Code_Node *code_resolve_expression(Code_Type_Resolver *resolver, Symbol_Table *s
         return code_resolve_procedure_call(resolver, symbols, (Syntax_Node_Procedure_Call *)root);
 
     case SYNTAX_NODE_SUBSCRIPT:
-    return code_resolve_subscript(resolver, symbols, (Syntax_Node_Subscript *)root);
+        return code_resolve_subscript(resolver, symbols, (Syntax_Node_Subscript *)root);
 
         NoDefaultCase();
     }
@@ -625,7 +660,7 @@ Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolv
             }
             else
             {
-                auto cast = code_implicit_cast(child, op->output);
+                auto cast = code_type_cast(child, op->output);
                 if (cast)
                 {
                     child = cast;
@@ -836,7 +871,7 @@ Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Symbol_Tab
                 }
                 else
                 {
-                    auto cast_left = code_implicit_cast(left, op->parameters[0]);
+                    auto cast_left = code_type_cast(left, op->parameters[0]);
                     if (cast_left)
                     {
                         left       = cast_left;
@@ -850,7 +885,7 @@ Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Symbol_Tab
                 }
                 else
                 {
-                    auto cast_right = code_implicit_cast(right, op->parameters[1]);
+                    auto cast_right = code_type_cast(right, op->parameters[1]);
                     if (cast_right)
                     {
                         right       = cast_right;
@@ -910,7 +945,7 @@ Code_Node_Assignment *code_resolve_assignment(Code_Type_Resolver *resolver, Symb
             }
             else
             {
-                auto cast = code_implicit_cast(value->child, destination->type);
+                auto cast = code_type_cast(value->child, destination->type);
                 if (cast)
                 {
                     value->child = cast;
@@ -1226,7 +1261,7 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
             {
                 if (expression)
                 {
-                    auto cast = code_implicit_cast(expression->child, symbol->type);
+                    auto cast = code_type_cast(expression->child, symbol->type);
                     if (cast)
                     {
                         expression->child = cast;
@@ -1370,7 +1405,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
         auto boolean   = symbol_table_get(symbols, "bool");
         if (!code_type_are_same(condition->child->type, boolean->type))
         {
-            auto cast = code_implicit_cast(condition->child, boolean->type);
+            auto cast = code_type_cast(condition->child, boolean->type);
             if (cast)
             {
                 condition->child = cast;
@@ -1411,7 +1446,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
         auto boolean             = symbol_table_get(&for_code->symbols, "bool");
         if (!code_type_are_same(condition->child->type, boolean->type))
         {
-            auto cast = code_implicit_cast(condition->child, boolean->type);
+            auto cast = code_type_cast(condition->child, boolean->type);
             if (cast)
             {
                 condition->child = cast;
@@ -1442,7 +1477,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
         auto boolean    = symbol_table_get(symbols, "bool");
         if (!code_type_are_same(condition->child->type, boolean->type))
         {
-            auto cast = code_implicit_cast(condition->child, boolean->type);
+            auto cast = code_type_cast(condition->child, boolean->type);
             if (cast)
             {
                 condition->child = cast;
@@ -1480,7 +1515,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
         auto boolean   = symbol_table_get(do_symbols, "bool");
         if (!code_type_are_same(condition->child->type, boolean->type))
         {
-            auto cast = code_implicit_cast(condition->child, boolean->type);
+            auto cast = code_type_cast(condition->child, boolean->type);
             if (cast)
             {
                 condition->child = cast;
