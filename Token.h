@@ -81,6 +81,8 @@ enum Token_Kind
     TOKEN_KIND_STRUCT,
     TOKEN_KIND_RETURN,
     TOKEN_KIND_CAST,
+    TOKEN_KIND_VOID,
+    TOKEN_KIND_NULL,
 
     TOKEN_KIND_IDENTIFIER,
 
@@ -167,7 +169,7 @@ static inline String token_kind_string(Token_Kind kind)
                                "do",
 
                                "proc",        "struct",
-                               "return",      "cast",
+                               "return",      "cast", "void", "null",
 
                                "identifier",
 

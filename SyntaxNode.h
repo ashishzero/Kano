@@ -90,7 +90,8 @@ struct Literal
     {
         INTEGER,
         REAL,
-        BOOL
+        BOOL,
+        NULL_POINTER
     };
 
     union Value {
@@ -179,6 +180,7 @@ struct Syntax_Node_Type : public Syntax_Node
     enum Id
     {
         ERROR,
+        VOID,
         INT,
         FLOAT,
         BOOL,

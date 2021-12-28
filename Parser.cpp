@@ -249,6 +249,14 @@ Syntax_Node *parse_subexpression(Parser *parser, uint32_t prec)
         return node;
     }
 
+    if (parser_accept_token(parser, TOKEN_KIND_NULL))
+    {
+        auto node = parser_new_syntax_node<Syntax_Node_Literal>(parser);
+        node->value.kind = Literal::NULL_POINTER;
+        parser_finish_syntax_node(parser, node);
+        return node;
+    }
+
     if (parser_accept_token(parser, TOKEN_KIND_IDENTIFIER))
     {
         auto   node = parser_new_syntax_node<Syntax_Node_Identifier>(parser);
@@ -696,7 +704,18 @@ Syntax_Node_Type *parse_type(Parser *parser)
     else if (parser_accept_token(parser, TOKEN_KIND_ASTERISK))
     {
         type->id = Syntax_Node_Type::POINTER;
-        type->type       = parse_type(parser);
+
+        if (parser_accept_token(parser, TOKEN_KIND_VOID))
+        {
+            auto void_ptr = parser_new_syntax_node<Syntax_Node_Type>(parser);
+            void_ptr->id  = Syntax_Node_Type::VOID;
+            parser_finish_syntax_node(parser, void_ptr);
+            type->type    = void_ptr;
+        }
+        else
+        {
+            type->type       = parse_type(parser);
+        }
     }
     else if (parser_peek_token(parser, TOKEN_KIND_PROC))
     {

@@ -24,6 +24,8 @@ const main := proc() {
 	color[0].z = 0;
 	color[0].w = 1;
 
+	var color_p : *Vec4 = null;
+
 	var count := color.count;
 
 	var number0: float = factorial(5);

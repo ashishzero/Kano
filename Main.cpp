@@ -289,6 +289,16 @@ static Code_Node_Type_Cast *code_type_cast(Code_Node *node, Code_Type *to_type, 
         cast_success   = (from_type == CODE_TYPE_INTEGER || from_type == CODE_TYPE_REAL || from_type == CODE_TYPE_REAL);
     }
     break;
+
+    case CODE_TYPE_POINTER: {
+        auto from_type = node->type;
+        if (from_type->kind == CODE_TYPE_POINTER)
+        {
+            auto ptr = (Code_Type_Pointer *)from_type;
+            cast_success = ptr->base_type->kind == CODE_TYPE_NULL;
+        }
+    }
+    break;
     }
 
     if (!cast_success && explicit_cast)
@@ -405,7 +415,7 @@ Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Symbol_Tab
     switch (root->value.kind)
     {
     case Literal::INTEGER: {
-        auto symbol = symbol_table_get(symbols, "int");
+        auto symbol = symbol_table_get(&resolver->symbols, "int");
         Assert(symbol->flags & SYMBOL_BIT_TYPE);
 
         node->type               = symbol->type;
@@ -414,7 +424,7 @@ Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Symbol_Tab
     break;
 
     case Literal::REAL: {
-        auto symbol = symbol_table_get(symbols, "float");
+        auto symbol = symbol_table_get(&resolver->symbols, "float");
         Assert(symbol->flags & SYMBOL_BIT_TYPE);
 
         node->type            = symbol->type;
@@ -423,11 +433,19 @@ Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Symbol_Tab
     break;
 
     case Literal::BOOL: {
-        auto symbol = symbol_table_get(symbols, "bool");
+        auto symbol = symbol_table_get(&resolver->symbols, "bool");
         Assert(symbol->flags & SYMBOL_BIT_TYPE);
 
         node->type               = symbol->type;
         node->data.boolean.value = root->value.data.boolean;
+    }
+    break;
+
+    case Literal::NULL_POINTER: {
+        auto symbol = symbol_table_get(&resolver->symbols, "*void");
+        Assert(symbol->flags & SYMBOL_BIT_TYPE);
+
+        node->type = symbol->type;
     }
     break;
 
@@ -991,8 +1009,19 @@ Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols
     break;
 
     case Syntax_Node_Type::POINTER: {
-        auto type       = new Code_Type_Pointer;
-        type->base_type = code_resolve_type(resolver, symbols, (Syntax_Node_Type *)root->type);
+        auto type = new Code_Type_Pointer;
+
+        auto ptr = (Syntax_Node_Type *)root->type;
+        
+        if (ptr->id == Syntax_Node_Type::VOID)
+        {
+            type->base_type = new Code_Type;
+        }
+        else
+        {
+            type->base_type = code_resolve_type(resolver, symbols, ptr);
+        }
+
         return type;
     }
     break;
@@ -1024,7 +1053,7 @@ Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols
         auto node   = (Syntax_Node_Identifier *)root->type;
 
         auto symbol = symbol_table_get(symbols, node->name);
-        if (symbol)
+        if (symbol && symbol->flags & SYMBOL_BIT_TYPE)
         {
             Assert(symbol->type->kind == CODE_TYPE_STRUCT && symbol->address.kind == Symbol_Address::CODE);
             return symbol->type;
@@ -1185,6 +1214,8 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
 
             symbol->type                                     = struct_type;
             symbol->address                                  = symbol_address_code(block);
+            
+            symbol->flags |= SYMBOL_BIT_TYPE;
 
             uint32_t alignment                               = 0;
             auto     dst_member                              = struct_type->members;
@@ -1666,6 +1697,17 @@ int main()
         CompilerTypes[CODE_TYPE_INTEGER] = new Code_Type_Integer;
         CompilerTypes[CODE_TYPE_REAL]    = new Code_Type_Real;
         CompilerTypes[CODE_TYPE_BOOL]    = new Code_Type_Bool;
+    }
+
+    {
+        auto pointer_type = new Code_Type_Pointer;
+        pointer_type->base_type = new Code_Type;
+
+        Symbol sym;
+        sym.name  = "*void";
+        sym.type  = pointer_type;
+        sym.flags = SYMBOL_BIT_CONSTANT | SYMBOL_BIT_TYPE;
+        symbol_table_put(&resolver.symbols, sym);
     }
 
     {

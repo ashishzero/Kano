@@ -56,6 +56,9 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
         case Literal::BOOL:
             fprintf(fp, "Literal(bool:%s)\n", node->value.data.boolean ? "true" : "false");
             break;
+        case Literal::NULL_POINTER:
+            fprintf(fp, "Literal(null)\n");
+            break;
             NoDefaultCase();
         }
     }
@@ -107,7 +110,7 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
     case SYNTAX_NODE_TYPE: {
         auto        node      = (Syntax_Node_Type *)root;
 
-        const char *TypeIdNames[] = {"error" ,"int", "float", "bool", "pointer", "procedure", "identifier", "array-view", "static-array"};
+        const char *TypeIdNames[] = {"error" , "void", "int", "float", "bool", "pointer", "procedure", "identifier", "array-view", "static-array"};
         Assert(node->id < ArrayCount(TypeIdNames));
 
         fprintf(fp, "Type(%s)\n", TypeIdNames[node->id]);
@@ -352,6 +355,9 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
             break;
         case CODE_TYPE_BOOL:
             fprintf(fp, "Literal(bool:%s)\n", node->data.boolean.value ? "true" : "false");
+            break;
+        case CODE_TYPE_POINTER:
+            fprintf(fp, "Literal(*void:null)\n");
             break;
             NoDefaultCase();
         }
