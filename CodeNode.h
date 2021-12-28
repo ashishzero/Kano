@@ -134,6 +134,7 @@ struct Symbol_Address
         STACK  = 0,
         GLOBAL = 1,
         CODE,
+        CCALL,
     };
     Kind  kind;
     void *memory;

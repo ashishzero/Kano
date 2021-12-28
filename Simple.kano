@@ -31,7 +31,9 @@ const main := proc() {
 
 	var color_size := size_of(type_of(color));
 
-	var color_p : *Vec4 = null;
+	var color_p : *Vec4 = allocate(size_of(Vec4));
+
+	free(color_p);
 
 	var count := color.count;
 

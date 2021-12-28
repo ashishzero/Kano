@@ -294,8 +294,9 @@ static Code_Node_Type_Cast *code_type_cast(Code_Node *node, Code_Type *to_type, 
         auto from_type = node->type;
         if (from_type->kind == CODE_TYPE_POINTER)
         {
-            auto ptr = (Code_Type_Pointer *)from_type;
-            cast_success = ptr->base_type->kind == CODE_TYPE_NULL;
+            auto to_ptr   = (Code_Type_Pointer *)to_type;
+            auto from_ptr = (Code_Type_Pointer *)from_type;
+            cast_success  = to_ptr->base_type->kind == CODE_TYPE_NULL || from_ptr->base_type->kind == CODE_TYPE_NULL;
         }
     }
     break;
@@ -1871,6 +1872,38 @@ int main()
         resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_LESS_EQUAL].add(binary_operator_real);
         resolver.binary_operators[BINARY_OPERATOR_COMPARE_EQUAL].add(binary_operator_real);
         resolver.binary_operators[BINARY_OPERATOR_COMPARE_NOT_EQUAL].add(binary_operator_real);
+    }
+
+    {
+        auto type            = new Code_Type_Procedure;
+        type->argument_count = 1;
+        type->arguments      = new Code_Type *;
+        type->arguments[0]   = symbol_table_get(&resolver.symbols, "int")->type;
+        type->return_type    = symbol_table_get(&resolver.symbols, "*void")->type;
+
+        Symbol sym;
+        sym.name           = "allocate";
+        sym.type           = type;
+        sym.address.kind   = Symbol_Address::CCALL;
+        sym.address.memory = nullptr;
+
+        symbol_table_put(&resolver.symbols, sym);
+    }
+    
+    {
+        auto type            = new Code_Type_Procedure;
+        type->argument_count = 1;
+        type->arguments      = new Code_Type *;
+        type->arguments[0]   = symbol_table_get(&resolver.symbols, "*void")->type;
+        type->return_type    = nullptr;
+
+        Symbol sym;
+        sym.name           = "free";
+        sym.type           = type;
+        sym.address.kind   = Symbol_Address::CCALL;
+        sym.address.memory = nullptr;
+
+        symbol_table_put(&resolver.symbols, sym);
     }
 
     auto exprs = code_resolve_global_scope(&resolver, &resolver.symbols, node);

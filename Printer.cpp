@@ -381,7 +381,7 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
     case CODE_NODE_ADDRESS: {
         auto node = (Code_Node_Address *)root;
 
-        const char *SymbolAddressNames[] = {"stack", "global", "code"};
+        const char *SymbolAddressNames[] = {"stack", "global", "code", "ccall"};
         Assert(node->address.kind < ArrayCount(SymbolAddressNames));
 
         if (node->child)
