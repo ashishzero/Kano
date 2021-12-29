@@ -69,6 +69,7 @@ enum Token_Kind
     TOKEN_KIND_INT,
     TOKEN_KIND_FLOAT,
     TOKEN_KIND_BOOL,
+    TOKEN_KIND_DOUBLE_PERDIOD,
 
     TOKEN_KIND_IF,
     TOKEN_KIND_THEN,
@@ -164,7 +165,7 @@ static inline String token_kind_string(Token_Kind kind)
                                "true",        "false",
 
                                "int",         "float",
-                               "bool",
+                               "bool", "..",
 
                                "if",          "then",
                                "else",

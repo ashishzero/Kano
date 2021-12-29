@@ -415,7 +415,7 @@ Code_Node_Expression *    code_resolve_root_expression(Code_Type_Resolver *resol
 
 Code_Node_Assignment *    code_resolve_assignment(Code_Type_Resolver *resolver, Symbol_Table *symbols,
                                                   Syntax_Node_Assignment *root);
-Code_Type *           code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Type *root);
+Code_Type *           code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Type *root, int depth = 0);
 
 Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Symbol_Table *symbols,
                                                Syntax_Node_Declaration *root, Code_Type **out_type = nullptr);
@@ -544,7 +544,7 @@ Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver *resolv
     {
         auto proc = (Code_Type_Procedure *)procedure->type;
 
-        if (proc->argument_count == root->parameter_count)
+        if (proc->argument_count == root->parameter_count && !proc->is_variadic)
         {
             auto node             = new Code_Node_Procedure_Call;
             node->procedure       = procedure;
@@ -576,6 +576,81 @@ Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver *resolv
             }
 
             node->stack_top = resolver->virtual_address[Symbol_Address::STACK];
+
+            return node;
+        }
+        else if (proc->is_variadic && root->parameter_count >= proc->argument_count - 1)
+        {
+            auto node             = new Code_Node_Procedure_Call;
+            node->procedure       = procedure;
+            node->type            = proc->return_type;
+
+            node->parameter_count = proc->argument_count;
+            node->paraments       = new Code_Node_Expression *[node->parameter_count];
+
+            uint32_t param_index  = 0;
+            auto param = root->parameters;
+            for (; param_index < proc->argument_count - 1; param = param->next, ++param_index)
+            {
+                auto code_param = code_resolve_root_expression(resolver, symbols, param->expression);
+
+                if (!code_type_are_same(proc->arguments[param_index], code_param->type))
+                {
+                    auto cast = code_type_cast(code_param->child, proc->arguments[param_index]);
+
+                    if (cast)
+                    {
+                        code_param->child = cast;
+                    }
+                    else
+                    {
+                        Unimplemented();
+                    }
+                }
+
+                node->paraments[param_index] = code_param;
+            }
+
+            Code_Node *child = nullptr;
+
+            if (root->parameter_count >= proc->argument_count)
+            {
+                auto stack_top = resolver->virtual_address[Symbol_Address::STACK];
+
+                auto address     = new Code_Node_Address;
+                address->type    = symbol_table_get(&resolver->symbols, "*void")->type;
+                address->child   = nullptr;
+                address->address = symbol_address_offset(stack_top, Symbol_Address::STACK);
+                child            = address;
+
+                auto va_arg_count = root->parameter_count - proc->argument_count + 1;
+
+                node->variadic_count = va_arg_count;
+                node->variadics      = new Code_Node_Expression *[va_arg_count];
+
+                uint64_t index = 0;
+                for (; param; param = param->next, ++index)
+                {
+                    Assert(index < va_arg_count);
+                    auto code_param        = code_resolve_root_expression(resolver, symbols, param->expression);
+                    node->variadics[index] = code_param;                    
+                }
+            }
+            else
+            {
+                auto null_ptr                = new Code_Node_Literal;
+                null_ptr->type               = symbol_table_get(&resolver->symbols, "*void")->type;
+                null_ptr->data.pointer.value = 0;
+                child                        = null_ptr;
+            }
+
+            node->stack_top = resolver->virtual_address[Symbol_Address::STACK];
+
+            auto va_arg   = new Code_Node_Expression;
+            va_arg->type  = child->type;
+            va_arg->child = child;
+
+            node->paraments[node->parameter_count - 1] = va_arg;
 
             return node;
         }
@@ -1038,8 +1113,10 @@ Code_Node_Assignment *code_resolve_assignment(Code_Type_Resolver *resolver, Symb
     return nullptr;
 }
 
-Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Type *root)
+Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Type *root, int depth)
 {
+    depth += 1;
+
     switch (root->id)
     {
     case Syntax_Node_Type::INT: {
@@ -1057,6 +1134,19 @@ Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols
     case Syntax_Node_Type::BOOL: {
         auto symbol = symbol_table_get(&resolver->symbols, "bool");
         return symbol->type;
+    }
+    break;
+
+    case Syntax_Node_Type::VARIADIC_ARGUMENT: {
+        if (depth == 1)
+        {
+            auto symbol = symbol_table_get(&resolver->symbols, "*void");
+            return symbol->type;
+        }
+        else
+        {
+            Unimplemented();
+        }
     }
     break;
 
@@ -1086,10 +1176,21 @@ Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols
         type->argument_count = node->argument_count;
         type->arguments      = new Code_Type *[type->argument_count];
 
+        auto last_index      = type->argument_count - 1;
+
         uint64_t arg_index   = 0;
         for (auto arg = node->arguments_type; arg; arg = arg->next, ++arg_index)
         {
             type->arguments[arg_index] = code_resolve_type(resolver, symbols, arg->type);
+
+            if (arg_index == last_index)
+            {
+                type->is_variadic = (arg->type->id == Syntax_Node_Type::VARIADIC_ARGUMENT);
+            }
+            else if (arg->type->id == Syntax_Node_Type::VARIADIC_ARGUMENT)
+            {
+                Unimplemented();
+            }
         }
 
         if (node->return_type)
@@ -1233,12 +1334,24 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
 
             resolver->address_kind = Symbol_Address::STACK;
 
+            auto last_index = proc_type->argument_count - 1;
+
             uint64_t arg_index     = 0;
             for (auto arg = proc->arguments; arg; arg = arg->next, ++arg_index)
             {
                 auto assign = code_resolve_declaration(resolver, proc_symbols, arg->declaration,
                                                        &proc_type->arguments[arg_index]);
                 Assert(assign == nullptr);
+
+                auto decl_type = arg->declaration->type;
+                if (arg_index == last_index)
+                {
+                    proc_type->is_variadic = (decl_type->id == Syntax_Node_Type::VARIADIC_ARGUMENT);
+                }
+                else if (decl_type->id == Syntax_Node_Type::VARIADIC_ARGUMENT)
+                {
+                    Unimplemented();
+                }
             }
 
             type = proc_type;

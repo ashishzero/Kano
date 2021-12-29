@@ -318,7 +318,7 @@ Syntax_Node *parse_subexpression(Parser *parser, uint32_t prec)
     auto                    token           = lexer_current_token(&parser->lexer);
     auto                    op_prec         = UnaryOperatorPrecedence[token->kind];
 
-    if (op_prec <= prec)
+    if (op_prec < prec)
         return nullptr;
 
     for (uint32_t index = 0; index < ArrayCount(UnaryOpTokens); ++index)
@@ -354,6 +354,11 @@ Procedure_Call parse_procedure_parameters(Parser *parser)
     {
         if (parser_peek_token(parser, TOKEN_KIND_CLOSE_BRACKET))
             break;
+
+        if (count)
+        {
+            parser_expect_token(parser, TOKEN_KIND_COMMA);
+        }
 
         auto param        = parser_new_syntax_node<Syntax_Node_Procedure_Parameter>(parser);
 
@@ -519,6 +524,7 @@ Syntax_Node_Expression *parse_root_expression(Parser *parser)
     else
     {
         expression->child = parse_expression(parser, 0);
+        Assert(expression->child);
     }
 
     parser_finish_syntax_node(parser, expression);
@@ -732,6 +738,11 @@ Syntax_Node_Type *parse_type(Parser *parser)
     else if (parser_accept_token(parser, TOKEN_KIND_BOOL))
     {
         type->id = Syntax_Node_Type::BOOL;
+        type->location = parser->location;
+    }
+    else if (parser_accept_token(parser, TOKEN_KIND_DOUBLE_PERDIOD))
+    {
+        type->id = Syntax_Node_Type::VARIADIC_ARGUMENT;
         type->location = parser->location;
     }
     else if (parser_accept_token(parser, TOKEN_KIND_ASTERISK))

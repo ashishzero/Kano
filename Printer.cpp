@@ -113,7 +113,7 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
     case SYNTAX_NODE_TYPE: {
         auto        node      = (Syntax_Node_Type *)root;
 
-        const char *TypeIdNames[] = {"error" , "void", "int", "float", "bool", "pointer", "procedure", "identifier", "type_of", "array-view", "static-array"};
+        const char *TypeIdNames[] = {"error" , "void", "int", "float", "bool", "variadic-argument", "pointer", "procedure", "identifier", "type_of", "array-view", "static-array"};
         Assert(node->id < ArrayCount(TypeIdNames));
 
         fprintf(fp, "Type(%s)\n", TypeIdNames[node->id]);

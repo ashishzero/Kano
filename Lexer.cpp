@@ -304,6 +304,12 @@ void lexer_next(Lexer *lexer)
             lexer_make_token(lexer, TOKEN_KIND_DASH_ARROW);
             return;
         }
+        else if (a == '.' && b == '.')
+        {
+            lexer->cursor += 2;
+            lexer_make_token(lexer, TOKEN_KIND_DOUBLE_PERDIOD);
+            return;
+        }
         else if (b == '=')
         {
             switch (a)

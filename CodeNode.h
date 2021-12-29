@@ -76,6 +76,7 @@ struct Code_Type_Procedure : public Code_Type
 
     Code_Type **arguments               = nullptr;
     uint64_t    argument_count          = 0;
+    bool        is_variadic             = false;
 
     Code_Type * return_type    = nullptr;
 };
@@ -223,7 +224,6 @@ struct Code_Node
     Code_Node_Kind kind  = CODE_NODE_NULL;
     uint32_t       flags = 0;
     Code_Type *    type  = nullptr;
-    bool           implicit = false;
 };
 
 struct Code_Value_Integer
@@ -292,7 +292,8 @@ struct Code_Node_Type_Cast : public Code_Node
         kind = CODE_NODE_TYPE_CAST;
     }
 
-    Code_Node *child = nullptr;
+    Code_Node *child    = nullptr;
+    bool       implicit = false;
 };
 
 enum Unary_Operator_Kind
@@ -431,6 +432,8 @@ struct Code_Node_Procedure_Call : public Code_Node
     Code_Node *            procedure       = nullptr;
     uint64_t               parameter_count = 0;
     Code_Node_Expression **paraments       = nullptr;
+    uint64_t               variadic_count  = 0;
+    Code_Node_Expression **variadics       = nullptr;
 
     uint64_t               stack_top       = 0;
 };

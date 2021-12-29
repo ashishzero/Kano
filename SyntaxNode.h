@@ -192,6 +192,7 @@ struct Syntax_Node_Type : public Syntax_Node
         INT,
         FLOAT,
         BOOL,
+        VARIADIC_ARGUMENT,
         POINTER,
         PROCEDURE,
         IDENTIFIER,
