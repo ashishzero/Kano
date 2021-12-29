@@ -32,6 +32,36 @@ void print_values(Find_Type_Value result)
     break;
     }
 }
+
+Find_Type_Value evaluate_procedure(Code_Node_Procedure_Call *root,Interp* interp)
+{
+    for (int i = 0; i < root->parameter_count; i++)
+    {
+        auto var = evaluate_node_expression((Code_Node_Expression *)root->paraments[i], interp);
+        //auto node = (Code_Type_Procedure *)root->paraments[i];
+        //switch (var.type)
+        //{
+        //case CODE_TYPE_BOOL: {
+        //   // *node->arguments[i] = var.value.boolean.value;
+        //}
+        //break;
+        //case CODE_TYPE_INTEGER:
+        //{
+        //  //  *node->arguments[i] = (int32_t)var.value.integer.value;
+        //}break;
+        //case CODE_TYPE_REAL: {
+        //   // *node->arguments[i] = var.value.real.value;
+        //}
+        //break;
+        //
+        //}
+
+    }
+    auto result = evaluate_expression((Code_Node *)root->procedure, interp);
+    return result;
+
+
+}
 void evaluate_do_block(Code_Node_Do *root, Interp *interp)
 {
     Find_Type_Value cond;
@@ -561,6 +591,22 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp)
             return type_value;
         }
         break;
+        case CODE_TYPE_PROCEDURE: {
+                switch (node->address.kind)
+                {
+                case Symbol_Address::CODE: {
+                    evaluate_node_block((Code_Node_Block *)node->address.memory, interp);
+                }
+                break;
+                case Symbol_Address::GLOBAL: {
+                }
+                break;
+                case Symbol_Address::STACK: {
+                }
+                break;
+            }
+        }
+        break;
             NoDefaultCase();
         }
     }
@@ -600,6 +646,15 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp)
     break;
     case CODE_NODE_IF: {
         return evaluate_expression((Code_Node *)root, interp);
+    }
+    break;
+    case CODE_NODE_PROCEDURE_CALL: {
+        return evaluate_procedure((Code_Node_Procedure_Call *)root, interp);
+    }
+    break;
+    case CODE_NODE_EXPRESSION: {
+        auto result = evaluate_node_expression((Code_Node_Expression *)root, interp);
+        print_values(result);
     }
     break;
 
