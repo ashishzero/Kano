@@ -223,6 +223,7 @@ struct Code_Node
     Code_Node_Kind kind  = CODE_NODE_NULL;
     uint32_t       flags = 0;
     Code_Type *    type  = nullptr;
+    bool           implicit = false;
 };
 
 struct Code_Value_Integer

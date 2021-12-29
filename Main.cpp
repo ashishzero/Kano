@@ -259,6 +259,7 @@ struct Code_Type_Resolver
 static Code_Node_Type_Cast *code_type_cast(Code_Node *node, Code_Type *to_type, bool explicit_cast = false)
 {
     bool cast_success = false;
+    bool implicity_casted = true;
 
     switch (to_type->kind)
     {
@@ -304,6 +305,7 @@ static Code_Node_Type_Cast *code_type_cast(Code_Node *node, Code_Type *to_type, 
 
     if (!cast_success && explicit_cast)
     {
+        implicity_casted = false;
         auto from_type = node->type->kind;
         cast_success = (to_type->kind == CODE_TYPE_POINTER && from_type == CODE_TYPE_POINTER) ||
         (to_type->kind == CODE_TYPE_PROCEDURE && from_type == CODE_TYPE_PROCEDURE);
@@ -311,16 +313,17 @@ static Code_Node_Type_Cast *code_type_cast(Code_Node *node, Code_Type *to_type, 
 
     if (cast_success)
     {
-        auto cast   = new Code_Node_Type_Cast;
-        cast->child = node;
-        cast->type  = to_type;
+        auto cast      = new Code_Node_Type_Cast;
+        cast->child    = node;
+        cast->type     = to_type;
+        cast->implicit = implicity_casted;
         return cast;
     }
 
     return nullptr;
 }
 
-static bool code_type_are_same(Code_Type *a, Code_Type *b)
+static bool code_type_are_same(Code_Type *a, Code_Type *b, bool recurse_pointer_type = true)
 {
     if (a == b)
         return true;
@@ -330,9 +333,13 @@ static bool code_type_are_same(Code_Type *a, Code_Type *b)
         switch (a->kind)
         {
         case CODE_TYPE_POINTER: {
-            auto a_ptr = (Code_Type_Pointer *)a;
-            auto b_ptr = (Code_Type_Pointer *)b;
-            return code_type_are_same(a_ptr->base_type, b_ptr->base_type);
+            if (recurse_pointer_type)
+            {
+                auto a_ptr = (Code_Type_Pointer *)a;
+                auto b_ptr = (Code_Type_Pointer *)b;
+                return code_type_are_same(a_ptr->base_type, b_ptr->base_type, recurse_pointer_type);
+            }
+            return true;
         }
         break;
 
@@ -342,7 +349,7 @@ static bool code_type_are_same(Code_Type *a, Code_Type *b)
 
             if (a_proc->return_type && b_proc->return_type)
             {
-                if (!code_type_are_same(a_proc->return_type, b_proc->return_type))
+                if (!code_type_are_same(a_proc->return_type, b_proc->return_type, recurse_pointer_type))
                     return false;
             }
             else if (!a_proc->return_type && b_proc->return_type)
@@ -359,7 +366,7 @@ static bool code_type_are_same(Code_Type *a, Code_Type *b)
 
             for (uint64_t arg_index = 0; arg_index < arg_count; ++arg_index)
             {
-                if (!code_type_are_same(a_args[arg_index], b_args[arg_index]))
+                if (!code_type_are_same(a_args[arg_index], b_args[arg_index], recurse_pointer_type))
                     return false;
             }
 
@@ -744,17 +751,24 @@ Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolv
 
     else if (op_kind == UNARY_OPERATOR_DEREFERENCE && (child->type->kind == CODE_TYPE_POINTER))
     {
-        auto node     = new Code_Node_Unary_Operator;
-        auto type     = ((Code_Type_Pointer *)child->type)->base_type;
+        auto pointer_type = (Code_Type_Pointer *)child->type;
 
-        node->type    = type;
-        node->child   = child;
-        node->op_kind = op_kind;
+        if (pointer_type->base_type->kind != CODE_TYPE_NULL)
+        {
+            auto node     = new Code_Node_Unary_Operator;
+            auto type     = ((Code_Type_Pointer *)child->type)->base_type;
 
-        if (child->flags & SYMBOL_BIT_CONST_EXPR)
-            node->flags |= SYMBOL_BIT_CONST_EXPR;
+            node->type    = type;
+            node->child   = child;
+            node->op_kind = op_kind;
 
-        return node;
+            if (child->flags & SYMBOL_BIT_CONST_EXPR)
+                node->flags |= SYMBOL_BIT_CONST_EXPR;
+
+            return node;
+        }
+
+        Unimplemented();
     }
 
     Unimplemented();
@@ -907,7 +921,7 @@ Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Symbol_Tab
                 bool left_match  = false;
                 bool right_match = false;
 
-                if (code_type_are_same(op->parameters[0], left->type))
+                if (code_type_are_same(op->parameters[0], left->type, false))
                 {
                     left_match = true;
                 }
@@ -939,7 +953,7 @@ Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Symbol_Tab
                 {
                     auto node     = new Code_Node_Binary_Operator;
 
-                    node->type    = op->output;
+                    node->type    = op->parameters[0]->kind == CODE_TYPE_POINTER ? left->type : op->output;
                     node->left    = left;
                     node->right   = right;
                     node->flags   = left->flags & right->flags;
