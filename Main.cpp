@@ -256,21 +256,34 @@ struct Code_Type_Resolver
     Bucket_Array<Binary_Operator, 8> binary_operators[_BINARY_OPERATOR_COUNT];
 };
 
-static Code_Node_Type_Cast *code_implicit_cast(Code_Node *node, Code_Type *to_type)
+static bool code_type_are_same(Code_Type *a, Code_Type *b, bool recurse_pointer_type = true);
+
+static Code_Node_Type_Cast *code_type_cast(Code_Node *node, Code_Type *to_type, bool explicit_cast = false)
 {
     bool cast_success = false;
+    bool implicity_casted = true;
 
     switch (to_type->kind)
     {
     case CODE_TYPE_INTEGER: {
         auto from_type = node->type->kind;
         cast_success   = (from_type == CODE_TYPE_BOOL);
+
+        if (!cast_success && explicit_cast)
+        {
+            cast_success = (from_type == CODE_TYPE_REAL);
+        }
     }
     break;
 
     case CODE_TYPE_REAL: {
         auto from_type = node->type->kind;
         cast_success   = (from_type == CODE_TYPE_INTEGER);
+
+        if (!cast_success && explicit_cast)
+        {
+            cast_success = (from_type == CODE_TYPE_BOOL);
+        }
     }
     break;
 
@@ -279,20 +292,52 @@ static Code_Node_Type_Cast *code_implicit_cast(Code_Node *node, Code_Type *to_ty
         cast_success   = (from_type == CODE_TYPE_INTEGER || from_type == CODE_TYPE_REAL || from_type == CODE_TYPE_REAL);
     }
     break;
+
+    case CODE_TYPE_POINTER: {
+        auto from_type = node->type;
+        if (from_type->kind == CODE_TYPE_POINTER)
+        {
+            auto to_ptr   = (Code_Type_Pointer *)to_type;
+            auto from_ptr = (Code_Type_Pointer *)from_type;
+            cast_success  = to_ptr->base_type->kind == CODE_TYPE_NULL || from_ptr->base_type->kind == CODE_TYPE_NULL;
+        }
+    }
+    break;
+
+    case CODE_TYPE_ARRAY_VIEW: {
+        auto from_type = node->type;
+        if (from_type->kind == CODE_TYPE_STATIC_ARRAY)
+        {
+            auto to_view  = (Code_Type_Array_View *)to_type;
+            auto from_arr = (Code_Type_Static_Array *)from_type;
+            cast_success = code_type_are_same(to_view->element_type, from_arr->element_type);
+        }
+    }
+    break;
+    }
+
+    if (!cast_success && explicit_cast)
+    {
+        implicity_casted = false;
+        auto from_type = node->type->kind;
+        cast_success = (to_type->kind == CODE_TYPE_POINTER && from_type == CODE_TYPE_POINTER) ||
+        (to_type->kind == CODE_TYPE_PROCEDURE && from_type == CODE_TYPE_PROCEDURE) ||
+        (to_type->kind == CODE_TYPE_ARRAY_VIEW && from_type == CODE_TYPE_STATIC_ARRAY);
     }
 
     if (cast_success)
     {
-        auto cast   = new Code_Node_Type_Cast;
-        cast->child = node;
-        cast->type  = to_type;
+        auto cast      = new Code_Node_Type_Cast;
+        cast->child    = node;
+        cast->type     = to_type;
+        cast->implicit = implicity_casted;
         return cast;
     }
 
     return nullptr;
 }
 
-static bool code_type_are_same(Code_Type *a, Code_Type *b)
+static bool code_type_are_same(Code_Type *a, Code_Type *b, bool recurse_pointer_type)
 {
     if (a == b)
         return true;
@@ -302,9 +347,13 @@ static bool code_type_are_same(Code_Type *a, Code_Type *b)
         switch (a->kind)
         {
         case CODE_TYPE_POINTER: {
-            auto a_ptr = (Code_Type_Pointer *)a;
-            auto b_ptr = (Code_Type_Pointer *)b;
-            return code_type_are_same(a_ptr->base_type, b_ptr->base_type);
+            if (recurse_pointer_type)
+            {
+                auto a_ptr = (Code_Type_Pointer *)a;
+                auto b_ptr = (Code_Type_Pointer *)b;
+                return code_type_are_same(a_ptr->base_type, b_ptr->base_type, recurse_pointer_type);
+            }
+            return true;
         }
         break;
 
@@ -314,7 +363,7 @@ static bool code_type_are_same(Code_Type *a, Code_Type *b)
 
             if (a_proc->return_type && b_proc->return_type)
             {
-                if (!code_type_are_same(a_proc->return_type, b_proc->return_type))
+                if (!code_type_are_same(a_proc->return_type, b_proc->return_type, recurse_pointer_type))
                     return false;
             }
             else if (!a_proc->return_type && b_proc->return_type)
@@ -331,7 +380,7 @@ static bool code_type_are_same(Code_Type *a, Code_Type *b)
 
             for (uint64_t arg_index = 0; arg_index < arg_count; ++arg_index)
             {
-                if (!code_type_are_same(a_args[arg_index], b_args[arg_index]))
+                if (!code_type_are_same(a_args[arg_index], b_args[arg_index], recurse_pointer_type))
                     return false;
             }
 
@@ -357,15 +406,15 @@ Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Symbol_Tab
 Code_Node_Address *code_resolve_identifier(Code_Type_Resolver *resolver, Symbol_Table *symbols,
                                            Syntax_Node_Identifier *root);
 Code_Node *        code_resolve_expression(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node *root);
-Code_Node_Unary_Operator * code_resolve_unary_operator(Code_Type_Resolver *resolver, Symbol_Table *symbols,
-                                                       Syntax_Node_Unary_Operator *root);
-Code_Node_Binary_Operator *code_resolve_binary_operator(Code_Type_Resolver *resolver, Symbol_Table *symbols,
-                                                        Syntax_Node_Binary_Operator *root);
-Code_Node_Expression *     code_resolve_root_expression(Code_Type_Resolver *resolver, Symbol_Table *symbols,
-                                                        Syntax_Node_Expression *root);
+Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolver, Symbol_Table *symbols,
+                                                      Syntax_Node_Unary_Operator *root);
+Code_Node *               code_resolve_binary_operator(Code_Type_Resolver *resolver, Symbol_Table *symbols,
+                                                       Syntax_Node_Binary_Operator *root);
+Code_Node_Expression *    code_resolve_root_expression(Code_Type_Resolver *resolver, Symbol_Table *symbols,
+                                                       Syntax_Node_Expression *root);
 
-Code_Node_Assignment *     code_resolve_assignment(Code_Type_Resolver *resolver, Symbol_Table *symbols,
-                                                   Syntax_Node_Assignment *root);
+Code_Node_Assignment *    code_resolve_assignment(Code_Type_Resolver *resolver, Symbol_Table *symbols,
+                                                  Syntax_Node_Assignment *root);
 Code_Type *           code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Type *root);
 
 Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Symbol_Table *symbols,
@@ -388,7 +437,7 @@ Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Symbol_Tab
     switch (root->value.kind)
     {
     case Literal::INTEGER: {
-        auto symbol = symbol_table_get(symbols, "int");
+        auto symbol = symbol_table_get(&resolver->symbols, "int");
         Assert(symbol->flags & SYMBOL_BIT_TYPE);
 
         node->type               = symbol->type;
@@ -397,7 +446,7 @@ Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Symbol_Tab
     break;
 
     case Literal::REAL: {
-        auto symbol = symbol_table_get(symbols, "float");
+        auto symbol = symbol_table_get(&resolver->symbols, "float");
         Assert(symbol->flags & SYMBOL_BIT_TYPE);
 
         node->type            = symbol->type;
@@ -405,12 +454,29 @@ Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Symbol_Tab
     }
     break;
 
+    case Literal::STRING: {
+        auto symbol = symbol_table_get(&resolver->symbols, "string");
+        Assert(symbol->flags & SYMBOL_BIT_TYPE);
+
+        node->type = symbol->type;
+        node->data.string.value = root->value.data.string;
+    }
+    break;
+
     case Literal::BOOL: {
-        auto symbol = symbol_table_get(symbols, "bool");
+        auto symbol = symbol_table_get(&resolver->symbols, "bool");
         Assert(symbol->flags & SYMBOL_BIT_TYPE);
 
         node->type               = symbol->type;
         node->data.boolean.value = root->value.data.boolean;
+    }
+    break;
+
+    case Literal::NULL_POINTER: {
+        auto symbol = symbol_table_get(&resolver->symbols, "*void");
+        Assert(symbol->flags & SYMBOL_BIT_TYPE);
+
+        node->type = symbol->type;
     }
     break;
 
@@ -488,13 +554,13 @@ Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver *resolv
             node->paraments       = new Code_Node_Expression *[node->parameter_count];
 
             uint32_t param_index  = 0;
-            for (auto param = root->parameters; param; param = param->next, ++param_index)
+            for (auto param = root->parameters; param ; param = param->next, ++param_index)
             {
                 auto code_param = code_resolve_root_expression(resolver, symbols, param->expression);
 
                 if (!code_type_are_same(proc->arguments[param_index], code_param->type))
                 {
-                    auto cast = code_implicit_cast(code_param->child, proc->arguments[param_index]);
+                    auto cast = code_type_cast(code_param->child, proc->arguments[param_index]);
 
                     if (cast)
                     {
@@ -524,12 +590,88 @@ Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver *resolv
     return nullptr;
 }
 
+Code_Node_Address *code_resolve_subscript(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Subscript *root)
+{
+    auto expression = code_resolve_root_expression(resolver, symbols, root->expression);
+    auto subscript  = code_resolve_root_expression(resolver, symbols, root->subscript);
+
+    if (expression->type->kind == CODE_TYPE_ARRAY_VIEW ||
+        expression->type->kind == CODE_TYPE_STATIC_ARRAY)
+    {
+        if (subscript->type->kind == CODE_TYPE_INTEGER)
+        {
+            auto node        = new Code_Node_Subscript;
+            node->expression = expression;
+            node->subscript  = subscript;
+
+            node->flags = expression->flags | SYMBOL_BIT_LVALUE;
+
+            if (expression->type->kind == CODE_TYPE_ARRAY_VIEW)
+            {
+                auto type = (Code_Type_Array_View *)expression->type;
+                node->type = type->element_type;
+            }
+            else if (expression->type->kind == CODE_TYPE_STATIC_ARRAY)
+            {
+                auto type = (Code_Type_Static_Array *)expression->type;
+                node->type = type->element_type;
+            }
+
+            auto address   = new Code_Node_Address;
+            address->type  = node->type;
+            address->flags = node->flags;
+            address->child = node;
+
+            return address; 
+        }
+        else
+        {
+            Unimplemented();
+        }
+    }
+    else
+    {
+        Unimplemented();
+    }
+
+    return nullptr;
+}
+
+Code_Node_Type_Cast *code_resolve_type_cast(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Type_Cast *root)
+{
+    auto expression = code_resolve_root_expression(resolver, symbols, root->expression);
+    auto type = code_resolve_type(resolver, symbols, root->type);
+
+    auto cast = code_type_cast(expression, type, true);
+    
+    if (!cast)
+    {
+        Unimplemented();
+    }
+
+    return cast;
+}
+
+Code_Node_Literal *code_resolve_size_of(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Size_Of *root)
+{
+    auto type  = code_resolve_type(resolver, symbols, root->type);
+
+    auto node                = new Code_Node_Literal;
+    node->type               = symbol_table_get(&resolver->symbols, "int")->type;
+    node->data.integer.value = type->runtime_size;
+
+    return node;
+}
+
 Code_Node *code_resolve_expression(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node *root)
 {
     switch (root->kind)
     {
     case SYNTAX_NODE_LITERAL:
         return code_resolve_literal(resolver, symbols, (Syntax_Node_Literal *)root);
+
+    case SYNTAX_NODE_TYPE_CAST:
+        return code_resolve_type_cast(resolver, symbols, (Syntax_Node_Type_Cast *)root);
 
     case SYNTAX_NODE_IDENTIFIER:
         return code_resolve_identifier(resolver, symbols, (Syntax_Node_Identifier *)root);
@@ -548,6 +690,12 @@ Code_Node *code_resolve_expression(Code_Type_Resolver *resolver, Symbol_Table *s
 
     case SYNTAX_NODE_PROCEDURE_CALL:
         return code_resolve_procedure_call(resolver, symbols, (Syntax_Node_Procedure_Call *)root);
+
+    case SYNTAX_NODE_SUBSCRIPT:
+        return code_resolve_subscript(resolver, symbols, (Syntax_Node_Subscript *)root);
+
+    case SYNTAX_NODE_SIZE_OF:
+        return code_resolve_size_of(resolver, symbols, (Syntax_Node_Size_Of *)root);
 
         NoDefaultCase();
     }
@@ -575,7 +723,7 @@ Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolv
             }
             else
             {
-                auto cast = code_implicit_cast(child, op->output);
+                auto cast = code_type_cast(child, op->output);
                 if (cast)
                 {
                     child = cast;
@@ -617,17 +765,24 @@ Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolv
 
     else if (op_kind == UNARY_OPERATOR_DEREFERENCE && (child->type->kind == CODE_TYPE_POINTER))
     {
-        auto node     = new Code_Node_Unary_Operator;
-        auto type     = ((Code_Type_Pointer *)child->type)->base_type;
+        auto pointer_type = (Code_Type_Pointer *)child->type;
 
-        node->type    = type;
-        node->child   = child;
-        node->op_kind = op_kind;
+        if (pointer_type->base_type->kind != CODE_TYPE_NULL)
+        {
+            auto node     = new Code_Node_Unary_Operator;
+            auto type     = ((Code_Type_Pointer *)child->type)->base_type;
 
-        if (child->flags & SYMBOL_BIT_CONST_EXPR)
-            node->flags |= SYMBOL_BIT_CONST_EXPR;
+            node->type    = type;
+            node->child   = child;
+            node->op_kind = op_kind;
 
-        return node;
+            if (child->flags & SYMBOL_BIT_CONST_EXPR)
+                node->flags |= SYMBOL_BIT_CONST_EXPR;
+
+            return node;
+        }
+
+        Unimplemented();
     }
 
     Unimplemented();
@@ -635,64 +790,191 @@ Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver *resolv
     return nullptr;
 }
 
-Code_Node_Binary_Operator *code_resolve_binary_operator(Code_Type_Resolver *resolver, Symbol_Table *symbols,
-                                                        Syntax_Node_Binary_Operator *root)
+Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Symbol_Table *symbols,
+                                        Syntax_Node_Binary_Operator *root)
 {
-    auto  left      = code_resolve_expression(resolver, symbols, root->left);
-    auto  right     = code_resolve_expression(resolver, symbols, root->right);
+    auto left = code_resolve_expression(resolver, symbols, root->left);
 
-    auto  op_kind   = token_to_binary_operator(root->op);
-
-    auto &operators = resolver->binary_operators[op_kind];
-
-    ForBucketArray(bucket, operators)
+    if (root->op == TOKEN_KIND_PERIOD)
     {
-        ForBucket(index, bucket, operators)
+        if (left->kind != CODE_NODE_ADDRESS)
         {
-            auto op          = &bucket->data[index];
+            Unimplemented();
+        }
 
-            bool left_match  = false;
-            bool right_match = false;
+        if (root->right->kind != SYNTAX_NODE_IDENTIFIER)
+        {
+            Unimplemented();
+        }
 
-            if (code_type_are_same(op->parameters[0], left->type))
+        bool valid_type = false;
+        auto base_type = left->type;
+
+        for (int depth = 0; depth < 2; ++depth)
+        {
+            if (base_type->kind == CODE_TYPE_STRUCT || 
+            base_type->kind == CODE_TYPE_ARRAY_VIEW || 
+            base_type->kind == CODE_TYPE_STATIC_ARRAY)
             {
-                left_match = true;
+                valid_type = true;
+                break;
+            }
+            else if (base_type->kind == CODE_TYPE_POINTER)
+            {
+                auto ptr  = (Code_Type_Pointer *)base_type;
+                base_type = ptr->base_type;
             }
             else
             {
-                auto cast_left = code_implicit_cast(left, op->parameters[0]);
-                if (cast_left)
+                Unimplemented();
+            }
+        }
+
+        if (valid_type)
+        {
+            auto iden   = (Syntax_Node_Identifier *)root->right;
+
+            switch (base_type->kind)
+            {
+                case CODE_TYPE_STRUCT: {
+                    auto type = (Code_Type_Struct *)base_type;
+                    auto symbol = symbol_table_get(symbols, type->name);
+                    Assert(symbol && symbol->type->kind == CODE_TYPE_STRUCT && symbol->address.kind == Symbol_Address::CODE);
+
+                    auto block = (Code_Node_Block *)symbol->address.memory;
+
+                    auto member = symbol_table_get(&block->symbols, iden->name, false);
+
+                    if (member)
+                    {
+                        Assert(member->address.kind == Symbol_Address::STACK);
+
+                        auto code_node     = (Code_Node_Address *)left;
+                        code_node->type    = member->type;
+                        code_node->offset += (uint64_t)member->address.memory;
+
+                        return code_node;
+                    }
+                    else
+                    {
+                        Unimplemented();
+                    }
+                }
+                break;
+
+                case CODE_TYPE_STATIC_ARRAY: {
+                    auto code_node = (Code_Node_Address *)left;
+
+                    if (iden->name == "data")
+                    {
+                        auto type           = (Code_Type_Static_Array *)base_type;                  
+                        auto ptr_type       = new Code_Type_Pointer;
+                        ptr_type->base_type = type->element_type;
+                        code_node->type     = ptr_type;
+                        return code_node;
+                    }
+                    else if (iden->name == "count")
+                    {
+                        auto type                = (Code_Type_Static_Array *)base_type;
+                        auto node                = new Code_Node_Literal;
+                        node->type               = symbol_table_get(&resolver->symbols, "int")->type;
+                        node->data.integer.value = type->element_count;
+                        return node;
+                    }
+                    else
+                    {
+                        Unimplemented();
+                    }
+                }
+                break;
+
+                case CODE_TYPE_ARRAY_VIEW: {
+                    auto code_node = (Code_Node_Address *)left;
+
+                    if (iden->name == "count")
+                    {
+                        code_node->type = symbol_table_get(&resolver->symbols, "int")->type;
+                        code_node->offset += 0;
+                    }
+                    else if (iden->name == "data")
+                    {
+                        auto type       = (Code_Type_Array_View *)base_type;
+                        code_node->type = type->element_type;
+                        code_node->offset += sizeof(int64_t);
+                    }
+                    else
+                    {
+                        Unimplemented();
+                    }
+
+                    return code_node;
+                }
+                break;
+            }
+        }
+        else
+        {
+            Unimplemented();
+        }
+    }
+
+    else
+    {
+        auto  right     = code_resolve_expression(resolver, symbols, root->right);
+
+        auto  op_kind   = token_to_binary_operator(root->op);
+
+        auto &operators = resolver->binary_operators[op_kind];
+
+        ForBucketArray(bucket, operators)
+        {
+            ForBucket(index, bucket, operators)
+            {
+                auto op          = &bucket->data[index];
+
+                bool left_match  = false;
+                bool right_match = false;
+
+                if (code_type_are_same(op->parameters[0], left->type, false))
                 {
-                    left       = cast_left;
                     left_match = true;
                 }
-            }
-
-            if (code_type_are_same(op->parameters[1], right->type))
-            {
-                right_match = true;
-            }
-            else
-            {
-                auto cast_right = code_implicit_cast(right, op->parameters[1]);
-                if (cast_right)
+                else
                 {
-                    right       = cast_right;
+                    auto cast_left = code_type_cast(left, op->parameters[0]);
+                    if (cast_left)
+                    {
+                        left       = cast_left;
+                        left_match = true;
+                    }
+                }
+
+                if (code_type_are_same(op->parameters[1], right->type))
+                {
                     right_match = true;
                 }
-            }
+                else
+                {
+                    auto cast_right = code_type_cast(right, op->parameters[1]);
+                    if (cast_right)
+                    {
+                        right       = cast_right;
+                        right_match = true;
+                    }
+                }
 
-            if (left_match && right_match && (!op->compound || (op->compound && (left->flags & SYMBOL_BIT_LVALUE))))
-            {
-                auto node     = new Code_Node_Binary_Operator;
+                if (left_match && right_match && (!op->compound || (op->compound && (left->flags & SYMBOL_BIT_LVALUE))))
+                {
+                    auto node     = new Code_Node_Binary_Operator;
 
-                node->type    = op->output;
-                node->left    = left;
-                node->right   = right;
-                node->flags   = left->flags & right->flags;
-                node->op_kind = op_kind;
+                    node->type    = op->parameters[0]->kind == CODE_TYPE_POINTER ? left->type : op->output;
+                    node->left    = left;
+                    node->right   = right;
+                    node->flags   = left->flags & right->flags;
+                    node->op_kind = op_kind;
 
-                return node;
+                    return node;
+                }
             }
         }
     }
@@ -733,7 +1015,7 @@ Code_Node_Assignment *code_resolve_assignment(Code_Type_Resolver *resolver, Symb
             }
             else
             {
-                auto cast = code_implicit_cast(value->child, destination->type);
+                auto cast = code_type_cast(value->child, destination->type);
                 if (cast)
                 {
                     value->child = cast;
@@ -758,36 +1040,45 @@ Code_Node_Assignment *code_resolve_assignment(Code_Type_Resolver *resolver, Symb
 
 Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Type *root)
 {
-    Code_Type *type = new Code_Type;
-
-    switch (root->token_type)
+    switch (root->id)
     {
-    case TOKEN_KIND_INT: {
-        auto symbol = symbol_table_get(symbols, "int");
+    case Syntax_Node_Type::INT: {
+        auto symbol = symbol_table_get(&resolver->symbols, "int");
         return symbol->type;
     }
     break;
 
-    case TOKEN_KIND_FLOAT: {
-        auto symbol = symbol_table_get(symbols, "float");
+    case Syntax_Node_Type::FLOAT: {
+        auto symbol = symbol_table_get(&resolver->symbols, "float");
         return symbol->type;
     }
     break;
 
-    case TOKEN_KIND_BOOL: {
-        auto symbol = symbol_table_get(symbols, "bool");
+    case Syntax_Node_Type::BOOL: {
+        auto symbol = symbol_table_get(&resolver->symbols, "bool");
         return symbol->type;
     }
     break;
 
-    case TOKEN_KIND_ASTERISK: {
-        auto type       = new Code_Type_Pointer;
-        type->base_type = code_resolve_type(resolver, symbols, (Syntax_Node_Type *)root->type);
+    case Syntax_Node_Type::POINTER: {
+        auto type = new Code_Type_Pointer;
+
+        auto ptr = (Syntax_Node_Type *)root->type;
+        
+        if (ptr->id == Syntax_Node_Type::VOID)
+        {
+            type->base_type = new Code_Type;
+        }
+        else
+        {
+            type->base_type = code_resolve_type(resolver, symbols, ptr);
+        }
+
         return type;
     }
     break;
 
-    case TOKEN_KIND_PROC: {
+    case Syntax_Node_Type::PROCEDURE: {
         auto node            = (Syntax_Node_Procedure_Prototype *)root->type;
 
         auto type            = new Code_Type_Procedure;
@@ -810,14 +1101,64 @@ Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols
     }
     break;
 
-    case TOKEN_KIND_IDENTIFIER: {
+    case Syntax_Node_Type::IDENTIFIER: {
         auto node   = (Syntax_Node_Identifier *)root->type;
 
         auto symbol = symbol_table_get(symbols, node->name);
-        if (symbol)
+        if (symbol && symbol->flags & SYMBOL_BIT_TYPE)
         {
             Assert(symbol->type->kind == CODE_TYPE_STRUCT && symbol->address.kind == Symbol_Address::CODE);
             return symbol->type;
+        }
+        else
+        {
+            Unimplemented();
+        }
+    }
+    break;
+
+    case Syntax_Node_Type::TYPE_OF: {
+        auto node = (Syntax_Node_Type_Of *)root->type;
+        auto expression = code_resolve_root_expression(resolver, symbols, node->expression);
+        return expression->type;
+    }
+    break;
+
+    case Syntax_Node_Type::ARRAY_VIEW: {
+        auto node = (Syntax_Node_Array_View *)root->type;
+
+        auto type = new Code_Type_Array_View;
+        type->element_type = code_resolve_type(resolver, symbols, node->element_type);
+        return type;
+    }
+    break;
+
+    case Syntax_Node_Type::STATIC_ARRAY: {
+        auto node = (Syntax_Node_Static_Array *)root->type;
+
+        auto type = new Code_Type_Static_Array;
+        type->element_type = code_resolve_type(resolver, symbols, node->element_type);
+        type->alignment = type->element_type->alignment;
+
+        auto expr = code_resolve_root_expression(resolver, symbols, node->expression);
+
+        if (expr->flags & SYMBOL_BIT_CONST_EXPR)
+        {
+            if (expr->type->kind == CODE_TYPE_INTEGER)
+            {
+                Assert(expr->child->kind == CODE_NODE_LITERAL);
+
+                auto literal = (Code_Node_Literal *)expr->child;
+
+                type->element_count = literal->data.integer.value;
+                type->runtime_size = type->element_count * type->element_type->runtime_size;
+
+                return type;
+            }
+            else
+            {
+                Unimplemented();
+            }
         }
         else
         {
@@ -831,7 +1172,7 @@ Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols
     }
     }
 
-    return type;
+    return nullptr;
 }
 
 Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Symbol_Table *symbols,
@@ -932,6 +1273,8 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
 
             symbol->type                                     = struct_type;
             symbol->address                                  = symbol_address_code(block);
+            
+            symbol->flags |= SYMBOL_BIT_TYPE;
 
             uint32_t alignment                               = 0;
             auto     dst_member                              = struct_type->members;
@@ -1008,7 +1351,7 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
             {
                 if (expression)
                 {
-                    auto cast = code_implicit_cast(expression->child, symbol->type);
+                    auto cast = code_type_cast(expression->child, symbol->type);
                     if (cast)
                     {
                         expression->child = cast;
@@ -1138,6 +1481,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
     case SYNTAX_NODE_EXPRESSION: {
         auto expression = code_resolve_root_expression(resolver, symbols, (Syntax_Node_Expression *)node);
         Code_Node_Statement *statement = new Code_Node_Statement;
+        statement->source_row          = node->location.start_row;
         statement->node                = expression;
         statement->type                = expression->type;
         return statement;
@@ -1152,7 +1496,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
         auto boolean   = symbol_table_get(symbols, "bool");
         if (!code_type_are_same(condition->child->type, boolean->type))
         {
-            auto cast = code_implicit_cast(condition->child, boolean->type);
+            auto cast = code_type_cast(condition->child, boolean->type);
             if (cast)
             {
                 condition->child = cast;
@@ -1173,6 +1517,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
         }
 
         Code_Node_Statement *statement = new Code_Node_Statement;
+        statement->source_row          = node->location.start_row;
         statement->node                = if_code;
         return statement;
     }
@@ -1193,7 +1538,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
         auto boolean             = symbol_table_get(&for_code->symbols, "bool");
         if (!code_type_are_same(condition->child->type, boolean->type))
         {
-            auto cast = code_implicit_cast(condition->child, boolean->type);
+            auto cast = code_type_cast(condition->child, boolean->type);
             if (cast)
             {
                 condition->child = cast;
@@ -1211,6 +1556,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
         resolver->virtual_address[Symbol_Address::STACK] = stack_top;
 
         Code_Node_Statement *statement                   = new Code_Node_Statement;
+        statement->source_row                            = node->location.start_row;
         statement->node                                  = for_code;
         return statement;
     }
@@ -1224,7 +1570,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
         auto boolean    = symbol_table_get(symbols, "bool");
         if (!code_type_are_same(condition->child->type, boolean->type))
         {
-            auto cast = code_implicit_cast(condition->child, boolean->type);
+            auto cast = code_type_cast(condition->child, boolean->type);
             if (cast)
             {
                 condition->child = cast;
@@ -1240,6 +1586,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
         while_code->body               = code_resolve_statement(resolver, symbols, while_node->body);
 
         Code_Node_Statement *statement = new Code_Node_Statement;
+        statement->source_row          = node->location.start_row;
         statement->node                = while_code;
         return statement;
     }
@@ -1262,7 +1609,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
         auto boolean   = symbol_table_get(do_symbols, "bool");
         if (!code_type_are_same(condition->child->type, boolean->type))
         {
-            auto cast = code_implicit_cast(condition->child, boolean->type);
+            auto cast = code_type_cast(condition->child, boolean->type);
             if (cast)
             {
                 condition->child = cast;
@@ -1278,6 +1625,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
         do_code->condition             = condition;
 
         Code_Node_Statement *statement = new Code_Node_Statement;
+        statement->source_row          = node->location.start_row;
         statement->node                = do_code;
         return statement;
     }
@@ -1289,6 +1637,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
         if (initialization)
         {
             Code_Node_Statement *statement = new Code_Node_Statement;
+            statement->source_row          = node->location.start_row;
             statement->node                = initialization;
             return statement;
         }
@@ -1307,6 +1656,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
     case SYNTAX_NODE_BLOCK: {
         auto                 block     = code_resolve_block(resolver, symbols, (Syntax_Node_Block *)node);
         Code_Node_Statement *statement = new Code_Node_Statement;
+        statement->source_row          = node->location.start_row;
         statement->node                = block;
         statement->type                = nullptr;
         return statement;
@@ -1416,6 +1766,19 @@ int main()
     }
 
     {
+        auto pointer_type = new Code_Type_Pointer;
+        pointer_type->base_type = new Code_Type;
+
+        Symbol sym;
+        sym.name  = "*void";
+        sym.type  = pointer_type;
+        sym.flags = SYMBOL_BIT_CONSTANT | SYMBOL_BIT_TYPE;
+        symbol_table_put(&resolver.symbols, sym);
+
+        CompilerTypes[CODE_TYPE_POINTER] = pointer_type;
+    }
+
+    {
         Symbol sym;
         sym.name  = "int";
         sym.type  = CompilerTypes[CODE_TYPE_INTEGER];
@@ -1440,11 +1803,52 @@ int main()
     }
 
     {
+        auto block = new Code_Node_Block;
+        block->symbols.parent = &resolver.symbols;
+
+        Symbol length;
+        length.name = "length";
+        length.address.kind   = Symbol_Address::STACK;
+        length.address.memory = 0;
+        length.type = symbol_table_get(&resolver.symbols, "int")->type;
+
+        Symbol data;
+        data.name = "data";
+        data.address.kind   = Symbol_Address::STACK;
+        data.address.memory = (uint8_t *)sizeof(int64_t);
+        data.type = symbol_table_get(&resolver.symbols, "*void")->type;
+
+        symbol_table_put(&block->symbols, length);
+        symbol_table_put(&block->symbols, data);
+
+        auto type          = new Code_Type_Struct;
+        type->alignment    = sizeof(int64_t);
+        type->runtime_size = sizeof(String);
+        type->name         = "string";
+        type->id           = (uint64_t)type;
+        type->member_count = 2;
+        type->members      = new Code_Type_Struct::Member[type->member_count];
+
+        type->members[0].name = length.name;
+        type->members[0].offset = (uint64_t)length.address.memory;
+        type->members[0].type = length.type;
+
+        type->members[1].name = data.name;
+        type->members[1].offset = (uint64_t)length.address.memory;
+        type->members[1].type = data.type;
+
+        Symbol sym;
+        sym.name    = "string";
+        sym.type    = type;
+        sym.flags   = SYMBOL_BIT_CONSTANT | SYMBOL_BIT_TYPE;
+        sym.address = symbol_address_code(block);
+        symbol_table_put(&resolver.symbols, sym);
+    }
+
+    {
         Unary_Operator unary_operator_int;
         unary_operator_int.parameter = CompilerTypes[CODE_TYPE_INTEGER];
-        ;
         unary_operator_int.output = CompilerTypes[CODE_TYPE_INTEGER];
-        ;
         resolver.unary_operators[UNARY_OPERATOR_PLUS].add(unary_operator_int);
         resolver.unary_operators[UNARY_OPERATOR_MINUS].add(unary_operator_int);
         resolver.unary_operators[UNARY_OPERATOR_BITWISE_NOT].add(unary_operator_int);
@@ -1453,9 +1857,7 @@ int main()
     {
         Unary_Operator unary_operator_real;
         unary_operator_real.parameter = CompilerTypes[CODE_TYPE_REAL];
-        ;
         unary_operator_real.output = CompilerTypes[CODE_TYPE_REAL];
-        ;
         resolver.unary_operators[UNARY_OPERATOR_PLUS].add(unary_operator_real);
         resolver.unary_operators[UNARY_OPERATOR_MINUS].add(unary_operator_real);
     }
@@ -1501,6 +1903,20 @@ int main()
         resolver.binary_operators[BINARY_OPERATOR_COMPOUND_BITWISE_AND].add(binary_operator_int);
         resolver.binary_operators[BINARY_OPERATOR_COMPOUND_BITWISE_XOR].add(binary_operator_int);
         resolver.binary_operators[BINARY_OPERATOR_COMPOUND_BITWISE_OR].add(binary_operator_int);
+    }
+
+    {
+        Binary_Operator binary_operator_pointer;
+        binary_operator_pointer.parameters[0] = CompilerTypes[CODE_TYPE_POINTER];
+        binary_operator_pointer.parameters[1] = CompilerTypes[CODE_TYPE_INTEGER];
+        binary_operator_pointer.output        = CompilerTypes[CODE_TYPE_POINTER];
+        binary_operator_pointer.compound      = false;
+        resolver.binary_operators[BINARY_OPERATOR_ADDITION].add(binary_operator_pointer);
+        resolver.binary_operators[BINARY_OPERATOR_SUBTRACTION].add(binary_operator_pointer);
+
+        binary_operator_pointer.compound      = true;
+        resolver.binary_operators[BINARY_OPERATOR_COMPOUND_ADDITION].add(binary_operator_pointer);
+        resolver.binary_operators[BINARY_OPERATOR_COMPOUND_SUBTRACTION].add(binary_operator_pointer);
     }
 
     {
@@ -1550,6 +1966,38 @@ int main()
         resolver.binary_operators[BINARY_OPERATOR_RELATIONAL_LESS_EQUAL].add(binary_operator_real);
         resolver.binary_operators[BINARY_OPERATOR_COMPARE_EQUAL].add(binary_operator_real);
         resolver.binary_operators[BINARY_OPERATOR_COMPARE_NOT_EQUAL].add(binary_operator_real);
+    }
+
+    {
+        auto type            = new Code_Type_Procedure;
+        type->argument_count = 1;
+        type->arguments      = new Code_Type *;
+        type->arguments[0]   = symbol_table_get(&resolver.symbols, "int")->type;
+        type->return_type    = symbol_table_get(&resolver.symbols, "*void")->type;
+
+        Symbol sym;
+        sym.name           = "allocate";
+        sym.type           = type;
+        sym.address.kind   = Symbol_Address::CCALL;
+        sym.address.memory = nullptr;
+
+        symbol_table_put(&resolver.symbols, sym);
+    }
+    
+    {
+        auto type            = new Code_Type_Procedure;
+        type->argument_count = 1;
+        type->arguments      = new Code_Type *;
+        type->arguments[0]   = symbol_table_get(&resolver.symbols, "*void")->type;
+        type->return_type    = nullptr;
+
+        Symbol sym;
+        sym.name           = "free";
+        sym.type           = type;
+        sym.address.kind   = Symbol_Address::CCALL;
+        sym.address.memory = nullptr;
+
+        symbol_table_put(&resolver.symbols, sym);
     }
 
     auto exprs = code_resolve_global_scope(&resolver, &resolver.symbols, node);

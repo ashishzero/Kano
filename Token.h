@@ -10,11 +10,14 @@ enum Token_Kind
     TOKEN_KIND_COMMA,
     TOKEN_KIND_DASH_ARROW,
     TOKEN_KIND_DEREFERENCE,
+    TOKEN_KIND_PERIOD,
     TOKEN_KIND_EQUALS,
     TOKEN_KIND_OPEN_BRACKET,
     TOKEN_KIND_CLOSE_BRACKET,
     TOKEN_KIND_OPEN_CURLY_BRACKET,
     TOKEN_KIND_CLOSE_CURLY_BRACKET,
+    TOKEN_KIND_OPEN_SQUARE_BRACKET,
+    TOKEN_KIND_CLOSE_SQUARE_BRACKET,
 
     TOKEN_KIND_PLUS,
     TOKEN_KIND_MINUS,
@@ -55,6 +58,7 @@ enum Token_Kind
 
     TOKEN_KIND_REAL,
     TOKEN_KIND_INTEGER,
+    TOKEN_KIND_STRING,
 
     TOKEN_KIND_VAR,
     TOKEN_KIND_CONST,
@@ -74,9 +78,15 @@ enum Token_Kind
     TOKEN_KIND_WHILE,
     TOKEN_KIND_DO,
 
+    TOKEN_KIND_SIZE_OF,
+    TOKEN_KIND_TYPE_OF,
+
     TOKEN_KIND_PROC,
     TOKEN_KIND_STRUCT,
     TOKEN_KIND_RETURN,
+    TOKEN_KIND_CAST,
+    TOKEN_KIND_VOID,
+    TOKEN_KIND_NULL,
 
     TOKEN_KIND_IDENTIFIER,
 
@@ -114,10 +124,12 @@ static inline String token_kind_string(Token_Kind kind)
 
                                ";",           ":",
                                ",",           "->",
-                               "?",           "=",
+                               "?",           ".",
+                               "=", 
 
                                "(",           ")",
                                "{",           "}",
+                               "[",           "]",
 
                                "+",           "-",
                                "*",           "/",
@@ -145,7 +157,7 @@ static inline String token_kind_string(Token_Kind kind)
                                ">=",          "<=",
                                "==",          "!=",
 
-                               "real number", "integer number",
+                               "real number", "integer number", "string",
 
                                "var",         "const",
 
@@ -160,8 +172,10 @@ static inline String token_kind_string(Token_Kind kind)
                                "for",         "while",
                                "do",
 
+                               "size_of",      "type_of",
+
                                "proc",        "struct",
-                               "return",
+                               "return",      "cast", "void", "null",
 
                                "identifier",
 

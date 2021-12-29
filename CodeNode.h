@@ -10,6 +10,8 @@ enum Code_Type_Kind
     CODE_TYPE_POINTER,
     CODE_TYPE_PROCEDURE,
     CODE_TYPE_STRUCT,
+    CODE_TYPE_ARRAY_VIEW,
+    CODE_TYPE_STATIC_ARRAY,
 
     _CODE_TYPE_COUNT
 };
@@ -72,8 +74,9 @@ struct Code_Type_Procedure : public Code_Type
         alignment    = sizeof(void *);
     }
 
-    Code_Type **arguments      = nullptr;
-    uint64_t    argument_count = 0;
+    Code_Type **arguments               = nullptr;
+    uint64_t    argument_count          = 0;
+
     Code_Type * return_type    = nullptr;
 };
 
@@ -98,6 +101,29 @@ struct Code_Type_Struct : public Code_Type
     uint64_t id;
 };
 
+struct Code_Type_Array_View : public Code_Type
+{
+    Code_Type_Array_View()
+    {
+        kind = CODE_TYPE_ARRAY_VIEW;
+        runtime_size = sizeof(Array_View<void *>);
+        alignment = sizeof(int64_t);
+    }
+
+    Code_Type *element_type = nullptr;
+};
+
+struct Code_Type_Static_Array : public Code_Type
+{
+    Code_Type_Static_Array()
+    {
+        kind = CODE_TYPE_STATIC_ARRAY;
+    }
+
+    Code_Type *element_type = nullptr;
+    uint64_t element_count  = 0;
+};
+
 //
 //
 //
@@ -109,6 +135,7 @@ struct Symbol_Address
         STACK  = 0,
         GLOBAL = 1,
         CODE,
+        CCALL,
     };
     Kind  kind;
     void *memory;
@@ -181,6 +208,7 @@ enum Code_Node_Kind
     CODE_NODE_RETURN,
     CODE_NODE_STATEMENT,
     CODE_NODE_PROCEDURE_CALL,
+    CODE_NODE_SUBSCRIPT,
     CODE_NODE_IF,
     CODE_NODE_FOR,
     CODE_NODE_WHILE,
@@ -195,6 +223,7 @@ struct Code_Node
     Code_Node_Kind kind  = CODE_NODE_NULL;
     uint32_t       flags = 0;
     Code_Type *    type  = nullptr;
+    bool           implicit = false;
 };
 
 struct Code_Value_Integer
@@ -217,7 +246,13 @@ struct Code_Value_Pointer
     uint64_t value;
 };
 
+struct Code_Value_String
+{
+    String value;
+};
+
 union Code_Value {
+    Code_Value_String  string = {};
     Code_Value_Integer integer;
     Code_Value_Real    real;
     Code_Value_Bool    boolean;
@@ -243,7 +278,11 @@ struct Code_Node_Address : public Code_Node
         kind = CODE_NODE_ADDRESS;
     }
 
+    Code_Node *child = nullptr; // If child is null, then address is valid
+
     Symbol_Address address;
+
+    uint64_t offset = 0;
 };
 
 struct Code_Node_Type_Cast : public Code_Node
@@ -376,6 +415,8 @@ struct Code_Node_Statement : public Code_Node
         kind = CODE_NODE_STATEMENT;
     }
 
+    uint64_t source_row    = -1;
+
     Code_Node *          node = nullptr;
     Code_Node_Statement *next = nullptr;
 };
@@ -392,6 +433,17 @@ struct Code_Node_Procedure_Call : public Code_Node
     Code_Node_Expression **paraments       = nullptr;
 
     uint64_t               stack_top       = 0;
+};
+
+struct Code_Node_Subscript : public Code_Node
+{
+    Code_Node_Subscript()
+    {
+        kind = CODE_NODE_SUBSCRIPT;
+    }
+
+    Code_Node_Expression *expression = nullptr;
+    Code_Node_Expression *subscript  = nullptr;
 };
 
 struct Code_Node_If : public Code_Node
