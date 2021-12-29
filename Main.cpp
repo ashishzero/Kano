@@ -2113,6 +2113,24 @@ int main()
         symbol_table_put(&resolver.symbols, sym);
     }
 
+    {
+        auto type            = new Code_Type_Procedure;
+        type->argument_count = 2;
+        type->arguments      = new Code_Type *[type->argument_count];
+        type->arguments[0]   = symbol_table_get(&resolver.symbols, "string")->type;
+        type->arguments[1]   = symbol_table_get(&resolver.symbols, "*void")->type;
+        type->return_type    = nullptr;
+        type->is_variadic    = true;
+
+        Symbol sym;
+        sym.name           = "print";
+        sym.type           = type;
+        sym.address.kind   = Symbol_Address::CCALL;
+        sym.address.memory = nullptr;
+
+        symbol_table_put(&resolver.symbols, sym);
+    }
+
     auto exprs = code_resolve_global_scope(&resolver, &resolver.symbols, node);
 
     {
