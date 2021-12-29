@@ -256,6 +256,8 @@ struct Code_Type_Resolver
     Bucket_Array<Binary_Operator, 8> binary_operators[_BINARY_OPERATOR_COUNT];
 };
 
+static bool code_type_are_same(Code_Type *a, Code_Type *b, bool recurse_pointer_type = true);
+
 static Code_Node_Type_Cast *code_type_cast(Code_Node *node, Code_Type *to_type, bool explicit_cast = false)
 {
     bool cast_success = false;
@@ -301,6 +303,17 @@ static Code_Node_Type_Cast *code_type_cast(Code_Node *node, Code_Type *to_type, 
         }
     }
     break;
+
+    case CODE_TYPE_ARRAY_VIEW: {
+        auto from_type = node->type;
+        if (from_type->kind == CODE_TYPE_STATIC_ARRAY)
+        {
+            auto to_view  = (Code_Type_Array_View *)to_type;
+            auto from_arr = (Code_Type_Static_Array *)from_type;
+            cast_success = code_type_are_same(to_view->element_type, from_arr->element_type);
+        }
+    }
+    break;
     }
 
     if (!cast_success && explicit_cast)
@@ -308,7 +321,8 @@ static Code_Node_Type_Cast *code_type_cast(Code_Node *node, Code_Type *to_type, 
         implicity_casted = false;
         auto from_type = node->type->kind;
         cast_success = (to_type->kind == CODE_TYPE_POINTER && from_type == CODE_TYPE_POINTER) ||
-        (to_type->kind == CODE_TYPE_PROCEDURE && from_type == CODE_TYPE_PROCEDURE);
+        (to_type->kind == CODE_TYPE_PROCEDURE && from_type == CODE_TYPE_PROCEDURE) ||
+        (to_type->kind == CODE_TYPE_ARRAY_VIEW && from_type == CODE_TYPE_STATIC_ARRAY);
     }
 
     if (cast_success)
@@ -323,7 +337,7 @@ static Code_Node_Type_Cast *code_type_cast(Code_Node *node, Code_Type *to_type, 
     return nullptr;
 }
 
-static bool code_type_are_same(Code_Type *a, Code_Type *b, bool recurse_pointer_type = true)
+static bool code_type_are_same(Code_Type *a, Code_Type *b, bool recurse_pointer_type)
 {
     if (a == b)
         return true;
