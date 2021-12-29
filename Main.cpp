@@ -1746,6 +1746,8 @@ int main()
         sym.type  = pointer_type;
         sym.flags = SYMBOL_BIT_CONSTANT | SYMBOL_BIT_TYPE;
         symbol_table_put(&resolver.symbols, sym);
+
+        CompilerTypes[CODE_TYPE_POINTER] = pointer_type;
     }
 
     {
@@ -1873,6 +1875,20 @@ int main()
         resolver.binary_operators[BINARY_OPERATOR_COMPOUND_BITWISE_AND].add(binary_operator_int);
         resolver.binary_operators[BINARY_OPERATOR_COMPOUND_BITWISE_XOR].add(binary_operator_int);
         resolver.binary_operators[BINARY_OPERATOR_COMPOUND_BITWISE_OR].add(binary_operator_int);
+    }
+
+    {
+        Binary_Operator binary_operator_pointer;
+        binary_operator_pointer.parameters[0] = CompilerTypes[CODE_TYPE_POINTER];
+        binary_operator_pointer.parameters[1] = CompilerTypes[CODE_TYPE_INTEGER];
+        binary_operator_pointer.output        = CompilerTypes[CODE_TYPE_POINTER];
+        binary_operator_pointer.compound      = false;
+        resolver.binary_operators[BINARY_OPERATOR_ADDITION].add(binary_operator_pointer);
+        resolver.binary_operators[BINARY_OPERATOR_SUBTRACTION].add(binary_operator_pointer);
+
+        binary_operator_pointer.compound      = true;
+        resolver.binary_operators[BINARY_OPERATOR_COMPOUND_ADDITION].add(binary_operator_pointer);
+        resolver.binary_operators[BINARY_OPERATOR_COMPOUND_SUBTRACTION].add(binary_operator_pointer);
     }
 
     {

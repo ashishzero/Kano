@@ -33,7 +33,10 @@ const main := proc() {
 
 	var color_size := size_of(type_of(color));
 
-	var color_p : *Vec4 = allocate(size_of(Vec4));
+	var color_p : *void = allocate(1 * size_of(Vec4));
+	var color_p_1 := cast(*Vec4) color_p + 1;
+
+	var color_value := ?color_p_1;
 
 	free(color_p);
 
