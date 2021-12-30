@@ -1,13 +1,6 @@
 #include "Printer.h"
 #include "Token.h"
 
-static inline String code_type_kind_string(Code_Type_Kind kind)
-{
-    static String strings[] = {"-null-", "integer", "real", "bool", "*", "proc", "struct"};
-    static_assert(ArrayCount(strings) == _CODE_TYPE_COUNT);
-    return strings[kind];
-}
-
 static inline String unary_operator_kind_string(Unary_Operator_Kind kind)
 {
     static String strings[] = {"+", "-", "~", "!", "*", "?"};
@@ -63,6 +56,12 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
         case Literal::BOOL:
             fprintf(fp, "Literal(bool:%s)\n", node->value.data.boolean ? "true" : "false");
             break;
+        case Literal::STRING:
+            fprintf(fp, "Literal(string:%s)\n", node->value.data.string.data);
+            break;
+        case Literal::NULL_POINTER:
+            fprintf(fp, "Literal(null)\n");
+            break;
             NoDefaultCase();
         }
     }
@@ -114,13 +113,37 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
     case SYNTAX_NODE_TYPE: {
         auto        node      = (Syntax_Node_Type *)root;
 
-        const char *type_name = (char *)token_kind_string(node->token_type).data;
-        fprintf(fp, "Type(%s)\n", type_name);
+        const char *TypeIdNames[] = {"error" , "void", "int", "float", "bool", "variadic-argument", "pointer", "procedure", "identifier", "type_of", "array-view", "static-array"};
+        Assert(node->id < ArrayCount(TypeIdNames));
+
+        fprintf(fp, "Type(%s)\n", TypeIdNames[node->id]);
 
         if (node->type)
         {
             print_syntax(node->type, fp, child_indent);
         }
+    }
+    break;
+
+    case SYNTAX_NODE_SIZE_OF: {
+        auto node = (Syntax_Node_Size_Of *)root;
+        fprintf(fp, "Size-Of()\n");
+        print_syntax(node->type, fp, child_indent, "Type-Argument");
+    }
+    break;
+
+    case SYNTAX_NODE_TYPE_OF: {
+        auto node = (Syntax_Node_Type_Of *)root;
+        fprintf(fp, "Type-Of()\n");
+        print_syntax(node->expression, fp, child_indent, "Type-Expression");
+    }
+    break;
+
+    case SYNTAX_NODE_TYPE_CAST: {
+        auto node = (Syntax_Node_Type_Cast *)root;
+        fprintf(fp, "TypeCast()\n");
+        print_syntax(node->type, fp, child_indent, "Type");
+        print_syntax(node->expression, fp, child_indent, "Expression");
     }
     break;
 
@@ -161,6 +184,14 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
         {
             print_syntax(param, fp, child_indent, "Param");
         }
+    }
+    break;
+
+    case SYNTAX_NODE_SUBSCRIPT: {
+        auto node = (Syntax_Node_Subscript *)root;
+        fprintf(fp, "Subscript()\n");
+        print_syntax(node->expression, fp, child_indent, "Expression");
+        print_syntax(node->subscript, fp, child_indent, "Subscript");
     }
     break;
 
@@ -238,6 +269,21 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
     }
     break;
 
+    case SYNTAX_NODE_ARRAY_VIEW: {
+        auto node = (Syntax_Node_Array_View *)root;
+        fprintf(fp, "Array-View()\n");
+        print_syntax(node->element_type, fp, child_indent, "Type");
+    }
+    break;
+
+    case SYNTAX_NODE_STATIC_ARRAY: {
+        auto node = (Syntax_Node_Static_Array *)root;
+        fprintf(fp, "Static-Array()\n");
+        print_syntax(node->expression, fp, child_indent, "Count");
+        print_syntax(node->element_type, fp, child_indent, "Type");
+    }
+    break;
+
     case SYNTAX_NODE_DECLARATION: {
         auto node = (Syntax_Node_Declaration *)root;
         if (node->flags & SYMBOL_BIT_CONSTANT)
@@ -263,7 +309,7 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
 
     case SYNTAX_NODE_STATEMENT: {
         auto node = (Syntax_Node_Statement *)root;
-        fprintf(fp, "Statement()\n");
+        fprintf(fp, "Statement(%zu)\n", node->location.start_row);
         print_syntax(node->node, fp, child_indent);
     }
     break;
@@ -327,6 +373,12 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
         case CODE_TYPE_BOOL:
             fprintf(fp, "Literal(bool:%s)\n", node->data.boolean.value ? "true" : "false");
             break;
+        case CODE_TYPE_POINTER:
+            fprintf(fp, "Literal(*void:null)\n");
+            break;
+        case CODE_TYPE_STRUCT:
+            fprintf(fp, "Literal(struct:%s)\n", ((Code_Type_Struct *)node->type)->name.data);
+            break;
             NoDefaultCase();
         }
     }
@@ -335,10 +387,21 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
     case CODE_NODE_ADDRESS: {
         auto node = (Code_Node_Address *)root;
 
-        const char *SymbolAddressNames[] = {"stack", "global", "code"};
+        const char *SymbolAddressNames[] = {"stack", "global", "code", "ccall"};
         Assert(node->address.kind < ArrayCount(SymbolAddressNames));
 
-        fprintf(fp, "Address(%s:%p)\n", SymbolAddressNames[node->address.kind], node->address.memory);
+        if (node->child)
+        {
+            fprintf(fp, "Address(+0x%zx)\n", node->offset);
+            print_code(node->child, fp, child_indent, "Child");
+        }
+        else
+        {
+            fprintf(fp, "Address(%s:0x%zx + 0x%zx)\n", 
+                SymbolAddressNames[node->address.kind], 
+                (uint64_t)node->address.memory,
+                node->offset);
+        }
     }
     break;
 
@@ -367,7 +430,8 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
     case CODE_NODE_EXPRESSION: {
         auto node = (Code_Node_Expression *)root;
         fprintf(fp, "Expression()\n");
-        print_code(node->child, fp, child_indent);
+        if (node->child)
+            print_code(node->child, fp, child_indent);
     }
     break;
 
@@ -381,7 +445,7 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
 
     case CODE_NODE_STATEMENT: {
         auto node = (Code_Node_Statement *)root;
-        fprintf(fp, "Statement()\n");
+        fprintf(fp, "Statement(%zu)\n", node->source_row);
         print_code(node->node, fp, child_indent);
     }
     break;
@@ -395,6 +459,14 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
         {
             print_code(node->paraments[index], fp, child_indent);
         }
+    }
+    break;
+
+    case CODE_NODE_SUBSCRIPT: {
+        auto node = (Code_Node_Subscript *)root;
+        fprintf(fp, "Subscript()\n");
+        print_code(node->expression, fp, child_indent, "Expression");
+        print_code(node->subscript, fp, child_indent, "Subscript");
     }
     break;
 

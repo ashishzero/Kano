@@ -45,7 +45,9 @@ static void     parser_init_precedence()
     //
     //
 
+    BinaryOperatorPrecedence[TOKEN_KIND_PERIOD]                       = 65;
     BinaryOperatorPrecedence[TOKEN_KIND_OPEN_BRACKET]                 = 65;
+    BinaryOperatorPrecedence[TOKEN_KIND_OPEN_SQUARE_BRACKET]          = 65;
 
     BinaryOperatorPrecedence[TOKEN_KIND_ASTERISK]                     = 60;
     BinaryOperatorPrecedence[TOKEN_KIND_DIVISION]                     = 60;
@@ -81,6 +83,8 @@ static void     parser_init_precedence()
     BinaryOperatorPrecedence[TOKEN_KIND_COMPOUND_BITWISE_AND]         = 15;
     BinaryOperatorPrecedence[TOKEN_KIND_COMPOUND_BITWISE_XOR]         = 15;
     BinaryOperatorPrecedence[TOKEN_KIND_COMPOUND_BITWISE_OR]          = 15;
+
+    BinaryOperatorPrecedence[TOKEN_KIND_EQUALS]                       = 15;
 }
 
 //
@@ -227,6 +231,21 @@ Syntax_Node *parse_subexpression(Parser *parser, uint32_t prec)
         return node;
     }
 
+    if (parser_accept_token(parser, TOKEN_KIND_STRING))
+    {
+        String string;
+        string.length = parser->value.string.length;
+        string.data   = new uint8_t[string.length + 1];
+        memcpy(string.data, parser->value.string.data, string.length);
+        string.data[string.length] = 0;
+
+        auto node               = parser_new_syntax_node<Syntax_Node_Literal>(parser);
+        node->value.kind        = Literal::STRING;
+        node->value.data.string = string;
+        parser_finish_syntax_node(parser, node);
+        return node;
+    }
+
     if (parser_accept_token(parser, TOKEN_KIND_TRUE))
     {
         auto node                = parser_new_syntax_node<Syntax_Node_Literal>(parser);
@@ -245,6 +264,14 @@ Syntax_Node *parse_subexpression(Parser *parser, uint32_t prec)
         return node;
     }
 
+    if (parser_accept_token(parser, TOKEN_KIND_NULL))
+    {
+        auto node = parser_new_syntax_node<Syntax_Node_Literal>(parser);
+        node->value.kind = Literal::NULL_POINTER;
+        parser_finish_syntax_node(parser, node);
+        return node;
+    }
+
     if (parser_accept_token(parser, TOKEN_KIND_IDENTIFIER))
     {
         auto   node = parser_new_syntax_node<Syntax_Node_Identifier>(parser);
@@ -255,13 +282,43 @@ Syntax_Node *parse_subexpression(Parser *parser, uint32_t prec)
         return node;
     }
 
+    if (parser_accept_token(parser, TOKEN_KIND_SIZE_OF))
+    {
+        auto node = parser_new_syntax_node<Syntax_Node_Size_Of>(parser);
+        if (parser_expect_token(parser, TOKEN_KIND_OPEN_BRACKET))
+        {
+            node->type = parse_type(parser);
+            parser_expect_token(parser, TOKEN_KIND_CLOSE_BRACKET);
+        }
+        parser_finish_syntax_node(parser, node);
+        return node;
+    }
+
+    if (parser_accept_token(parser, TOKEN_KIND_CAST))
+    {
+        auto node  = parser_new_syntax_node<Syntax_Node_Type_Cast>(parser);
+        if (parser_expect_token(parser, TOKEN_KIND_OPEN_BRACKET))
+        {
+            node->type = parse_type(parser);
+            if (parser_expect_token(parser, TOKEN_KIND_CLOSE_BRACKET))
+            {
+                auto expression = parser_new_syntax_node<Syntax_Node_Expression>(parser);
+                expression->child = parse_subexpression(parser, 0);
+                parser_finish_syntax_node(parser, expression);
+                node->expression = expression;
+            }
+        }
+        parser_finish_syntax_node(parser, node);
+        return node;
+    }
+
     static const Token_Kind UnaryOpTokens[] = {TOKEN_KIND_PLUS,        TOKEN_KIND_MINUS,    TOKEN_KIND_BITWISE_NOT,
                                                TOKEN_KIND_LOGICAL_NOT, TOKEN_KIND_ASTERISK, TOKEN_KIND_DEREFERENCE};
 
     auto                    token           = lexer_current_token(&parser->lexer);
     auto                    op_prec         = UnaryOperatorPrecedence[token->kind];
 
-    if (op_prec <= prec)
+    if (op_prec < prec)
         return nullptr;
 
     for (uint32_t index = 0; index < ArrayCount(UnaryOpTokens); ++index)
@@ -298,8 +355,21 @@ Procedure_Call parse_procedure_parameters(Parser *parser)
         if (parser_peek_token(parser, TOKEN_KIND_CLOSE_BRACKET))
             break;
 
+        if (count)
+        {
+            parser_expect_token(parser, TOKEN_KIND_COMMA);
+        }
+
         auto param        = parser_new_syntax_node<Syntax_Node_Procedure_Parameter>(parser);
+
         param->expression = parse_root_expression(parser);
+
+        if (!param->expression->child)
+        {
+            auto site = lexer_current_token(&parser->lexer);
+            parser_error(parser, site, "Expected expression");
+            break;
+        }
 
         parent->next      = param;
         parent            = param;
@@ -323,6 +393,12 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec)
 
     while (parser_should_continue(parser))
     {
+        auto token   = lexer_current_token(&parser->lexer);
+
+        auto op_prec = BinaryOperatorPrecedence[token->kind];
+        if (op_prec <= prec)
+            break;
+
         // assignment
         if (parser_accept_token(parser, TOKEN_KIND_EQUALS))
         {
@@ -337,41 +413,6 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec)
             assignment->right         = parse_root_expression(parser);
             return assignment;
         }
-
-        static const Token_Kind BinaryOpTokens[] = {
-            TOKEN_KIND_PLUS,
-            TOKEN_KIND_MINUS,
-            TOKEN_KIND_ASTERISK,
-            TOKEN_KIND_DIVISION,
-            TOKEN_KIND_REMAINDER,
-            TOKEN_KIND_BITWISE_SHIFT_RIGHT,
-            TOKEN_KIND_BITWISE_SHIFT_LEFT,
-            TOKEN_KIND_BITWISE_AND,
-            TOKEN_KIND_BITWISE_XOR,
-            TOKEN_KIND_BITWISE_OR,
-            TOKEN_KIND_RELATIONAL_GREATER,
-            TOKEN_KIND_RELATIONAL_LESS,
-            TOKEN_KIND_RELATIONAL_GREATER_EQUAL,
-            TOKEN_KIND_RELATIONAL_LESS_EQUAL,
-            TOKEN_KIND_COMPARE_EQUAL,
-            TOKEN_KIND_COMPARE_NOT_EQUAL,
-            TOKEN_KIND_COMPOUND_PLUS,
-            TOKEN_KIND_COMPOUND_MINUS,
-            TOKEN_KIND_COMPOUND_MULTIPLY,
-            TOKEN_KIND_COMPOUND_DIVIDE,
-            TOKEN_KIND_COMPOUND_REMAINDER,
-            TOKEN_KIND_COMPOUND_BITWISE_SHIFT_RIGHT,
-            TOKEN_KIND_COMPOUND_BITWISE_SHIFT_LEFT,
-            TOKEN_KIND_COMPOUND_BITWISE_AND,
-            TOKEN_KIND_COMPOUND_BITWISE_XOR,
-            TOKEN_KIND_COMPOUND_BITWISE_OR,
-        };
-
-        auto token   = lexer_current_token(&parser->lexer);
-
-        auto op_prec = BinaryOperatorPrecedence[token->kind];
-        if (op_prec <= prec)
-            break;
 
         if (parser_peek_token(parser, TOKEN_KIND_OPEN_BRACKET))
         {
@@ -395,6 +436,57 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec)
             continue;
         }
 
+        if (parser_peek_token(parser, TOKEN_KIND_OPEN_SQUARE_BRACKET))
+        {
+            auto node = parser_new_syntax_node<Syntax_Node_Subscript>(parser);
+            parser_accept_token(parser, TOKEN_KIND_OPEN_SQUARE_BRACKET);
+
+            auto subscript = parse_root_expression(parser);
+            parser_expect_token(parser, TOKEN_KIND_CLOSE_SQUARE_BRACKET);
+
+            parser_finish_syntax_node(parser, node);
+
+            auto expression      = parser_new_syntax_node<Syntax_Node_Expression>(parser);
+            parser_finish_syntax_node(parser, expression);
+            expression->location = left->location;
+            expression->child    = left;
+
+            node->expression = expression; 
+            node->subscript  = subscript;
+            left             = node;
+            continue;
+        }
+
+        static const Token_Kind BinaryOpTokens[] = {TOKEN_KIND_PLUS,
+                                                    TOKEN_KIND_MINUS,
+                                                    TOKEN_KIND_ASTERISK,
+                                                    TOKEN_KIND_DIVISION,
+                                                    TOKEN_KIND_REMAINDER,
+                                                    TOKEN_KIND_BITWISE_SHIFT_RIGHT,
+                                                    TOKEN_KIND_BITWISE_SHIFT_LEFT,
+                                                    TOKEN_KIND_BITWISE_AND,
+                                                    TOKEN_KIND_BITWISE_XOR,
+                                                    TOKEN_KIND_BITWISE_OR,
+                                                    TOKEN_KIND_RELATIONAL_GREATER,
+                                                    TOKEN_KIND_RELATIONAL_LESS,
+                                                    TOKEN_KIND_RELATIONAL_GREATER_EQUAL,
+                                                    TOKEN_KIND_RELATIONAL_LESS_EQUAL,
+                                                    TOKEN_KIND_COMPARE_EQUAL,
+                                                    TOKEN_KIND_COMPARE_NOT_EQUAL,
+                                                    TOKEN_KIND_COMPOUND_PLUS,
+                                                    TOKEN_KIND_COMPOUND_MINUS,
+                                                    TOKEN_KIND_COMPOUND_MULTIPLY,
+                                                    TOKEN_KIND_COMPOUND_DIVIDE,
+                                                    TOKEN_KIND_COMPOUND_REMAINDER,
+                                                    TOKEN_KIND_COMPOUND_BITWISE_SHIFT_RIGHT,
+                                                    TOKEN_KIND_COMPOUND_BITWISE_SHIFT_LEFT,
+                                                    TOKEN_KIND_COMPOUND_BITWISE_AND,
+                                                    TOKEN_KIND_COMPOUND_BITWISE_XOR,
+                                                    TOKEN_KIND_COMPOUND_BITWISE_OR,
+                                                    TOKEN_KIND_PERIOD};
+
+        bool found_binary_operator = false;
+
         for (uint32_t index = 0; index < ArrayCount(BinaryOpTokens); ++index)
         {
             Token_Kind token = BinaryOpTokens[index];
@@ -402,13 +494,17 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec)
             {
                 auto node = parser_new_syntax_node<Syntax_Node_Binary_Operator>(parser);
                 parser_finish_syntax_node(parser, node);
-                node->op    = token;
-                node->left  = left;
-                node->right = parse_expression(parser, op_prec);
-                left        = node;
+                node->op              = token;
+                node->left            = left;
+                node->right           = parse_expression(parser, op_prec);
+                left                  = node;
+                found_binary_operator = true;
                 break;
             }
         }
+
+        if (!found_binary_operator)
+            break;
     }
 
     return left;
@@ -428,15 +524,13 @@ Syntax_Node_Expression *parse_root_expression(Parser *parser)
     else
     {
         expression->child = parse_expression(parser, 0);
-    }
-
-    if (!expression->child)
-    {
-        expression->child = parser_new_syntax_node<Syntax_Node>(parser);
-        parser_finish_syntax_node(parser, expression->child);
+        Assert(expression->child);
     }
 
     parser_finish_syntax_node(parser, expression);
+
+    expression->location = expression->child->location;
+
     return expression;
 }
 
@@ -633,39 +727,104 @@ Syntax_Node_Type *parse_type(Parser *parser)
 
     if (parser_accept_token(parser, TOKEN_KIND_INT))
     {
-        type->token_type = TOKEN_KIND_INT;
+        type->id       = Syntax_Node_Type::INT;
+        type->location = parser->location;
     }
     else if (parser_accept_token(parser, TOKEN_KIND_FLOAT))
     {
-        type->token_type = TOKEN_KIND_FLOAT;
+        type->id = Syntax_Node_Type::FLOAT;
+        type->location = parser->location;
     }
     else if (parser_accept_token(parser, TOKEN_KIND_BOOL))
     {
-        type->token_type = TOKEN_KIND_BOOL;
+        type->id = Syntax_Node_Type::BOOL;
+        type->location = parser->location;
+    }
+    else if (parser_accept_token(parser, TOKEN_KIND_DOUBLE_PERDIOD))
+    {
+        type->id = Syntax_Node_Type::VARIADIC_ARGUMENT;
+        type->location = parser->location;
     }
     else if (parser_accept_token(parser, TOKEN_KIND_ASTERISK))
     {
-        type->token_type = TOKEN_KIND_ASTERISK;
-        type->type       = parse_type(parser);
+        type->id = Syntax_Node_Type::POINTER;
+        type->location = parser->location;
+
+        if (parser_accept_token(parser, TOKEN_KIND_VOID))
+        {
+            auto void_ptr = parser_new_syntax_node<Syntax_Node_Type>(parser);
+            void_ptr->id  = Syntax_Node_Type::VOID;
+            parser_finish_syntax_node(parser, void_ptr);
+            type->type    = void_ptr;
+        }
+        else
+        {
+            type->type       = parse_type(parser);
+        }
     }
     else if (parser_peek_token(parser, TOKEN_KIND_PROC))
     {
-        type->token_type = TOKEN_KIND_PROC;
+        type->id = Syntax_Node_Type::PROCEDURE;
+        type->location = parser->location;
         type->type       = parse_procedure_prototype(parser);
     }
-    else if (parser_peek_token(parser, TOKEN_KIND_IDENTIFIER))
+    else if (parser_accept_token(parser, TOKEN_KIND_IDENTIFIER))
     {
         auto identifier = parser_new_syntax_node<Syntax_Node_Identifier>(parser);
-        parser_accept_token(parser, TOKEN_KIND_IDENTIFIER);
         parser_finish_syntax_node(parser, identifier);
+        type->location = identifier->location;
 
         String name;
         name.length      = parser->value.string.length;
         name.data        = parser->value.string.data;
         identifier->name = string_builder_copy(parser->builder, name);
 
-        type->token_type = TOKEN_KIND_IDENTIFIER;
+        type->id = Syntax_Node_Type::IDENTIFIER;
         type->type       = identifier;
+    }
+    else if (parser_accept_token(parser, TOKEN_KIND_TYPE_OF))
+    {
+        auto node = parser_new_syntax_node<Syntax_Node_Type_Of>(parser);
+        if (parser_expect_token(parser, TOKEN_KIND_OPEN_BRACKET))
+        {
+            node->expression = parse_root_expression(parser);
+            parser_expect_token(parser, TOKEN_KIND_CLOSE_BRACKET);
+        }
+        parser_finish_syntax_node(parser, node);
+        type->location = node->location;
+        type->id = Syntax_Node_Type::TYPE_OF;
+        type->type     = node;
+    }
+    else if (parser_accept_token(parser, TOKEN_KIND_OPEN_SQUARE_BRACKET))
+    {
+        if (parser_accept_token(parser, TOKEN_KIND_CLOSE_SQUARE_BRACKET)) 
+        {
+            type->id = Syntax_Node_Type::ARRAY_VIEW;
+
+            auto node = parser_new_syntax_node<Syntax_Node_Array_View>(parser);
+            node->location = type->location;
+
+            node->element_type = parse_type(parser);
+
+            parser_finish_syntax_node(parser, node);
+
+            type->type = node;
+        }
+        else
+        {
+            type->id = Syntax_Node_Type::STATIC_ARRAY;
+
+            auto node = parser_new_syntax_node<Syntax_Node_Static_Array>(parser);
+            node->location = type->location;
+            node->expression = parse_root_expression(parser);
+            parser_expect_token(parser, TOKEN_KIND_CLOSE_SQUARE_BRACKET);
+
+            node->element_type = parse_type(parser);
+
+            parser_finish_syntax_node(parser, node);
+
+            type->type = node;
+        }
     }
     else
     {
@@ -679,11 +838,10 @@ Syntax_Node_Type *parse_type(Parser *parser)
 
 Syntax_Node_Declaration *parse_declaration(Parser *parser)
 {
-    auto declaration = parser_new_syntax_node<Syntax_Node_Declaration>(parser);
-
+    uint32_t flags = 0;
     if (parser_accept_token(parser, TOKEN_KIND_CONST))
     {
-        declaration->flags |= SYMBOL_BIT_CONSTANT;
+        flags |= SYMBOL_BIT_CONSTANT;
     }
     else if (!parser_accept_token(parser, TOKEN_KIND_VAR))
     {
@@ -691,6 +849,9 @@ Syntax_Node_Declaration *parse_declaration(Parser *parser)
         parser_error(parser, token, "Expected declaration 'var' or 'const'\n");
         parser->parsing = false;
     }
+
+    auto declaration   = parser_new_syntax_node<Syntax_Node_Declaration>(parser);
+    declaration->flags = flags;
 
     if (parser_expect_token(parser, TOKEN_KIND_IDENTIFIER))
     {
@@ -886,6 +1047,9 @@ Syntax_Node_Statement *parse_statement(Parser *parser)
     }
 
     parser_finish_syntax_node(parser, statement);
+
+    statement->location = statement->node->location;
+
     return statement;
 }
 

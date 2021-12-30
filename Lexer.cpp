@@ -234,6 +234,32 @@ void lexer_next(Lexer *lexer)
             return;
         }
 
+        if (a == '"')
+        {
+            lexer->cursor++;
+            auto string = lexer->cursor;
+            while (lexer_continue(lexer))
+            {
+                if (lexer_advance_newline(lexer))
+                {
+                    lexer_error(lexer, "Expected '\"");
+                    return;
+                }
+                if (*lexer->cursor == '"')
+                {
+                    lexer->value.string.length = lexer->cursor - string;
+                    lexer->value.string.data   = string;
+                    lexer->cursor++;
+                    lexer_make_token(lexer, TOKEN_KIND_STRING);
+                    return;
+                }
+                lexer->cursor++;
+            }
+
+            lexer_error(lexer, "Expected '\"");
+            return;
+        }
+
         // three character tokens
         if (lexer->cursor + 2 < lexer->content.data + lexer->content.length)
         {
@@ -276,6 +302,12 @@ void lexer_next(Lexer *lexer)
         {
             lexer->cursor += 2;
             lexer_make_token(lexer, TOKEN_KIND_DASH_ARROW);
+            return;
+        }
+        else if (a == '.' && b == '.')
+        {
+            lexer->cursor += 2;
+            lexer_make_token(lexer, TOKEN_KIND_DOUBLE_PERDIOD);
             return;
         }
         else if (b == '=')
@@ -348,6 +380,10 @@ void lexer_next(Lexer *lexer)
             lexer->cursor++;
             lexer_make_token(lexer, TOKEN_KIND_DEREFERENCE);
             return;
+        case '.':
+            lexer->cursor++;
+            lexer_make_token(lexer, TOKEN_KIND_PERIOD);
+            return;
         case '=':
             lexer->cursor++;
             lexer_make_token(lexer, TOKEN_KIND_EQUALS);
@@ -367,6 +403,14 @@ void lexer_next(Lexer *lexer)
         case '}':
             lexer->cursor++;
             lexer_make_token(lexer, TOKEN_KIND_CLOSE_CURLY_BRACKET);
+            return;
+        case '[':
+            lexer->cursor++;
+            lexer_make_token(lexer, TOKEN_KIND_OPEN_SQUARE_BRACKET);
+            return;
+        case ']':
+            lexer->cursor++;
+            lexer_make_token(lexer, TOKEN_KIND_CLOSE_SQUARE_BRACKET);
             return;
         case '+':
             lexer->cursor++;
@@ -436,13 +480,17 @@ void lexer_next(Lexer *lexer)
             content.length                          = (lexer->cursor - content.data);
 
             static const String     KeyWords[]      = {"var",  "const", "true", "false", "int", "float", "bool",   "if",
-                                              "then", "else",  "for",  "while", "do",  "proc",  "struct", "return"};
+                                              "then", "else",  "for",  "while", "do",  "size_of", "type_of",
+                                              "proc",  "struct", "return", 
+                                              "cast", "void", "null"};
 
             static const Token_Kind KeyWordTokens[] = {
                 TOKEN_KIND_VAR,  TOKEN_KIND_CONST, TOKEN_KIND_TRUE,   TOKEN_KIND_FALSE,
                 TOKEN_KIND_INT,  TOKEN_KIND_FLOAT, TOKEN_KIND_BOOL,   TOKEN_KIND_IF,
-                TOKEN_KIND_THEN, TOKEN_KIND_ELSE,  TOKEN_KIND_FOR,    TOKEN_KIND_WHILE,
-                TOKEN_KIND_DO,   TOKEN_KIND_PROC,  TOKEN_KIND_STRUCT, TOKEN_KIND_RETURN};
+                TOKEN_KIND_THEN, TOKEN_KIND_ELSE,  TOKEN_KIND_FOR,    TOKEN_KIND_WHILE, TOKEN_KIND_DO,
+                TOKEN_KIND_SIZE_OF, TOKEN_KIND_TYPE_OF,
+                TOKEN_KIND_PROC,  TOKEN_KIND_STRUCT, TOKEN_KIND_RETURN,
+                TOKEN_KIND_CAST, TOKEN_KIND_VOID, TOKEN_KIND_NULL};
 
             static_assert(ArrayCount(KeyWords) == ArrayCount(KeyWordTokens));
 

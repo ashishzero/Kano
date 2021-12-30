@@ -29,11 +29,15 @@ enum Syntax_Node_Kind
     SYNTAX_NODE_PROCEDURE_PROTOTYPE_ARGUMENT,
     SYNTAX_NODE_PROCEDURE_PROTOTYPE,
     SYNTAX_NODE_TYPE,
+    SYNTAX_NODE_SIZE_OF,
+    SYNTAX_NODE_TYPE_OF,
+    SYNTAX_NODE_TYPE_CAST,
     SYNTAX_NODE_RETURN,
     SYNTAX_NODE_ASSIGNMENT,
     SYNTAX_NODE_EXPRESSION,
     SYNTAX_NODE_PROCEDURE_PARAMETER,
     SYNTAX_NODE_PROCEDURE_CALL,
+    SYNTAX_NODE_SUBSCRIPT,
     SYNTAX_NODE_IF,
     SYNTAX_NODE_FOR,
     SYNTAX_NODE_WHILE,
@@ -42,6 +46,8 @@ enum Syntax_Node_Kind
     SYNTAX_NODE_PROCEDURE,
     SYNTAX_NODE_DECLARATION,
     SYNTAX_NODE_STRUCT,
+    SYNTAX_NODE_ARRAY_VIEW,
+    SYNTAX_NODE_STATIC_ARRAY,
     SYNTAX_NODE_STATEMENT,
     SYNTAX_NODE_BLOCK,
     SYNTAX_NODE_GLOBAL_SCOPE
@@ -55,6 +61,9 @@ struct Syntax_Node_Binary_Operator;
 struct Syntax_Node_Procedure_Prototype_Argument;
 struct Syntax_Node_Procedure_Prototype;
 struct Syntax_Node_Type;
+struct Syntax_Node_Size_Of;
+struct Syntax_Node_Type_Of;
+struct Syntax_Node_Type_Cast;
 struct Syntax_Node_Assignment;
 struct Syntax_Node_Expression;
 struct Syntax_Node_Procedure_Parameter;
@@ -67,6 +76,8 @@ struct Syntax_Node_Procedure_Argument;
 struct Syntax_Node_Procedure;
 struct Syntax_Node_Declaration;
 struct Syntax_Node_Struct;
+struct Syntax_Node_Array_View;
+struct Syntax_Node_Static_Array;
 struct Syntax_Node_Statement;
 struct Syntax_Node_Block;
 struct Syntax_Node_Global_Scope;
@@ -83,13 +94,18 @@ struct Literal
     {
         INTEGER,
         REAL,
-        BOOL
+        BOOL,
+        STRING,
+        NULL_POINTER
     };
 
     union Value {
-        int32_t integer = 0;
+        String  string = {};
+        int32_t integer;
         float   real;
         bool    boolean;
+
+        Value() = default;
     };
 
     Kind  kind = INTEGER;
@@ -169,8 +185,55 @@ struct Syntax_Node_Type : public Syntax_Node
         kind = SYNTAX_NODE_TYPE;
     }
 
-    Token_Kind   token_type = TOKEN_KIND_ERROR;
+    enum Id
+    {
+        ERROR,
+        VOID,
+        INT,
+        FLOAT,
+        BOOL,
+        VARIADIC_ARGUMENT,
+        POINTER,
+        PROCEDURE,
+        IDENTIFIER,
+        TYPE_OF,
+        ARRAY_VIEW,
+        STATIC_ARRAY,
+    };
+
+    Id id = ERROR;
     Syntax_Node *type       = nullptr;
+};
+
+struct Syntax_Node_Size_Of : public Syntax_Node
+{
+    Syntax_Node_Size_Of()
+    {
+        kind = SYNTAX_NODE_SIZE_OF;
+    }
+
+    Syntax_Node_Type *type = nullptr;
+};
+
+struct Syntax_Node_Type_Of : public Syntax_Node
+{
+    Syntax_Node_Type_Of()
+    {
+        kind = SYNTAX_NODE_TYPE_OF;
+    }
+
+    Syntax_Node_Expression *expression = nullptr;
+};
+
+struct Syntax_Node_Type_Cast : public Syntax_Node
+{
+    Syntax_Node_Type_Cast()
+    {
+        kind = SYNTAX_NODE_TYPE_CAST;
+    }
+
+    Syntax_Node_Type *type             = nullptr;
+    Syntax_Node_Expression *expression = nullptr;
 };
 
 struct Syntax_Node_Return : public Syntax_Node
@@ -225,6 +288,17 @@ struct Syntax_Node_Procedure_Call : public Syntax_Node
     Syntax_Node_Expression *         procedure       = nullptr;
     uint64_t                         parameter_count = 0;
     Syntax_Node_Procedure_Parameter *parameters      = nullptr;
+};
+
+struct Syntax_Node_Subscript : public Syntax_Node
+{
+    Syntax_Node_Subscript()
+    {
+        kind = SYNTAX_NODE_SUBSCRIPT;
+    }
+
+    Syntax_Node_Expression * expression = nullptr;
+    Syntax_Node_Expression * subscript  = nullptr;
 };
 
 struct Syntax_Node_If : public Syntax_Node
@@ -328,6 +402,27 @@ struct Syntax_Node_Struct : public Syntax_Node
 
     uint64_t                      member_count = 0;
     Syntax_Node_Declaration_List *members      = nullptr;
+};
+
+struct Syntax_Node_Array_View : public Syntax_Node
+{
+    Syntax_Node_Array_View()
+    {
+        kind = SYNTAX_NODE_ARRAY_VIEW;
+    }
+
+    Syntax_Node_Type *element_type = nullptr;
+};
+
+struct Syntax_Node_Static_Array : public Syntax_Node
+{
+    Syntax_Node_Static_Array()
+    {
+        kind = SYNTAX_NODE_STATIC_ARRAY;
+    }
+
+    Syntax_Node_Expression *expression = nullptr;
+    Syntax_Node_Type *element_type = nullptr;
 };
 
 struct Syntax_Node_Statement : public Syntax_Node
