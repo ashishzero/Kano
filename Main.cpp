@@ -1567,7 +1567,7 @@ int main()
     interp_init(&interp, 1024 * 1024 * 4);
 
     for (auto expr : exprs)
-        evaluate_code_node_assignment(expr, &interp);
+        evaluate_code_node_assignment(expr, &interp,0);
 
     auto main_proc = symbol_table_get(&resolver.symbols, "main", false);
     if (main_proc)
@@ -1588,7 +1588,7 @@ int main()
                         fclose(fp);
                     }
 
-                    evaluate_node_block(proc, &interp);
+                    evaluate_node_block(proc, &interp,0);
                 }
                 else
                 {

@@ -13,5 +13,5 @@ struct Find_Type_Value
 };
 
 void            interp_init(Interp *interp, size_t size);
-Find_Type_Value evaluate_code_node_assignment(Code_Node_Assignment *node, Interp *interp);
-void            evaluate_node_block(Code_Node_Block *root, Interp *stack);
+Find_Type_Value evaluate_code_node_assignment(Code_Node_Assignment *node, Interp *interp, uint64_t top);
+void            evaluate_node_block(Code_Node_Block *root, Interp *stack, uint64_t);

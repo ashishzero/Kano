@@ -1,9 +1,9 @@
 #include "Interp.h"
 #include "CodeNode.h"
 
-Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp);
-Find_Type_Value evaluate_node_expression(Code_Node_Expression *root, Interp *interp);
-void            evaluate_node_statement(Code_Node_Statement *root, Interp *interp);
+Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t top);
+Find_Type_Value evaluate_node_expression(Code_Node_Expression *root, Interp *interp, uint64_t top);
+void            evaluate_node_statement(Code_Node_Statement *root, Interp *interp, uint64_t top);
 
 void            interp_init(Interp *interp, size_t size)
 {
@@ -33,82 +33,90 @@ void print_values(Find_Type_Value result)
     }
 }
 
-Find_Type_Value evaluate_procedure(Code_Node_Procedure_Call *root,Interp* interp)
+Find_Type_Value evaluate_procedure(Code_Node_Procedure_Call *root, Interp *interp, uint64_t prev_top)
 {
+    
+    auto top = root->stack_top + prev_top;
+    top += root->type->runtime_size;
     for (int i = 0; i < root->parameter_count; i++)
     {
-        auto var = evaluate_node_expression((Code_Node_Expression *)root->paraments[i], interp);
-        //auto node = (Code_Type_Procedure *)root->paraments[i];
-        //switch (var.type)
-        //{
-        //case CODE_TYPE_BOOL: {
-        //   // *node->arguments[i] = var.value.boolean.value;
-        //}
-        //break;
-        //case CODE_TYPE_INTEGER:
-        //{
-        //  //  *node->arguments[i] = (int32_t)var.value.integer.value;
-        //}break;
-        //case CODE_TYPE_REAL: {
-        //   // *node->arguments[i] = var.value.real.value;
-        //}
-        //break;
-        //
-        //}
-
+        auto var  = evaluate_node_expression((Code_Node_Expression *)root->paraments[i], interp, prev_top);
+        auto node = (Code_Type_Procedure *)root->paraments[i];
+         switch (var.type)
+        {
+        case CODE_TYPE_BOOL: {
+            bool *value = (bool *)(interp->stack + top);
+            *value      = var.value.boolean.value;
+            top += sizeof(bool);
+        }
+        break;
+        case CODE_TYPE_INTEGER: {
+            int *value = (int *)(interp->stack + top);
+            *value     = var.value.integer.value;
+            top += sizeof(int);
+        }
+        break;
+        case CODE_TYPE_REAL: {
+            float *value = (float *)(interp->stack + top);
+            *value       = var.value.real.value;
+            top += sizeof(float);
+        }
+        break;
+        }
     }
-    auto result = evaluate_expression((Code_Node *)root->procedure, interp);
+    auto result = evaluate_expression((Code_Node*)root->procedure, interp, (root->stack_top + prev_top));
     return result;
-
-
 }
-void evaluate_do_block(Code_Node_Do *root, Interp *interp)
+void evaluate_do_block(Code_Node_Do *root, Interp *interp, uint64_t top)
 {
     Find_Type_Value cond;
     do
     {
-        evaluate_node_statement((Code_Node_Statement *)root->body, interp);
-        cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp);
+        evaluate_node_statement((Code_Node_Statement *)root->body, interp, top);
+        cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
     } while (cond.value.boolean.value);
 }
-void evaluate_while_block(Code_Node_While *root, Interp *interp)
+void evaluate_while_block(Code_Node_While *root, Interp *interp, uint64_t top)
 {
-    auto cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp);
+    auto cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
     while (cond.value.boolean.value)
     {
-        evaluate_node_statement((Code_Node_Statement *)root->body, interp);
-        cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp);
+        evaluate_node_statement((Code_Node_Statement *)root->body, interp, top);
+        cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
         printf("statement executes:: %d\n", (int)cond.value.boolean.value);
     }
 }
-void evaluate_if_block(Code_Node_If *root, Interp *interp)
+void evaluate_if_block(Code_Node_If *root, Interp *interp, uint64_t top)
 {
-    auto cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp);
+    auto cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
     if (cond.value.boolean.value)
-        evaluate_node_statement((Code_Node_Statement *)root->true_statement, interp);
+        evaluate_node_statement((Code_Node_Statement *)root->true_statement, interp, top);
     else
-        evaluate_node_statement((Code_Node_Statement *)root->false_statement, interp);
+    {
+        if (root->false_statement)
+            evaluate_node_statement((Code_Node_Statement *)root->false_statement, interp, top);
+    }
 }
 
-void evaluate_for_block(Code_Node_For *root, Interp *interp)
+void evaluate_for_block(Code_Node_For *root, Interp *interp, uint64_t top)
 {
-    evaluate_node_statement((Code_Node_Statement *)root->initialization, interp);
-    auto cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp);
+    evaluate_node_statement((Code_Node_Statement *)root->initialization, interp, top);
+    auto cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
     printf("statement executes:: %d\n", (int)cond.value.boolean.value);
     while (cond.value.boolean.value)
     {
-        evaluate_node_statement((Code_Node_Statement *)root->body, interp);
-        auto incre = evaluate_node_expression((Code_Node_Expression *)root->increment, interp);
+        evaluate_node_statement((Code_Node_Statement *)root->body, interp, top);
+        auto incre = evaluate_node_expression((Code_Node_Expression *)root->increment, interp, top);
         print_values(incre);
-        cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp);
+        cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
     }
 }
-Find_Type_Value evaluate_code_node_assignment(Code_Node_Assignment *node, Interp *interp)
+Find_Type_Value evaluate_code_node_assignment(Code_Node_Assignment *node, Interp *interp, uint64_t top)
 {
-    auto value = evaluate_node_expression((Code_Node_Expression *)node->value, interp);
+    auto value = evaluate_node_expression((Code_Node_Expression *)node->value, interp, top);
     Assert(node->destination->child->kind == CODE_NODE_ADDRESS);
 
-    auto            destiny = (Code_Node_Address *)node->destination->child;
+    auto destiny = (Code_Node_Address *)node->destination->child;
 
     switch (destiny->type->kind)
     {
@@ -170,7 +178,7 @@ Find_Type_Value evaluate_node_literal(Code_Node_Literal *root)
     }
     return type_value;
 }
-Find_Type_Value evaluate_unary_operator(Code_Node_Unary_Operator *root, Interp *interp)
+Find_Type_Value evaluate_unary_operator(Code_Node_Unary_Operator *root, Interp *interp, uint64_t top)
 {
     auto node       = root;
     auto check_kind = (Code_Node *)root;
@@ -180,7 +188,7 @@ Find_Type_Value evaluate_unary_operator(Code_Node_Unary_Operator *root, Interp *
         switch (node->op_kind)
         {
         case UNARY_OPERATOR_LOGICAL_NOT: {
-            auto type_value                = evaluate_expression(node->child, interp);
+            auto type_value                = evaluate_expression(node->child, interp, top);
             type_value.value.boolean.value = !type_value.value.boolean.value;
             type_value.type                = CODE_TYPE_BOOL;
             return type_value;
@@ -194,21 +202,21 @@ Find_Type_Value evaluate_unary_operator(Code_Node_Unary_Operator *root, Interp *
         switch (node->op_kind)
         {
         case UNARY_OPERATOR_PLUS: {
-            auto type_value                = evaluate_expression(node->child, interp);
+            auto type_value                = evaluate_expression(node->child, interp, top);
             type_value.value.integer.value = 0 + type_value.value.integer.value;
             type_value.type                = CODE_TYPE_INTEGER;
             return type_value;
         }
         break;
         case UNARY_OPERATOR_MINUS: {
-            auto type_value                = evaluate_expression(node->child, interp);
+            auto type_value                = evaluate_expression(node->child, interp, top);
             type_value.value.integer.value = 0 - type_value.value.integer.value;
             type_value.type                = CODE_TYPE_INTEGER;
             return type_value;
         }
         break;
         case UNARY_OPERATOR_BITWISE_NOT: {
-            auto type_value                = evaluate_expression(node->child, interp);
+            auto type_value                = evaluate_expression(node->child, interp, top);
             type_value.value.integer.value = ~type_value.value.integer.value;
             type_value.type                = CODE_TYPE_INTEGER;
             return type_value;
@@ -222,14 +230,14 @@ Find_Type_Value evaluate_unary_operator(Code_Node_Unary_Operator *root, Interp *
         switch (node->op_kind)
         {
         case UNARY_OPERATOR_PLUS: {
-            auto type_value             = evaluate_expression(node->child, interp);
+            auto type_value             = evaluate_expression(node->child, interp, top);
             type_value.value.real.value = 0 + type_value.value.real.value;
             type_value.type             = CODE_TYPE_REAL;
             return type_value;
         }
         break;
         case UNARY_OPERATOR_MINUS: {
-            auto type_value             = evaluate_expression(node->child, interp);
+            auto type_value             = evaluate_expression(node->child, interp, top);
             type_value.value.real.value = 0 - type_value.value.real.value;
             type_value.type             = CODE_TYPE_REAL;
             return type_value;
@@ -281,7 +289,7 @@ Find_Type_Value evaluate_unary_operator(Code_Node_Unary_Operator *root, Interp *
     return Find_Type_Value{};
 }
 
-Find_Type_Value evaluate_binary_operator(Code_Node_Binary_Operator *root, Interp *interp)
+Find_Type_Value evaluate_binary_operator(Code_Node_Binary_Operator *root, Interp *interp, uint64_t top)
 {
     auto            node       = root;
     auto            check_kind = (Code_Node *)root;
@@ -289,8 +297,8 @@ Find_Type_Value evaluate_binary_operator(Code_Node_Binary_Operator *root, Interp
     switch (check_kind->type->kind)
     {
     case CODE_TYPE_INTEGER: {
-        auto a       = evaluate_expression(node->left, interp);
-        auto b       = evaluate_expression(node->right, interp);
+        auto a       = evaluate_expression(node->left, interp, top);
+        auto b       = evaluate_expression(node->right, interp, top);
         auto destiny = (Code_Node_Address *)node->left;
         int *dst     = (int *)(interp->stack + (uint64_t)destiny->address.memory);
         switch (node->op_kind)
@@ -426,8 +434,8 @@ Find_Type_Value evaluate_binary_operator(Code_Node_Binary_Operator *root, Interp
     }
     break;
     case CODE_TYPE_REAL: {
-        auto   a       = evaluate_expression(node->left, interp);
-        auto   b       = evaluate_expression(node->right, interp);
+        auto   a       = evaluate_expression(node->left, interp, top);
+        auto   b       = evaluate_expression(node->right, interp, top);
         auto   destiny = (Code_Node_Address *)node->left;
         float *dst     = (float *)(interp->stack + (uint64_t)destiny->address.memory);
         switch (node->op_kind)
@@ -491,8 +499,8 @@ Find_Type_Value evaluate_binary_operator(Code_Node_Binary_Operator *root, Interp
     }
     break;
     case CODE_TYPE_BOOL: {
-        auto a = evaluate_expression(node->left, interp);
-        auto b = evaluate_expression(node->right, interp);
+        auto a = evaluate_expression(node->left, interp, top);
+        auto b = evaluate_expression(node->right, interp, top);
         switch (node->op_kind)
         {
         case BINARY_OPERATOR_RELATIONAL_GREATER: {
@@ -541,7 +549,7 @@ Find_Type_Value evaluate_binary_operator(Code_Node_Binary_Operator *root, Interp
     Unreachable();
     return Find_Type_Value{};
 }
-Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp)
+Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t top)
 {
     switch (root->kind)
     {
@@ -551,12 +559,12 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp)
     break;
 
     case CODE_NODE_UNARY_OPERATOR: {
-        return evaluate_unary_operator((Code_Node_Unary_Operator *)root, interp);
+        return evaluate_unary_operator((Code_Node_Unary_Operator *)root, interp, top);
     }
     break;
 
     case CODE_NODE_BINARY_OPERATOR: {
-        return evaluate_binary_operator((Code_Node_Binary_Operator *)root, interp);
+        return evaluate_binary_operator((Code_Node_Binary_Operator *)root, interp, top);
     }
     break;
 
@@ -577,10 +585,15 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp)
         break;
         case CODE_TYPE_REAL: {
 
-            float *value                = (float *)(interp->stack + offset);
-            type_value.value.real.value = *value;
-            type_value.type             = CODE_TYPE_REAL;
-            return type_value;
+            float *stack_value = (float *)(interp->stack + top + offset);
+             type_value.value.real.value = *stack_value;
+             type_value.type             = CODE_TYPE_REAL;
+             return type_value;
+
+            //float *value                = (float *)(interp->stack + offset);
+            //type_value.value.real.value = *value;
+            //type_value.type             = CODE_TYPE_REAL;
+            //return type_value;
         }
         break;
 
@@ -592,18 +605,18 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp)
         }
         break;
         case CODE_TYPE_PROCEDURE: {
-                switch (node->address.kind)
-                {
-                case Symbol_Address::CODE: {
-                    evaluate_node_block((Code_Node_Block *)node->address.memory, interp);
-                }
-                break;
-                case Symbol_Address::GLOBAL: {
-                }
-                break;
-                case Symbol_Address::STACK: {
-                }
-                break;
+            switch (node->address.kind)
+            {
+            case Symbol_Address::CODE: {
+                evaluate_node_block((Code_Node_Block *)node->address.memory, interp, top);
+            }
+            break;
+            case Symbol_Address::GLOBAL: {
+            }
+            break;
+            case Symbol_Address::STACK: {
+            }
+            break;
             }
         }
         break;
@@ -613,13 +626,13 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp)
     break;
 
     case CODE_NODE_ASSIGNMENT: {
-        return evaluate_code_node_assignment((Code_Node_Assignment *)root, interp);
+        return evaluate_code_node_assignment((Code_Node_Assignment *)root, interp, top);
     }
     break;
 
     case CODE_NODE_TYPE_CAST: {
         auto            cast  = (Code_Node_Type_Cast *)root;
-        auto            value = evaluate_expression(cast->child, interp);
+        auto            value = evaluate_expression(cast->child, interp, top);
         Find_Type_Value type_value;
         type_value.type = cast->type->kind;
 
@@ -645,16 +658,21 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp)
     }
     break;
     case CODE_NODE_IF: {
-        return evaluate_expression((Code_Node *)root, interp);
+        return evaluate_expression((Code_Node *)root, interp, top);
     }
     break;
     case CODE_NODE_PROCEDURE_CALL: {
-        return evaluate_procedure((Code_Node_Procedure_Call *)root, interp);
+        return evaluate_procedure((Code_Node_Procedure_Call *)root, interp, top);
     }
     break;
     case CODE_NODE_EXPRESSION: {
-        auto result = evaluate_node_expression((Code_Node_Expression *)root, interp);
+        auto result = evaluate_node_expression((Code_Node_Expression *)root, interp, top);
         print_values(result);
+    }
+    break;
+    case CODE_NODE_RETURN: {
+        auto node = (Code_Node_Return *)root;
+        return evaluate_expression(node->expression, interp, top);
     }
     break;
 
@@ -665,55 +683,55 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp)
     return Find_Type_Value{};
 }
 
-Find_Type_Value evaluate_node_expression(Code_Node_Expression *root, Interp *interp)
+Find_Type_Value evaluate_node_expression(Code_Node_Expression *root, Interp *interp, uint64_t top)
 {
-    return evaluate_expression(root->child, interp);
+    return evaluate_expression(root->child, interp, top);
 }
 
-void evaluate_node_statement(Code_Node_Statement *root, Interp *interp)
+void evaluate_node_statement(Code_Node_Statement *root, Interp *interp, uint64_t top)
 {
     switch (root->node->kind)
     {
     case CODE_NODE_EXPRESSION: {
-        auto result = evaluate_node_expression((Code_Node_Expression *)root->node, interp);
+        auto result = evaluate_node_expression((Code_Node_Expression *)root->node, interp, top);
         print_values(result);
     }
     break;
     case CODE_NODE_ASSIGNMENT: {
-        auto result = evaluate_code_node_assignment((Code_Node_Assignment *)root->node, interp);
+        auto result = evaluate_code_node_assignment((Code_Node_Assignment *)root->node, interp, top);
         print_values(result);
         // Unimplemented();
     }
     break;
     case CODE_NODE_BLOCK: {
-        evaluate_node_block((Code_Node_Block *)root->node, interp);
+        evaluate_node_block((Code_Node_Block *)root->node, interp, top);
     }
     break;
     case CODE_NODE_IF: {
-        evaluate_if_block((Code_Node_If *)root->node, interp);
+        evaluate_if_block((Code_Node_If *)root->node, interp, top);
     }
     break;
     case CODE_NODE_FOR: {
-        evaluate_for_block((Code_Node_For *)root->node, interp);
+        evaluate_for_block((Code_Node_For *)root->node, interp, top);
     }
     break;
     case CODE_NODE_WHILE: {
-        evaluate_while_block((Code_Node_While *)root->node, interp);
+        evaluate_while_block((Code_Node_While *)root->node, interp, top);
     }
     break;
     case CODE_NODE_DO: {
-        evaluate_do_block((Code_Node_Do *)root->node, interp);
+        evaluate_do_block((Code_Node_Do *)root->node, interp, top);
     }
     break;
         NoDefaultCase();
     }
 }
 
-void evaluate_node_block(Code_Node_Block *root, Interp *interp)
+void evaluate_node_block(Code_Node_Block *root, Interp *interp, uint64_t top)
 {
     for (auto statement = root->statement_head; statement; statement = statement->next)
     {
-        evaluate_node_statement(statement, interp);
+        evaluate_node_statement(statement, interp, top);
     }
     printf("Block %d statement executed\n", (int)root->statement_count);
 }
