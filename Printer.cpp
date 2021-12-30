@@ -401,7 +401,7 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
         {
             fprintf(fp, "Address(%s:0x%zx + 0x%zx)\n", 
                 SymbolAddressNames[node->address->kind], 
-                (uint64_t)node->address->memory,
+                node->address->offset,
                 node->offset);
         }
         else

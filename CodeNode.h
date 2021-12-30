@@ -138,23 +138,27 @@ struct Symbol_Address
         CODE,
         CCALL,
     };
-    Kind  kind;
-    void *memory;
+    Kind kind;
+
+    union {
+        uint64_t                offset;
+        struct Code_Node_Block *code;
+    };
 };
 
 inline Symbol_Address symbol_address_offset(uint32_t offset, Symbol_Address::Kind kind)
 {
     Symbol_Address address;
     address.kind   = kind;
-    address.memory = (void *)((uint64_t)offset);
+    address.offset = offset;
     return address;
 }
 
 inline Symbol_Address symbol_address_code(struct Code_Node_Block *block)
 {
     Symbol_Address code;
-    code.kind   = Symbol_Address::CODE;
-    code.memory = (void *)block;
+    code.kind = Symbol_Address::CODE;
+    code.code = block;
     return code;
 }
 

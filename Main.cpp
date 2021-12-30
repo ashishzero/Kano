@@ -933,7 +933,7 @@ Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Symbol_Tab
                 Assert(symbol && symbol->type->kind == CODE_TYPE_STRUCT &&
                        symbol->address.kind == Symbol_Address::CODE);
 
-                auto block  = (Code_Node_Block *)symbol->address.memory;
+                auto block  = symbol->address.code;
 
                 auto member = symbol_table_get(&block->symbols, iden->name, false);
 
@@ -943,7 +943,7 @@ Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Symbol_Tab
 
                     auto code_node  = (Code_Node_Address *)left;
                     code_node->type = member->type;
-                    code_node->offset += (uint64_t)member->address.memory;
+                    code_node->offset += member->address.offset;
 
                     return code_node;
                 }
@@ -1937,13 +1937,13 @@ int main()
         auto length            = resolver.symbols_allocator.add();
         length->name           = "length";
         length->address.kind   = Symbol_Address::STACK;
-        length->address.memory = 0;
+        length->address.offset = 0;
         length->type           = symbol_table_get(&resolver.symbols, "int")->type;
 
         auto data              = resolver.symbols_allocator.add();
         data->name             = "data";
         data->address.kind     = Symbol_Address::STACK;
-        data->address.memory   = (uint8_t *)sizeof(int64_t);
+        data->address.offset   = sizeof(int64_t);
         data->type             = symbol_table_get(&resolver.symbols, "*void")->type;
 
         symbol_table_put(&block->symbols, length);
@@ -1958,11 +1958,11 @@ int main()
         type->members           = new Code_Type_Struct::Member[type->member_count];
 
         type->members[0].name   = length->name;
-        type->members[0].offset = (uint64_t)length->address.memory;
+        type->members[0].offset = length->address.offset;
         type->members[0].type   = length->type;
 
         type->members[1].name   = data->name;
-        type->members[1].offset = (uint64_t)length->address.memory;
+        type->members[1].offset = length->address.offset;
         type->members[1].type   = data->type;
 
         auto sym                = resolver.symbols_allocator.add();
@@ -2107,7 +2107,7 @@ int main()
         sym->name            = "allocate";
         sym->type            = type;
         sym->address.kind    = Symbol_Address::CCALL;
-        sym->address.memory  = nullptr;
+        sym->address.code  = nullptr;
 
         symbol_table_put(&resolver.symbols, sym);
     }
@@ -2123,7 +2123,7 @@ int main()
         sym->name            = "free";
         sym->type            = type;
         sym->address.kind    = Symbol_Address::CCALL;
-        sym->address.memory  = nullptr;
+        sym->address.code    = nullptr;
 
         symbol_table_put(&resolver.symbols, sym);
     }
@@ -2141,7 +2141,7 @@ int main()
         sym->name            = "print";
         sym->type            = type;
         sym->address.kind    = Symbol_Address::CCALL;
-        sym->address.memory  = nullptr;
+        sym->address.code    = nullptr;
 
         symbol_table_put(&resolver.symbols, sym);
     }
@@ -2174,7 +2174,7 @@ int main()
                 auto proc_type = (Code_Type_Procedure *)type;
                 if (proc_type->argument_count == 0 && !proc_type->return_type)
                 {
-                    auto proc = (Code_Node_Block *)main_proc->address.memory;
+                    auto proc = main_proc->address.code;
 
                     {
                         auto fp = fopen("code.txt", "ab");
