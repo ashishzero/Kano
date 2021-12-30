@@ -35,14 +35,14 @@ void print_values(Find_Type_Value result)
 
 Find_Type_Value evaluate_procedure(Code_Node_Procedure_Call *root, Interp *interp, uint64_t prev_top)
 {
-    
+
     auto top = root->stack_top + prev_top;
     top += root->type->runtime_size;
     for (int i = 0; i < root->parameter_count; i++)
     {
         auto var  = evaluate_node_expression((Code_Node_Expression *)root->paraments[i], interp, prev_top);
         auto node = (Code_Type_Procedure *)root->paraments[i];
-         switch (var.type)
+        switch (var.type)
         {
         case CODE_TYPE_BOOL: {
             bool *value = (bool *)(interp->stack + top);
@@ -64,7 +64,7 @@ Find_Type_Value evaluate_procedure(Code_Node_Procedure_Call *root, Interp *inter
         break;
         }
     }
-    auto result = evaluate_expression((Code_Node*)root->procedure, interp, (root->stack_top + prev_top));
+    auto result = evaluate_expression((Code_Node *)root->procedure, interp, (root->stack_top + prev_top));
     return result;
 }
 void evaluate_do_block(Code_Node_Do *root, Interp *interp, uint64_t top)
@@ -118,28 +118,35 @@ Find_Type_Value evaluate_code_node_assignment(Code_Node_Assignment *node, Interp
 
     auto destiny = (Code_Node_Address *)node->destination->child;
 
+    auto offset  = destiny->offset;
+    if (destiny->address)
+    {
+        Assert(destiny->address->kind == Symbol_Address::STACK);
+        offset += (uint64_t)destiny->address->memory;
+    }
+
     switch (destiny->type->kind)
     {
     case CODE_TYPE_REAL: {
-        float *dst = (float *)(interp->stack + (uint64_t)destiny->address.memory);
+        float *dst = (float *)(interp->stack + offset);
         *dst       = value.value.real.value;
         return value;
     }
     break;
     case CODE_TYPE_INTEGER: {
-        int *dst = (int *)(interp->stack + (uint64_t)destiny->address.memory);
+        int *dst = (int *)(interp->stack + offset);
         *dst     = value.value.integer.value;
         return value;
     }
     break;
     case CODE_TYPE_BOOL: {
-        bool *dst = (bool *)(interp->stack + (uint64_t)destiny->address.memory);
+        bool *dst = (bool *)(interp->stack + offset);
         *dst      = value.value.boolean.value;
         return value;
     }
     break;
     case CODE_TYPE_POINTER: {
-        uint64_t *dst = (uint64_t *)(interp->stack + (uint64_t)destiny->address.memory);
+        uint64_t *dst = (uint64_t *)(interp->stack + offset);
         *dst          = value.value.pointer.value;
         return value;
     }
@@ -248,7 +255,7 @@ Find_Type_Value evaluate_unary_operator(Code_Node_Unary_Operator *root, Interp *
 
             auto            address       = (Code_Node_Address *)node->child;
 
-            uint64_t *      address_value = (uint64_t *)(interp->stack + (uint64_t)address->address.memory);
+            uint64_t *      address_value = (uint64_t *)(interp->stack + (uint64_t)address->address->memory);
             float *         value         = (float *)(interp->stack + *address_value);
 
             Find_Type_Value type_value;
@@ -268,13 +275,13 @@ Find_Type_Value evaluate_unary_operator(Code_Node_Unary_Operator *root, Interp *
 
         Find_Type_Value type_value;
         type_value.type                = CODE_TYPE_POINTER;
-        type_value.value.pointer.value = (uint64_t)address->address.memory;
+        type_value.value.pointer.value = (uint64_t)address->address->memory;
         return type_value;
     }
     break;
     case UNARY_OPERATOR_DEREFERENCE: {
         auto            var    = (Code_Node_Address *)node;
-        uint64_t        offset = (uint64_t)var->address.memory;
+        uint64_t        offset = (uint64_t)var->address->memory;
         int *           value  = (int *)(interp->stack + offset);
         Find_Type_Value type_value;
         type_value.value.integer.value = *value;
@@ -300,7 +307,7 @@ Find_Type_Value evaluate_binary_operator(Code_Node_Binary_Operator *root, Interp
         auto a       = evaluate_expression(node->left, interp, top);
         auto b       = evaluate_expression(node->right, interp, top);
         auto destiny = (Code_Node_Address *)node->left;
-        int *dst     = (int *)(interp->stack + (uint64_t)destiny->address.memory);
+        int *dst     = (int *)(interp->stack + (uint64_t)destiny->address->memory);
         switch (node->op_kind)
         {
         case BINARY_OPERATOR_ADDITION: {
@@ -437,7 +444,7 @@ Find_Type_Value evaluate_binary_operator(Code_Node_Binary_Operator *root, Interp
         auto   a       = evaluate_expression(node->left, interp, top);
         auto   b       = evaluate_expression(node->right, interp, top);
         auto   destiny = (Code_Node_Address *)node->left;
-        float *dst     = (float *)(interp->stack + (uint64_t)destiny->address.memory);
+        float *dst     = (float *)(interp->stack + (uint64_t)destiny->address->memory);
         switch (node->op_kind)
         {
         case BINARY_OPERATOR_ADDITION: {
@@ -571,7 +578,11 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
     case CODE_NODE_ADDRESS: {
         auto node = (Code_Node_Address *)root;
         // Assert(node->type.kind == CODE_TYPE_REAL);
-        uint64_t        offset = (uint64_t)node->address.memory;
+        auto offset = node->offset;
+        if (node->address)
+        {
+            offset += (uint64_t)node->address->memory;
+        }
         Find_Type_Value type_value;
 
         switch (node->type->kind)
@@ -585,15 +596,15 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
         break;
         case CODE_TYPE_REAL: {
 
-            float *stack_value = (float *)(interp->stack + top + offset);
-             type_value.value.real.value = *stack_value;
-             type_value.type             = CODE_TYPE_REAL;
-             return type_value;
+            float *stack_value          = (float *)(interp->stack + top + offset);
+            type_value.value.real.value = *stack_value;
+            type_value.type             = CODE_TYPE_REAL;
+            return type_value;
 
-            //float *value                = (float *)(interp->stack + offset);
-            //type_value.value.real.value = *value;
-            //type_value.type             = CODE_TYPE_REAL;
-            //return type_value;
+            // float *value                = (float *)(interp->stack + offset);
+            // type_value.value.real.value = *value;
+            // type_value.type             = CODE_TYPE_REAL;
+            // return type_value;
         }
         break;
 
@@ -605,10 +616,10 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
         }
         break;
         case CODE_TYPE_PROCEDURE: {
-            switch (node->address.kind)
+            switch (node->address->kind)
             {
             case Symbol_Address::CODE: {
-                evaluate_node_block((Code_Node_Block *)node->address.memory, interp, top);
+                evaluate_node_block((Code_Node_Block *)node->address->memory, interp, top);
             }
             break;
             case Symbol_Address::GLOBAL: {
@@ -632,7 +643,7 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
 
     case CODE_NODE_TYPE_CAST: {
         auto            cast  = (Code_Node_Type_Cast *)root;
-        auto            value = evaluate_expression(cast->child, interp, top);
+        auto            value = evaluate_node_expression(cast->child, interp, top);
         Find_Type_Value type_value;
         type_value.type = cast->type->kind;
 

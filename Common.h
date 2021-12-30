@@ -535,7 +535,7 @@ template <typename T, uint32_t N> struct Bucket_Array
         index = 0;
     }
 
-    void add(T d)
+    T *add()
     {
         if (index == N)
         {
@@ -545,7 +545,13 @@ template <typename T, uint32_t N> struct Bucket_Array
             last        = buk;
         }
 
-        last->data[index++] = d;
+        return &last->data[index++];
+    }
+
+    void add(T d)
+    {
+        auto dst = add();
+        *dst = d;
     }
 
     constexpr uint32_t bucket_size()

@@ -388,19 +388,25 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
         auto node = (Code_Node_Address *)root;
 
         const char *SymbolAddressNames[] = {"stack", "global", "code", "ccall"};
-        Assert(node->address.kind < ArrayCount(SymbolAddressNames));
+
+        if (node->address)
+            Assert(node->address->kind < ArrayCount(SymbolAddressNames));
 
         if (node->child)
         {
             fprintf(fp, "Address(+0x%zx)\n", node->offset);
             print_code(node->child, fp, child_indent, "Child");
         }
-        else
+        else if (node->address)
         {
             fprintf(fp, "Address(%s:0x%zx + 0x%zx)\n", 
-                SymbolAddressNames[node->address.kind], 
-                (uint64_t)node->address.memory,
+                SymbolAddressNames[node->address->kind], 
+                (uint64_t)node->address->memory,
                 node->offset);
+        }
+        else
+        {
+            fprintf(fp, "Address(stack:+0x%zx)\n", node->offset);
         }
     }
     break;

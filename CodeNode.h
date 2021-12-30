@@ -74,9 +74,9 @@ struct Code_Type_Procedure : public Code_Type
         alignment    = sizeof(void *);
     }
 
-    Code_Type **arguments               = nullptr;
-    uint64_t    argument_count          = 0;
-    bool        is_variadic             = false;
+    Code_Type **arguments      = nullptr;
+    uint64_t    argument_count = 0;
+    bool        is_variadic    = false;
 
     Code_Type * return_type    = nullptr;
 };
@@ -92,7 +92,7 @@ struct Code_Type_Struct : public Code_Type
     {
         String     name;
         Code_Type *type;
-        uint32_t   offset;
+        uint64_t   offset;
     };
 
     String   name;
@@ -106,9 +106,9 @@ struct Code_Type_Array_View : public Code_Type
 {
     Code_Type_Array_View()
     {
-        kind = CODE_TYPE_ARRAY_VIEW;
+        kind         = CODE_TYPE_ARRAY_VIEW;
         runtime_size = sizeof(Array_View<void *>);
-        alignment = sizeof(int64_t);
+        alignment    = sizeof(int64_t);
     }
 
     Code_Type *element_type = nullptr;
@@ -121,8 +121,8 @@ struct Code_Type_Static_Array : public Code_Type
         kind = CODE_TYPE_STATIC_ARRAY;
     }
 
-    Code_Type *element_type = nullptr;
-    uint64_t element_count  = 0;
+    Code_Type *element_type  = nullptr;
+    uint32_t   element_count = 0;
 };
 
 //
@@ -187,9 +187,9 @@ struct Symbol_Lookup
 
 struct Symbol_Table
 {
-    Symbol_Lookup lookup;
-    Array<Symbol> buffer;
-    Symbol_Table *parent = nullptr;
+    Symbol_Lookup   lookup;
+    Array<Symbol *> buffer;
+    Symbol_Table *  parent = nullptr;
 };
 
 //
@@ -258,7 +258,7 @@ union Code_Value {
     Code_Value_Bool    boolean;
     Code_Value_Pointer pointer;
 
-    Code_Value() = default;
+    Code_Value(){};
 };
 
 struct Code_Node_Literal : public Code_Node
@@ -278,11 +278,11 @@ struct Code_Node_Address : public Code_Node
         kind = CODE_NODE_ADDRESS;
     }
 
-    Code_Node *child = nullptr; // If child is null, then address is valid
+    Code_Node *           child   = nullptr; // If child is null, then address is valid
 
-    Symbol_Address address;
+    const Symbol_Address *address = nullptr;
 
-    uint64_t offset = 0;
+    uint64_t              offset  = 0;
 };
 
 struct Code_Node_Type_Cast : public Code_Node
@@ -292,8 +292,8 @@ struct Code_Node_Type_Cast : public Code_Node
         kind = CODE_NODE_TYPE_CAST;
     }
 
-    Code_Node *child    = nullptr;
-    bool       implicit = false;
+    struct Code_Node_Expression *child    = nullptr;
+    bool                         implicit = false;
 };
 
 enum Unary_Operator_Kind
@@ -416,10 +416,10 @@ struct Code_Node_Statement : public Code_Node
         kind = CODE_NODE_STATEMENT;
     }
 
-    uint64_t source_row    = -1;
+    uint64_t             source_row = -1;
 
-    Code_Node *          node = nullptr;
-    Code_Node_Statement *next = nullptr;
+    Code_Node *          node       = nullptr;
+    Code_Node_Statement *next       = nullptr;
 };
 
 struct Code_Node_Procedure_Call : public Code_Node
