@@ -1,6 +1,22 @@
 #include "Interp.h"
 #include "CodeNode.h"
 
+template <typename T> T to_type(Find_Type_Value &val)
+{
+    if (val.address)
+        return *(T *)val.address;
+    return *(T *)&val.imm;
+}
+#define TypeValue(val, type) to_type<type>(val)
+
+template <typename T> T *to_type_ptr(Find_Type_Value &val)
+{
+    if (val.address)
+        return (T *)val.address;
+    return (T *)&val.imm;
+}
+#define TypeValueRef(val, type) to_type_ptr<type>(val)
+
 Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t top);
 Find_Type_Value evaluate_node_expression(Code_Node_Expression *root, Interp *interp, uint64_t top);
 void            evaluate_node_statement(Code_Node_Statement *root, Interp *interp, uint64_t top);
@@ -12,59 +28,52 @@ void            interp_init(Interp *interp, size_t size)
 
 void print_values(Find_Type_Value result)
 {
-    switch (result.type)
+    switch (result.type->kind)
     {
     case CODE_TYPE_BOOL: {
-        printf("statement executes:: %d\n", (int)result.value.boolean.value);
+        printf("statement executes:: %d\n", (int)TypeValue(result, Kano_Bool));
     }
     break;
     case CODE_TYPE_REAL: {
-        printf("statement executes:: %f\n", result.value.real.value);
+        printf("statement executes:: %f\n", TypeValue(result, Kano_Real));
     }
     break;
     case CODE_TYPE_INTEGER: {
-        printf("statement executes:: %d\n", result.value.integer.value);
+        printf("statement executes:: %d\n", TypeValue(result, Kano_Int));
     }
     break;
     case CODE_TYPE_POINTER: {
-        printf("statement executes:: %zu\n", result.value.pointer.value);
+        printf("statement executes:: %p\n", TypeValue(result, void *));
     }
     break;
     }
 }
 
+uint64_t push_into_interp_stack(Find_Type_Value var, Interp *interp, uint64_t top)
+{
+    memcpy(interp->stack + top, TypeValueRef(var, void *), var.type->runtime_size);
+    top += var.type->runtime_size;
+    return top;
+}
+
 Find_Type_Value evaluate_procedure(Code_Node_Procedure_Call *root, Interp *interp, uint64_t prev_top)
 {
-
     auto top = root->stack_top + prev_top;
+    for (int i = 0; i < root->variadic_count; i++)
+    {
+        auto var = evaluate_node_expression((Code_Node_Expression *)root->variadics[i], interp, prev_top);
+        top      = push_into_interp_stack(var, interp, top);
+    }
+    // allocate for return type
+    auto proc_top = top;
     top += root->type->runtime_size;
     for (int i = 0; i < root->parameter_count; i++)
     {
         auto var  = evaluate_node_expression((Code_Node_Expression *)root->paraments[i], interp, prev_top);
         auto node = (Code_Type_Procedure *)root->paraments[i];
-        switch (var.type)
-        {
-        case CODE_TYPE_BOOL: {
-            bool *value = (bool *)(interp->stack + top);
-            *value      = var.value.boolean.value;
-            top += sizeof(bool);
-        }
-        break;
-        case CODE_TYPE_INTEGER: {
-            int *value = (int *)(interp->stack + top);
-            *value     = var.value.integer.value;
-            top += sizeof(int);
-        }
-        break;
-        case CODE_TYPE_REAL: {
-            float *value = (float *)(interp->stack + top);
-            *value       = var.value.real.value;
-            top += sizeof(float);
-        }
-        break;
-        }
+        top       = push_into_interp_stack(var, interp, top);
     }
-    auto result = evaluate_expression((Code_Node *)root->procedure, interp, (root->stack_top + prev_top));
+    auto result = evaluate_expression((Code_Node *)root->procedure, interp, proc_top);
     return result;
 }
 void evaluate_do_block(Code_Node_Do *root, Interp *interp, uint64_t top)
@@ -74,22 +83,24 @@ void evaluate_do_block(Code_Node_Do *root, Interp *interp, uint64_t top)
     {
         evaluate_node_statement((Code_Node_Statement *)root->body, interp, top);
         cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
-    } while (cond.value.boolean.value);
+    } while (TypeValue(cond, bool));
 }
+
 void evaluate_while_block(Code_Node_While *root, Interp *interp, uint64_t top)
 {
     auto cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
-    while (cond.value.boolean.value)
+    while (TypeValue(cond, bool))
     {
         evaluate_node_statement((Code_Node_Statement *)root->body, interp, top);
         cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
-        printf("statement executes:: %d\n", (int)cond.value.boolean.value);
+        printf("statement executes:: %d\n", (int)TypeValue(cond, bool));
     }
 }
+
 void evaluate_if_block(Code_Node_If *root, Interp *interp, uint64_t top)
 {
     auto cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
-    if (cond.value.boolean.value)
+    if (TypeValue(cond, bool))
         evaluate_node_statement((Code_Node_Statement *)root->true_statement, interp, top);
     else
     {
@@ -102,8 +113,8 @@ void evaluate_for_block(Code_Node_For *root, Interp *interp, uint64_t top)
 {
     evaluate_node_statement((Code_Node_Statement *)root->initialization, interp, top);
     auto cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
-    printf("statement executes:: %d\n", (int)cond.value.boolean.value);
-    while (cond.value.boolean.value)
+    printf("statement executes:: %d\n", (int)TypeValue(cond, bool));
+    while (TypeValue(cond, bool))
     {
         evaluate_node_statement((Code_Node_Statement *)root->body, interp, top);
         auto incre = evaluate_node_expression((Code_Node_Expression *)root->increment, interp, top);
@@ -111,6 +122,7 @@ void evaluate_for_block(Code_Node_For *root, Interp *interp, uint64_t top)
         cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
     }
 }
+
 Find_Type_Value evaluate_code_node_assignment(Code_Node_Assignment *node, Interp *interp, uint64_t top)
 {
     auto value = evaluate_node_expression((Code_Node_Expression *)node->value, interp, top);
@@ -125,443 +137,639 @@ Find_Type_Value evaluate_code_node_assignment(Code_Node_Assignment *node, Interp
         offset += (uint64_t)destiny->address->offset;
     }
 
-    switch (destiny->type->kind)
-    {
-    case CODE_TYPE_REAL: {
-        float *dst = (float *)(interp->stack + offset);
-        *dst       = value.value.real.value;
-        return value;
-    }
-    break;
-    case CODE_TYPE_INTEGER: {
-        int *dst = (int *)(interp->stack + offset);
-        *dst     = value.value.integer.value;
-        return value;
-    }
-    break;
-    case CODE_TYPE_BOOL: {
-        bool *dst = (bool *)(interp->stack + offset);
-        *dst      = value.value.boolean.value;
-        return value;
-    }
-    break;
-    case CODE_TYPE_POINTER: {
-        uint64_t *dst = (uint64_t *)(interp->stack + offset);
-        *dst          = value.value.pointer.value;
-        return value;
-    }
-    break;
+    memcpy(interp->stack + top + offset, TypeValueRef(value, void *), value.type->runtime_size);
 
-        NoDefaultCase();
-    }
-
-    Unreachable();
     return value;
 }
 
-Find_Type_Value evaluate_node_literal(Code_Node_Literal *root)
+Find_Type_Value evaluate_node_literal(Code_Node_Literal *root, Interp *interp, uint64_t top)
 {
     auto            node       = root;
     auto            check_kind = (Code_Node *)root;
     Find_Type_Value type_value;
-    switch (check_kind->type->kind)
-    {
-    case CODE_TYPE_BOOL: {
-        type_value.value.boolean.value = node->data.boolean.value;
-        type_value.type                = CODE_TYPE_BOOL;
-    }
-    break;
-    case CODE_TYPE_INTEGER: {
-        type_value.value.integer.value = node->data.integer.value;
-        type_value.type                = CODE_TYPE_INTEGER;
-    }
-    break;
-    case CODE_TYPE_REAL: {
-        type_value.value.real.value = node->data.real.value;
-        type_value.type             = CODE_TYPE_REAL;
-    }
-    break;
-        NoDefaultCase();
-    }
+
+    type_value.address = (uint8_t *)&node->data.boolean.value;
+    type_value.type    = node->type;
+
     return type_value;
 }
+
 Find_Type_Value evaluate_unary_operator(Code_Node_Unary_Operator *root, Interp *interp, uint64_t top)
 {
-    auto node       = root;
-    auto check_kind = (Code_Node *)root;
-    switch (check_kind->type->kind)
+    switch (root->op_kind)
     {
-    case CODE_TYPE_BOOL: {
-        switch (node->op_kind)
-        {
-        case UNARY_OPERATOR_LOGICAL_NOT: {
-            auto type_value                = evaluate_expression(node->child, interp, top);
-            type_value.value.boolean.value = !type_value.value.boolean.value;
-            type_value.type                = CODE_TYPE_BOOL;
-            return type_value;
-        }
-        break;
-            NoDefaultCase();
-        }
-    }
-    break;
-    case CODE_TYPE_INTEGER: {
-        switch (node->op_kind)
-        {
-        case UNARY_OPERATOR_PLUS: {
-            auto type_value                = evaluate_expression(node->child, interp, top);
-            type_value.value.integer.value = 0 + type_value.value.integer.value;
-            type_value.type                = CODE_TYPE_INTEGER;
-            return type_value;
-        }
-        break;
-        case UNARY_OPERATOR_MINUS: {
-            auto type_value                = evaluate_expression(node->child, interp, top);
-            type_value.value.integer.value = 0 - type_value.value.integer.value;
-            type_value.type                = CODE_TYPE_INTEGER;
-            return type_value;
-        }
-        break;
-        case UNARY_OPERATOR_BITWISE_NOT: {
-            auto type_value                = evaluate_expression(node->child, interp, top);
-            type_value.value.integer.value = ~type_value.value.integer.value;
-            type_value.type                = CODE_TYPE_INTEGER;
-            return type_value;
-        }
-        break;
-            NoDefaultCase();
-        }
-    }
-    break;
-    case CODE_TYPE_REAL: {
-        switch (node->op_kind)
-        {
-        case UNARY_OPERATOR_PLUS: {
-            auto type_value             = evaluate_expression(node->child, interp, top);
-            type_value.value.real.value = 0 + type_value.value.real.value;
-            type_value.type             = CODE_TYPE_REAL;
-            return type_value;
-        }
-        break;
-        case UNARY_OPERATOR_MINUS: {
-            auto type_value             = evaluate_expression(node->child, interp, top);
-            type_value.value.real.value = 0 - type_value.value.real.value;
-            type_value.type             = CODE_TYPE_REAL;
-            return type_value;
-        }
-        break;
-        case UNARY_OPERATOR_DEREFERENCE: {
-            Assert(node->child->kind == CODE_NODE_ADDRESS);
-
-            auto            address       = (Code_Node_Address *)node->child;
-
-            uint64_t *      address_value = (uint64_t *)(interp->stack + address->address->offset);
-            float *         value         = (float *)(interp->stack + *address_value);
-
-            Find_Type_Value type_value;
-            type_value.value.real.value = *value;
-            type_value.type             = CODE_TYPE_REAL;
-            return type_value;
-        }
-        break;
-            NoDefaultCase();
-        }
-    }
-    break;
-    case UNARY_OPERATOR_POINTER_TO: {
-        Assert(node->child->kind == CODE_NODE_ADDRESS);
-
-        auto            address = (Code_Node_Address *)node->child;
-
-        Find_Type_Value type_value;
-        type_value.type                = CODE_TYPE_POINTER;
-        type_value.value.pointer.value = (uint64_t)address->address->offset;
+    case UNARY_OPERATOR_LOGICAL_NOT: {
+        auto type_value = evaluate_expression(root->child, interp, top);
+        auto ref        = TypeValueRef(type_value, bool);
+        *ref            = !*ref;
         return type_value;
     }
     break;
+
+    case UNARY_OPERATOR_BITWISE_NOT: {
+        auto type_value = evaluate_expression(root->child, interp, top);
+        auto ref        = TypeValueRef(type_value, int64_t);
+        *ref            = ~*ref;
+        return type_value;
+    }
+    break;
+
+    case UNARY_OPERATOR_PLUS: {
+        auto type_value = evaluate_expression(root->child, interp, top);
+        return type_value;
+    }
+    break;
+
+    case UNARY_OPERATOR_MINUS: {
+        auto value = evaluate_expression(root->child, interp, top);
+
+        if (value.type->kind == CODE_TYPE_INTEGER)
+        {
+
+            Find_Type_Value r;
+            r.imm.int_value = -TypeValue(value, Kano_Int);
+            r.type          = root->type;
+            return r;
+        }
+        else if (value.type->kind == CODE_TYPE_REAL)
+        {
+            Find_Type_Value r;
+            r.imm.real_value = -TypeValue(value, Kano_Real);
+            r.type           = root->type;
+            return r;
+        }
+
+        Unreachable();
+    }
+    break;
+
     case UNARY_OPERATOR_DEREFERENCE: {
-        auto            var    = (Code_Node_Address *)node;
-        uint64_t        offset = var->address->offset;
-        int *           value  = (int *)(interp->stack + offset);
+        Assert(root->child->kind == CODE_NODE_ADDRESS);
+
+        auto     address = (Code_Node_Address *)root->child;
+
+        uint64_t offset  = address->offset;
+        if (address->address)
+        {
+            Assert(address->address->kind == Symbol_Address::STACK);
+            offset += address->address->offset;
+        }
+
+        auto            address_value = (uint8_t *)(interp->stack + top + offset);
+
         Find_Type_Value type_value;
-        type_value.value.integer.value = *value;
-        type_value.type                = CODE_TYPE_INTEGER;
+        type_value.address = address_value;
+        type_value.type    = root->type;
         return type_value;
     }
     break;
-        NoDefaultCase();
+
+    case UNARY_OPERATOR_POINTER_TO: {
+        Assert(root->child->kind == CODE_NODE_ADDRESS);
+
+        auto            address = (Code_Node_Address *)root->child;
+
+        Find_Type_Value type_value;
+        type_value.type = root->type;
+
+        auto offset     = address->offset;
+        if (address->address)
+        {
+            offset += address->address->offset;
+        }
+
+        type_value.address = (uint8_t *)(interp->stack + offset + top);
+        return type_value;
+    }
+    break;
     }
 
     Unreachable();
     return Find_Type_Value{};
 }
 
-Find_Type_Value evaluate_binary_operator(Code_Node_Binary_Operator *root, Interp *interp, uint64_t top)
+typedef Find_Type_Value (*BinaryOperatorProc)(Find_Type_Value a, Find_Type_Value b, Code_Type *type);
+
+typedef Kano_Int (*BinaryOperatorIntProc)(Kano_Int a, Kano_Int b);
+
+Find_Type_Value binary_add(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
 {
-    auto            node       = root;
-    auto            check_kind = (Code_Node *)root;
-    Find_Type_Value type_value;
-    switch (check_kind->type->kind)
+    Find_Type_Value r;
+    r.type = type;
+
+    switch (type->kind)
     {
     case CODE_TYPE_INTEGER: {
-        auto a       = evaluate_expression(node->left, interp, top);
-        auto b       = evaluate_expression(node->right, interp, top);
-        auto destiny = (Code_Node_Address *)node->left;
-        int *dst     = (int *)(interp->stack + destiny->address->offset);
-        switch (node->op_kind)
-        {
-        case BINARY_OPERATOR_ADDITION: {
-            type_value.value.integer.value = a.value.integer.value + b.value.integer.value;
-            type_value.type                = CODE_TYPE_INTEGER;
-            return type_value;
-        }
-        break;
-        case BINARY_OPERATOR_SUBTRACTION: {
-            type_value.value.integer.value = a.value.integer.value - b.value.integer.value;
-            type_value.type                = CODE_TYPE_INTEGER;
-            return type_value;
-        }
-        break;
-        case BINARY_OPERATOR_MULTIPLICATION: {
-            type_value.value.integer.value = a.value.integer.value * b.value.integer.value;
-            type_value.type                = CODE_TYPE_INTEGER;
-            return type_value;
-        }
-        break;
-        case BINARY_OPERATOR_DIVISION: {
-            type_value.value.integer.value = a.value.integer.value / b.value.integer.value;
-            type_value.type                = CODE_TYPE_INTEGER;
-            return type_value;
-        }
-        break;
-        case BINARY_OPERATOR_REMAINDER: {
-            type_value.value.integer.value = a.value.integer.value % b.value.integer.value;
-            type_value.type                = CODE_TYPE_INTEGER;
-            return type_value;
-        }
-        break;
-        case BINARY_OPERATOR_BITWISE_AND: {
-            type_value.value.integer.value = a.value.integer.value & b.value.integer.value;
-            type_value.type                = CODE_TYPE_INTEGER;
-            return type_value;
-        }
-        break;
-        case BINARY_OPERATOR_BITWISE_OR: {
-            type_value.value.integer.value = a.value.integer.value | b.value.integer.value;
-            type_value.type                = CODE_TYPE_INTEGER;
-            return type_value;
-        }
-        break;
-        case BINARY_OPERATOR_BITWISE_XOR: {
-            type_value.value.integer.value = a.value.integer.value ^ b.value.integer.value;
-            type_value.type                = CODE_TYPE_INTEGER;
-            return type_value;
-        }
-        break;
-        case BINARY_OPERATOR_BITWISE_SHIFT_RIGHT: {
-            type_value.value.integer.value = a.value.integer.value >> b.value.integer.value;
-            type_value.type                = CODE_TYPE_INTEGER;
-            return type_value;
-        }
-        break;
-        case BINARY_OPERATOR_BITWISE_SHIFT_LEFT: {
-            type_value.value.integer.value = a.value.integer.value << b.value.integer.value;
-            type_value.type                = CODE_TYPE_INTEGER;
-            return type_value;
-        }
-        break;
-        case BINARY_OPERATOR_COMPARE_EQUAL: {
-            type_value.value.boolean.value = (a.value.integer.value == b.value.integer.value);
-            type_value.type                = CODE_TYPE_BOOL;
-            return type_value;
-        }
-        break;
-        case BINARY_OPERATOR_COMPOUND_ADDITION: {
-            a.value.integer.value += b.value.integer.value;
-            *dst = a.value.integer.value;
-            return a;
-        }
-        break;
-        case BINARY_OPERATOR_COMPOUND_SUBTRACTION: {
-            a.value.integer.value -= b.value.integer.value;
-            *dst = a.value.integer.value;
-            return a;
-        }
-        break;
-        case BINARY_OPERATOR_COMPOUND_MULTIPLICATION: {
-            a.value.integer.value *= b.value.integer.value;
-            *dst = a.value.integer.value;
-            return a;
-        }
-        break;
-        case BINARY_OPERATOR_COMPOUND_DIVISION: {
-            a.value.integer.value /= b.value.integer.value;
-            *dst = a.value.integer.value;
-            return a;
-        }
-        break;
-        case BINARY_OPERATOR_COMPOUND_REMAINDER: {
-            a.value.integer.value %= b.value.integer.value;
-            *dst = a.value.integer.value;
-            return a;
-        }
-        break;
-        case BINARY_OPERATOR_COMPOUND_BITWISE_SHIFT_RIGHT: {
-            a.value.integer.value >>= b.value.integer.value;
-            *dst = a.value.integer.value;
-            return a;
-        }
-        break;
-        case BINARY_OPERATOR_COMPOUND_BITWISE_SHIFT_LEFT: {
-            a.value.integer.value <<= b.value.integer.value;
-            *dst = a.value.integer.value;
-            return a;
-        }
-        break;
-        case BINARY_OPERATOR_COMPOUND_BITWISE_AND: {
-            a.value.integer.value &= b.value.integer.value;
-            *dst = a.value.integer.value;
-            return a;
-        }
-        break;
-        case BINARY_OPERATOR_COMPOUND_BITWISE_XOR: {
-            a.value.integer.value ^= b.value.integer.value;
-            *dst = a.value.integer.value;
-            return a;
-        }
-        break;
-        case BINARY_OPERATOR_COMPOUND_BITWISE_OR: {
-            a.value.integer.value |= b.value.integer.value;
-            *dst = a.value.integer.value;
-            return a;
-        }
-        break;
-            NoDefaultCase();
-        }
+        Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
+        r.imm.int_value = TypeValue(a, Kano_Int) + TypeValue(b, Kano_Int);
+        return r;
     }
     break;
+
     case CODE_TYPE_REAL: {
-        auto   a       = evaluate_expression(node->left, interp, top);
-        auto   b       = evaluate_expression(node->right, interp, top);
-        auto   destiny = (Code_Node_Address *)node->left;
-        float *dst     = (float *)(interp->stack + destiny->address->offset);
-        switch (node->op_kind)
-        {
-        case BINARY_OPERATOR_ADDITION: {
-            type_value.value.real.value = a.value.real.value + b.value.real.value;
-            type_value.type             = CODE_TYPE_REAL;
-            return type_value;
-        }
-        break;
-        case BINARY_OPERATOR_SUBTRACTION: {
-            type_value.value.real.value = a.value.real.value - b.value.real.value;
-            type_value.type             = CODE_TYPE_REAL;
-            return type_value;
-        }
-        break;
-        case BINARY_OPERATOR_MULTIPLICATION: {
-            type_value.value.real.value = a.value.real.value * b.value.real.value;
-            type_value.type             = CODE_TYPE_REAL;
-            return type_value;
-        }
-        break;
-        case BINARY_OPERATOR_DIVISION: {
-            type_value.value.real.value = a.value.real.value / b.value.real.value;
-            type_value.type             = CODE_TYPE_REAL;
-            return type_value;
-        }
-        break;
-        case BINARY_OPERATOR_COMPARE_EQUAL: {
-            type_value.value.boolean.value = (a.value.real.value == b.value.real.value);
-            type_value.type                = CODE_TYPE_BOOL;
-            return type_value;
-        }
-        break;
-        case BINARY_OPERATOR_COMPOUND_ADDITION: {
-            a.value.real.value += b.value.real.value;
-            *dst = a.value.real.value;
-            return a;
-        }
-        break;
-        case BINARY_OPERATOR_COMPOUND_SUBTRACTION: {
-            a.value.real.value -= b.value.real.value;
-            *dst = a.value.real.value;
-            return a;
-        }
-        break;
-        case BINARY_OPERATOR_COMPOUND_MULTIPLICATION: {
-            a.value.real.value *= b.value.real.value;
-            *dst = a.value.real.value;
-            return a;
-        }
-        break;
-        case BINARY_OPERATOR_COMPOUND_DIVISION: {
-            a.value.real.value /= b.value.real.value;
-            *dst = a.value.real.value;
-            return a;
-        }
-        break;
-            NoDefaultCase();
-        }
+        Assert(a.type->kind == CODE_TYPE_REAL && b.type->kind == CODE_TYPE_REAL);
+        r.imm.real_value = TypeValue(a, Kano_Real) + TypeValue(b, Kano_Real);
+        return r;
     }
     break;
+    }
+
+    Unreachable();
+    return r;
+}
+
+Find_Type_Value binary_sub(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    Find_Type_Value r;
+    r.type = type;
+
+    switch (type->kind)
+    {
+    case CODE_TYPE_INTEGER: {
+        Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
+        r.imm.int_value = TypeValue(a, Kano_Int) - TypeValue(b, Kano_Int);
+        return r;
+    }
+    break;
+
+    case CODE_TYPE_REAL: {
+        Assert(a.type->kind == CODE_TYPE_REAL && b.type->kind == CODE_TYPE_REAL);
+        r.imm.real_value = TypeValue(a, Kano_Real) - TypeValue(b, Kano_Real);
+        return r;
+    }
+    break;
+    }
+
+    Unreachable();
+    return r;
+}
+
+Find_Type_Value binary_mul(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    Find_Type_Value r;
+    r.type = type;
+
+    switch (type->kind)
+    {
+    case CODE_TYPE_INTEGER: {
+        Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
+        r.imm.int_value = TypeValue(a, Kano_Int) * TypeValue(b, Kano_Int);
+        return r;
+    }
+    break;
+
+    case CODE_TYPE_REAL: {
+        Assert(a.type->kind == CODE_TYPE_REAL && b.type->kind == CODE_TYPE_REAL);
+        r.imm.real_value = TypeValue(a, Kano_Real) * TypeValue(b, Kano_Real);
+        return r;
+    }
+    break;
+    }
+
+    Unreachable();
+    return r;
+}
+
+Find_Type_Value binary_div(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    Find_Type_Value r;
+    r.type = type;
+
+    switch (type->kind)
+    {
+    case CODE_TYPE_INTEGER: {
+        Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
+        r.imm.int_value = TypeValue(a, Kano_Int) / TypeValue(b, Kano_Int);
+        return r;
+    }
+    break;
+
+    case CODE_TYPE_REAL: {
+        Assert(a.type->kind == CODE_TYPE_REAL && b.type->kind == CODE_TYPE_REAL);
+        r.imm.real_value = TypeValue(a, Kano_Real) / TypeValue(b, Kano_Real);
+        return r;
+    }
+    break;
+    }
+
+    Unreachable();
+    return r;
+}
+
+Find_Type_Value binary_mod(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    Find_Type_Value r;
+    r.type = type;
+    Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
+    r.imm.int_value = TypeValue(a, Kano_Int) % TypeValue(b, Kano_Int);
+    return r;
+}
+
+Find_Type_Value binary_rs(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    Find_Type_Value r;
+    r.type = type;
+    Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
+    r.imm.int_value = TypeValue(a, Kano_Int) >> TypeValue(b, Kano_Int);
+    return r;
+}
+
+Find_Type_Value binary_ls(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    Find_Type_Value r;
+    r.type = type;
+    Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
+    r.imm.int_value = TypeValue(a, Kano_Int) << TypeValue(b, Kano_Int);
+    return r;
+}
+
+Find_Type_Value binary_and(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    Find_Type_Value r;
+    r.type = type;
+    Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
+    r.imm.int_value = TypeValue(a, Kano_Int) & TypeValue(b, Kano_Int);
+    return r;
+}
+Find_Type_Value binary_xor(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    Find_Type_Value r;
+    r.type = type;
+    Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
+    r.imm.int_value = TypeValue(a, Kano_Int) ^ TypeValue(b, Kano_Int);
+    return r;
+}
+
+Find_Type_Value binary_or(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    Find_Type_Value r;
+    r.type = type;
+    Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
+    r.imm.int_value = TypeValue(a, Kano_Int) | TypeValue(b, Kano_Int);
+    return r;
+}
+
+Find_Type_Value binary_gt(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    Find_Type_Value r;
+    r.type = type;
+
+    switch (a.type->kind)
+    {
+    case CODE_TYPE_INTEGER: {
+        Assert(b.type->kind == CODE_TYPE_INTEGER);
+        r.imm.bool_value = TypeValue(a, Kano_Int) > TypeValue(b, Kano_Int);
+        return r;
+    }
+    break;
+
+    case CODE_TYPE_REAL: {
+        Assert(b.type->kind == CODE_TYPE_REAL);
+        r.imm.bool_value = TypeValue(a, Kano_Real) > TypeValue(b, Kano_Real);
+        return r;
+    }
+    break;
+    }
+
+    Unreachable();
+    return r;
+}
+
+Find_Type_Value binary_lt(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    Find_Type_Value r;
+    r.type = type;
+
+    switch (a.type->kind)
+    {
+    case CODE_TYPE_INTEGER: {
+        Assert(b.type->kind == CODE_TYPE_INTEGER);
+        r.imm.bool_value = TypeValue(a, Kano_Int) < TypeValue(b, Kano_Int);
+        return r;
+    }
+    break;
+
+    case CODE_TYPE_REAL: {
+        Assert(b.type->kind == CODE_TYPE_REAL);
+        r.imm.bool_value = TypeValue(a, Kano_Real) < TypeValue(b, Kano_Real);
+        return r;
+    }
+    break;
+    }
+
+    Unreachable();
+    return r;
+}
+
+Find_Type_Value binary_ge(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    Find_Type_Value r;
+    r.type = type;
+
+    switch (a.type->kind)
+    {
+    case CODE_TYPE_INTEGER: {
+        Assert(b.type->kind == CODE_TYPE_INTEGER);
+        r.imm.bool_value = TypeValue(a, Kano_Int) >= TypeValue(b, Kano_Int);
+        return r;
+    }
+    break;
+
+    case CODE_TYPE_REAL: {
+        Assert(b.type->kind == CODE_TYPE_REAL);
+        r.imm.bool_value = TypeValue(a, Kano_Real) >= TypeValue(b, Kano_Real);
+        return r;
+    }
+    break;
+    }
+
+    Unreachable();
+    return r;
+}
+
+Find_Type_Value binary_le(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    Find_Type_Value r;
+    r.type = type;
+
+    switch (a.type->kind)
+    {
+    case CODE_TYPE_INTEGER: {
+        Assert(b.type->kind == CODE_TYPE_INTEGER);
+        r.imm.bool_value = TypeValue(a, Kano_Int) <= TypeValue(b, Kano_Int);
+        return r;
+    }
+    break;
+
+    case CODE_TYPE_REAL: {
+        Assert(b.type->kind == CODE_TYPE_REAL);
+        r.imm.bool_value = TypeValue(a, Kano_Real) <= TypeValue(b, Kano_Real);
+        return r;
+    }
+    break;
+    }
+
+    Unreachable();
+    return r;
+}
+
+Find_Type_Value binary_cmp(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    Find_Type_Value r;
+    r.type = type;
+
+    switch (a.type->kind)
+    {
+    case CODE_TYPE_INTEGER: {
+        Assert(b.type->kind == CODE_TYPE_INTEGER);
+        r.imm.bool_value = TypeValue(a, Kano_Int) == TypeValue(b, Kano_Int);
+        return r;
+    }
+    break;
+
+    case CODE_TYPE_REAL: {
+        Assert(b.type->kind == CODE_TYPE_REAL);
+        r.imm.bool_value = TypeValue(a, Kano_Real) == TypeValue(b, Kano_Real);
+        return r;
+    }
+    break;
+
     case CODE_TYPE_BOOL: {
-        auto a = evaluate_expression(node->left, interp, top);
-        auto b = evaluate_expression(node->right, interp, top);
-        switch (node->op_kind)
-        {
-        case BINARY_OPERATOR_RELATIONAL_GREATER: {
-            type_value.value.boolean.value = a.value.integer.value > b.value.integer.value;
-            type_value.type                = CODE_TYPE_BOOL;
-            return type_value;
-        }
-        break;
-        case BINARY_OPERATOR_RELATIONAL_LESS: {
-            type_value.value.boolean.value = a.value.integer.value < b.value.integer.value;
-            type_value.type                = CODE_TYPE_BOOL;
-            return type_value;
-        }
-        break;
-        case BINARY_OPERATOR_RELATIONAL_GREATER_EQUAL: {
-            type_value.value.boolean.value = a.value.integer.value >= b.value.integer.value;
-            type_value.type                = CODE_TYPE_BOOL;
-            return type_value;
-        }
-        break;
-        case BINARY_OPERATOR_RELATIONAL_LESS_EQUAL: {
-            type_value.value.boolean.value = a.value.integer.value <= b.value.integer.value;
-            type_value.type                = CODE_TYPE_BOOL;
-            return type_value;
-        }
-        break;
-        case BINARY_OPERATOR_COMPARE_EQUAL: {
-            type_value.value.boolean.value = (a.value.integer.value == b.value.integer.value);
-            type_value.type                = CODE_TYPE_BOOL;
-            return type_value;
-        }
-        break;
-        case BINARY_OPERATOR_COMPARE_NOT_EQUAL: {
-            type_value.value.boolean.value = a.value.integer.value != b.value.integer.value;
-            type_value.type                = CODE_TYPE_BOOL;
-            return type_value;
-        }
-        break;
-            NoDefaultCase();
-        }
+        Assert(b.type->kind == CODE_TYPE_BOOL);
+        r.imm.bool_value = TypeValue(a, Kano_Bool) == TypeValue(b, Kano_Bool);
+        return r;
     }
     break;
-        NoDefaultCase();
+    }
+
+    Unreachable();
+    return r;
+}
+
+Find_Type_Value binary_ncmp(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    Find_Type_Value r;
+    r.type = type;
+
+    switch (a.type->kind)
+    {
+    case CODE_TYPE_INTEGER: {
+        Assert(b.type->kind == CODE_TYPE_INTEGER);
+        r.imm.bool_value = TypeValue(a, Kano_Int) != TypeValue(b, Kano_Int);
+        return r;
+    }
+    break;
+
+    case CODE_TYPE_REAL: {
+        Assert(b.type->kind == CODE_TYPE_REAL);
+        r.imm.bool_value = TypeValue(a, Kano_Real) != TypeValue(b, Kano_Real);
+        return r;
+    }
+    break;
+
+    case CODE_TYPE_BOOL: {
+        Assert(b.type->kind == CODE_TYPE_BOOL);
+        r.imm.bool_value = TypeValue(a, Kano_Bool) != TypeValue(b, Kano_Bool);
+        return r;
+    }
+    break;
+    }
+
+    Unreachable();
+    return r;
+}
+
+Find_Type_Value binary_cadd(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    a.type = type;
+
+    switch (type->kind)
+    {
+    case CODE_TYPE_INTEGER: {
+        Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
+        auto ref = TypeValueRef(a, Kano_Int);
+        *ref += TypeValue(b, Kano_Int);
+        return a;
+    }
+    break;
+
+    case CODE_TYPE_REAL: {
+        Assert(a.type->kind == CODE_TYPE_REAL && b.type->kind == CODE_TYPE_REAL);
+        auto ref = TypeValueRef(a, Kano_Real);
+        *ref += TypeValue(b, Kano_Real);
+        return a;
+    }
+    break;
+
+    case CODE_TYPE_POINTER: {
+        Assert(a.type->kind == CODE_TYPE_POINTER && b.type->kind == CODE_TYPE_INTEGER);
+        auto ref = TypeValueRef(a, uint8_t **);
+        *ref += TypeValue(b, Kano_Int);
+        return a;
+    }
+    break;
     }
 
     Unreachable();
     return Find_Type_Value{};
 }
+
+Find_Type_Value binary_csub(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    a.type = type;
+
+    switch (type->kind)
+    {
+    case CODE_TYPE_INTEGER: {
+        Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
+        auto ref = TypeValueRef(a, Kano_Int);
+        *ref -= TypeValue(b, Kano_Int);
+        return a;
+    }
+    break;
+
+    case CODE_TYPE_REAL: {
+        Assert(a.type->kind == CODE_TYPE_REAL && b.type->kind == CODE_TYPE_REAL);
+        auto ref = TypeValueRef(a, Kano_Real);
+        *ref -= TypeValue(b, Kano_Real);
+        return a;
+    }
+    break;
+    }
+
+    Unreachable();
+    return Find_Type_Value{};
+}
+
+Find_Type_Value binary_cmul(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    a.type = type;
+
+    switch (type->kind)
+    {
+    case CODE_TYPE_INTEGER: {
+        Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
+        auto ref = TypeValueRef(a, Kano_Int);
+        *ref *= TypeValue(b, Kano_Int);
+        return a;
+    }
+    break;
+
+    case CODE_TYPE_REAL: {
+        Assert(a.type->kind == CODE_TYPE_REAL && b.type->kind == CODE_TYPE_REAL);
+        auto ref = TypeValueRef(a, Kano_Real);
+        *ref *= TypeValue(b, Kano_Real);
+        return a;
+    }
+    break;
+    }
+
+    Unreachable();
+    return Find_Type_Value{};
+}
+
+Find_Type_Value binary_cdiv(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    a.type = type;
+
+    switch (type->kind)
+    {
+    case CODE_TYPE_INTEGER: {
+        Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
+        auto ref = TypeValueRef(a, Kano_Int);
+        *ref /= TypeValue(b, Kano_Int);
+        return a;
+    }
+    break;
+
+    case CODE_TYPE_REAL: {
+        Assert(a.type->kind == CODE_TYPE_REAL && b.type->kind == CODE_TYPE_REAL);
+        auto ref = TypeValueRef(a, Kano_Real);
+        *ref /= TypeValue(b, Kano_Real);
+        return a;
+    }
+    break;
+    }
+
+    Unreachable();
+    return Find_Type_Value{};
+}
+
+Find_Type_Value binary_cmod(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    a.type = type;
+    Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
+    auto ref = TypeValueRef(a, Kano_Int);
+    *ref %= TypeValue(b, Kano_Int);
+    return a;
+}
+
+Find_Type_Value binary_crs(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    a.type = type;
+    Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
+    auto ref = TypeValueRef(a, Kano_Int);
+    *ref >>= TypeValue(b, Kano_Int);
+    return a;
+}
+
+Find_Type_Value binary_cls(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    a.type = type;
+    Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
+    auto ref = TypeValueRef(a, Kano_Int);
+    *ref <<= TypeValue(b, Kano_Int);
+    return a;
+}
+
+Find_Type_Value binary_cand(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    a.type = type;
+    Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
+    auto ref = TypeValueRef(a, Kano_Int);
+    *ref &= TypeValue(b, Kano_Int);
+    return a;
+}
+
+Find_Type_Value binary_cxor(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    a.type = type;
+    Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
+    auto ref = TypeValueRef(a, Kano_Int);
+    *ref ^= TypeValue(b, Kano_Int);
+    return a;
+}
+
+Find_Type_Value binary_cor(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+{
+    a.type = type;
+    Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
+    auto ref = TypeValueRef(a, Kano_Int);
+    *ref |= TypeValue(b, Kano_Int);
+    return a;
+}
+
+static BinaryOperatorProc BinaryOperators[] = {
+    binary_add,  binary_sub,  binary_mul,  binary_div, binary_mod, binary_rs,   binary_ls,   binary_add,  binary_xor,
+    binary_or,   binary_gt,   binary_lt,   binary_ge,  binary_le,  binary_cmp,  binary_ncmp, binary_cadd, binary_csub,
+    binary_cmul, binary_cdiv, binary_cmod, binary_crs, binary_cls, binary_cadd, binary_cxor, binary_cor};
+
+Find_Type_Value evaluate_binary_operator(Code_Node_Binary_Operator *node, Interp *interp, uint64_t top)
+{
+    auto a = evaluate_expression(node->left, interp, top);
+    auto b = evaluate_expression(node->right, interp, top);
+
+    Assert(node->op_kind < ArrayCount(BinaryOperators));
+
+    return BinaryOperators[node->op_kind](a, b, node->type);
+}
+
 Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t top)
 {
     switch (root->kind)
     {
     case CODE_NODE_LITERAL: {
-        return evaluate_node_literal((Code_Node_Literal *)root);
+        return evaluate_node_literal((Code_Node_Literal *)root, interp, top);
     }
     break;
 
@@ -577,61 +785,44 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
 
     case CODE_NODE_ADDRESS: {
         auto node = (Code_Node_Address *)root;
-        // Assert(node->type.kind == CODE_TYPE_REAL);
-        auto offset = node->offset;
-        if (node->address)
+
+        if (node->type->kind != CODE_TYPE_PROCEDURE)
         {
-            offset += node->address->offset;
-        }
-        Find_Type_Value type_value;
+            auto offset = node->offset;
 
-        switch (node->type->kind)
-        {
-        case CODE_TYPE_INTEGER: {
-            int *value                     = (int *)(interp->stack + offset);
-            type_value.value.integer.value = *value;
-            type_value.type                = CODE_TYPE_INTEGER;
-            return type_value;
-        }
-        break;
-        case CODE_TYPE_REAL: {
-
-            float *stack_value          = (float *)(interp->stack + top + offset);
-            type_value.value.real.value = *stack_value;
-            type_value.type             = CODE_TYPE_REAL;
-            return type_value;
-
-            // float *value                = (float *)(interp->stack + offset);
-            // type_value.value.real.value = *value;
-            // type_value.type             = CODE_TYPE_REAL;
-            // return type_value;
-        }
-        break;
-
-        case CODE_TYPE_BOOL: {
-            bool *value                    = (bool *)(interp->stack + offset);
-            type_value.value.boolean.value = *value;
-            type_value.type                = CODE_TYPE_BOOL;
-            return type_value;
-        }
-        break;
-        case CODE_TYPE_PROCEDURE: {
-            switch (node->address->kind)
+            if (node->address)
             {
-            case Symbol_Address::CODE: {
-                evaluate_node_block(node->address->code, interp, top);
+                // TODO: SUPPORT!!
+                Assert(!node->child && node->address->kind == Symbol_Address::STACK);
+                offset += node->address->offset;
             }
-            break;
-            case Symbol_Address::GLOBAL: {
-            }
-            break;
-            case Symbol_Address::STACK: {
-            }
-            break;
-            }
+
+            Find_Type_Value type_value;
+            type_value.type    = root->type;
+            type_value.address = (uint8_t *)(interp->stack + top + offset);
+            return type_value;
         }
-        break;
-            NoDefaultCase();
+        else
+        {
+            Assert(!node->child && node->address->kind == Symbol_Address::CODE);
+            evaluate_node_block(node->address->code, interp, top);
+
+            Find_Type_Value type_value;
+
+            auto            proc = (Code_Type_Procedure *)node->type;
+
+            if (proc->return_type)
+            {
+                type_value.address = (uint8_t *)(interp->stack + top);
+                type_value.type    = proc->return_type;
+            }
+            else
+            {
+                type_value.address = nullptr;
+                type_value.type    = nullptr;
+            }
+
+            return type_value;
         }
     }
     break;
@@ -645,23 +836,62 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
         auto            cast  = (Code_Node_Type_Cast *)root;
         auto            value = evaluate_node_expression(cast->child, interp, top);
         Find_Type_Value type_value;
-        type_value.type = cast->type->kind;
+        type_value.type = cast->type;
 
-        switch (type_value.type)
+        switch (cast->type->kind)
         {
         case CODE_TYPE_REAL: {
-            Assert(value.type == CODE_TYPE_INTEGER);
-            type_value.value.real.value = (float)value.value.integer.value;
+            Assert(value.type->kind == CODE_TYPE_INTEGER);
+            type_value.imm.real_value = (Kano_Real)TypeValue(value, Kano_Int);
         }
         break;
+
         case CODE_TYPE_INTEGER: {
-            type_value.value.integer.value = value.value.integer.value;
+            if (value.type->kind == CODE_TYPE_BOOL)
+            {
+                type_value.imm.int_value = TypeValue(value, Kano_Bool);
+            }
+            else if (value.type->kind == CODE_TYPE_REAL)
+            {
+                type_value.imm.int_value = (Kano_Int)TypeValue(value, Kano_Real);
+            }
+            else
+            {
+                Unreachable();
+            }
         }
         break;
+
         case CODE_TYPE_BOOL: {
-            type_value.value.boolean.value = value.value.boolean.value;
+            if (value.type->kind == CODE_TYPE_INTEGER)
+            {
+                type_value.imm.bool_value = TypeValue(value, Kano_Int) != 0;
+            }
+            else if (value.type->kind == CODE_TYPE_REAL)
+            {
+                type_value.imm.bool_value = TypeValue(value, Kano_Real) != 0.0;
+            }
+            else
+            {
+                Unreachable();
+            }
         }
         break;
+
+        case CODE_TYPE_POINTER: {
+            Assert(value.type->kind == CODE_TYPE_POINTER);
+            type_value.imm.pointer_value = TypeValue(value, uint8_t *);
+        }
+        break;
+
+        case CODE_TYPE_ARRAY_VIEW: {
+            Assert(value.type->kind == CODE_TYPE_STATIC_ARRAY);
+            type_value.imm.array_value.data   = TypeValue(value, uint8_t *);
+            auto type                         = (Code_Type_Static_Array *)value.type;
+            type_value.imm.array_value.length = type->element_count;
+        }
+        break;
+
             NoDefaultCase();
         }
 
@@ -679,11 +909,14 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
     case CODE_NODE_EXPRESSION: {
         auto result = evaluate_node_expression((Code_Node_Expression *)root, interp, top);
         print_values(result);
+        return result;
     }
     break;
     case CODE_NODE_RETURN: {
-        auto node = (Code_Node_Return *)root;
-        return evaluate_expression(node->expression, interp, top);
+        auto node   = (Code_Node_Return *)root;
+        auto result = evaluate_expression(node->expression, interp, top);
+        push_into_interp_stack(result, interp, top);
+        return result;
     }
     break;
 
@@ -743,6 +976,7 @@ void evaluate_node_block(Code_Node_Block *root, Interp *interp, uint64_t top)
     for (auto statement = root->statement_head; statement; statement = statement->next)
     {
         evaluate_node_statement(statement, interp, top);
+        printf("STATEMENT  ::  %zu \n", statement->source_row);
     }
     printf("Block %d statement executed\n", (int)root->statement_count);
 }

@@ -26,13 +26,14 @@ const accumulate := proc(var count: int, var args: ..) -> int {
 
 	var sum:= 0;
 	for var i:= 0; i < count; i += 1 {
-		sum += count;
+		sum += ?ptr;
+		ptr += size_of(int);
 	}
 
 	return sum;
 }
 
-const main := proc() {
+const main := proc() { 
 	var color: [2] Vec4;
 
 	color[0].x = cast(int) 1.2;

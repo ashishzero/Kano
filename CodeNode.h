@@ -1,6 +1,10 @@
 #pragma once
 #include "SyntaxNode.h"
 
+using Kano_Int = int64_t;
+using Kano_Real = double;
+using Kano_Bool = bool;
+
 enum Code_Type_Kind
 {
     CODE_TYPE_NULL,
@@ -28,8 +32,8 @@ struct Code_Type_Integer : public Code_Type
     Code_Type_Integer()
     {
         kind         = CODE_TYPE_INTEGER;
-        runtime_size = sizeof(int32_t);
-        alignment    = sizeof(int32_t);
+        runtime_size = sizeof(Kano_Int);
+        alignment    = sizeof(Kano_Int);
     }
 };
 
@@ -38,8 +42,8 @@ struct Code_Type_Real : public Code_Type
     Code_Type_Real()
     {
         kind         = CODE_TYPE_REAL;
-        runtime_size = sizeof(float);
-        alignment    = sizeof(float);
+        runtime_size = sizeof(Kano_Real);
+        alignment    = sizeof(Kano_Real);
     }
 };
 
@@ -48,8 +52,8 @@ struct Code_Type_Bool : public Code_Type
     Code_Type_Bool()
     {
         kind         = CODE_TYPE_BOOL;
-        runtime_size = sizeof(bool);
-        alignment    = sizeof(bool);
+        runtime_size = sizeof(Kano_Bool);
+        alignment    = sizeof(Kano_Bool);
     }
 };
 
@@ -232,12 +236,12 @@ struct Code_Node
 
 struct Code_Value_Integer
 {
-    int32_t value;
+    int64_t value;
 };
 
 struct Code_Value_Real
 {
-    float value;
+    double value;
 };
 
 struct Code_Value_Bool

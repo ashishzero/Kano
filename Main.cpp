@@ -632,12 +632,17 @@ Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver *resolv
             if (root->parameter_count >= proc->argument_count)
             {
                 auto stack_top       = resolver->virtual_address[Symbol_Address::STACK];
-
+                
                 auto address         = new Code_Node_Address;
                 address->type        = symbol_table_get(&resolver->symbols, "*void")->type;
                 address->child       = nullptr;
                 address->offset      = stack_top;
-                child                = address;
+
+                auto pointer_to      = new Code_Node_Unary_Operator;
+                pointer_to->type     = address->type;
+                pointer_to->child    = address;
+                pointer_to->op_kind  = UNARY_OPERATOR_POINTER_TO;
+                child                = pointer_to;
 
                 auto va_arg_count    = root->parameter_count - proc->argument_count + 1;
 
