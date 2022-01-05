@@ -132,7 +132,7 @@ struct Code_Type_Static_Array : public Code_Type
 //
 //
 //
-
+typedef void (*CCall)(struct Interp *interp, uint64_t top);
 struct Symbol_Address
 {
     enum Kind
@@ -143,11 +143,12 @@ struct Symbol_Address
         CCALL,
     };
     Kind kind;
-
     union {
         uint64_t                offset;
         struct Code_Node_Block *code;
+        CCall                   ccall;
     };
+    
 };
 
 inline Symbol_Address symbol_address_offset(uint32_t offset, Symbol_Address::Kind kind)
@@ -236,22 +237,22 @@ struct Code_Node
 
 struct Code_Value_Integer
 {
-    int64_t value;
+    Kano_Int value;
 };
 
 struct Code_Value_Real
 {
-    double value;
+    Kano_Real value;
 };
 
 struct Code_Value_Bool
 {
-    bool value;
+    Kano_Bool value;
 };
 
 struct Code_Value_Pointer
 {
-    uint64_t value;
+    uint8_t * value;
 };
 
 struct Code_Value_String

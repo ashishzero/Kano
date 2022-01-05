@@ -1,5 +1,6 @@
 #include "Interp.h"
 #include "CodeNode.h"
+#include <stdlib.h>
 
 template <typename T> T to_type(Find_Type_Value &val)
 {
@@ -28,6 +29,8 @@ void            interp_init(Interp *interp, size_t size)
 
 void print_values(Find_Type_Value result)
 {
+    if (result.type == NULL)
+        return;
     switch (result.type->kind)
     {
     case CODE_TYPE_BOOL: {
@@ -66,14 +69,18 @@ Find_Type_Value evaluate_procedure(Code_Node_Procedure_Call *root, Interp *inter
     }
     // allocate for return type
     auto proc_top = top;
-    top += root->type->runtime_size;
+    if (root->type)
+        top += root->type->runtime_size;
     for (int i = 0; i < root->parameter_count; i++)
     {
         auto var  = evaluate_node_expression((Code_Node_Expression *)root->paraments[i], interp, prev_top);
         auto node = (Code_Type_Procedure *)root->paraments[i];
         top       = push_into_interp_stack(var, interp, top);
     }
+    interp->call_stack_count += 1;
+    interp->call_stack_index += 1;
     auto result = evaluate_expression((Code_Node *)root->procedure, interp, proc_top);
+    interp->call_stack_count -= 1;
     return result;
 }
 void evaluate_do_block(Code_Node_Do *root, Interp *interp, uint64_t top)
@@ -272,7 +279,14 @@ Find_Type_Value binary_add(Find_Type_Value a, Find_Type_Value b, Code_Type *type
         return r;
     }
     break;
+    case CODE_TYPE_POINTER: {
+        Assert(a.type->kind == CODE_TYPE_POINTER && b.type->kind == CODE_TYPE_INTEGER);
+        r.imm.pointer_value = TypeValue(a, uint8_t *) + TypeValue(b, Kano_Int);
+        return r;
     }
+    break;
+    }
+
 
     Unreachable();
     return r;
@@ -295,6 +309,12 @@ Find_Type_Value binary_sub(Find_Type_Value a, Find_Type_Value b, Code_Type *type
     case CODE_TYPE_REAL: {
         Assert(a.type->kind == CODE_TYPE_REAL && b.type->kind == CODE_TYPE_REAL);
         r.imm.real_value = TypeValue(a, Kano_Real) - TypeValue(b, Kano_Real);
+        return r;
+    }
+    break;
+    case CODE_TYPE_POINTER: {
+        Assert(a.type->kind == CODE_TYPE_POINTER && b.type->kind == CODE_TYPE_INTEGER);
+        r.imm.pointer_value = TypeValue(a, uint8_t *) - TypeValue(b, Kano_Int);
         return r;
     }
     break;
@@ -603,7 +623,7 @@ Find_Type_Value binary_cadd(Find_Type_Value a, Find_Type_Value b, Code_Type *typ
 
     case CODE_TYPE_POINTER: {
         Assert(a.type->kind == CODE_TYPE_POINTER && b.type->kind == CODE_TYPE_INTEGER);
-        auto ref = TypeValueRef(a, uint8_t **);
+        auto ref = TypeValueRef(a, uint8_t *);
         *ref += TypeValue(b, Kano_Int);
         return a;
     }
@@ -632,6 +652,13 @@ Find_Type_Value binary_csub(Find_Type_Value a, Find_Type_Value b, Code_Type *typ
         Assert(a.type->kind == CODE_TYPE_REAL && b.type->kind == CODE_TYPE_REAL);
         auto ref = TypeValueRef(a, Kano_Real);
         *ref -= TypeValue(b, Kano_Real);
+        return a;
+    }
+    break;
+    case CODE_TYPE_POINTER: {
+        Assert(a.type->kind == CODE_TYPE_POINTER && b.type->kind == CODE_TYPE_INTEGER);
+        auto ref = TypeValueRef(a, uint8_t *);
+        *ref -= TypeValue(b, Kano_Int);
         return a;
     }
     break;
@@ -804,25 +831,53 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
         }
         else
         {
-            Assert(!node->child && node->address->kind == Symbol_Address::CODE);
-            evaluate_node_block(node->address->code, interp, top);
+            //Assert(!node->child && node->address->kind == Symbol_Address::CODE);
 
-            Find_Type_Value type_value;
-
-            auto            proc = (Code_Type_Procedure *)node->type;
-
-            if (proc->return_type)
+            switch (node->address->kind)
             {
-                type_value.address = (uint8_t *)(interp->stack + top);
-                type_value.type    = proc->return_type;
+            case Symbol_Address::CODE: {
+
+                evaluate_node_block(node->address->code, interp, top);
+
+                Find_Type_Value type_value;
+
+                auto            proc = (Code_Type_Procedure *)node->type;
+
+                if (proc->return_type)
+                {
+                    type_value.address = (uint8_t *)(interp->stack + top);
+                    type_value.type    = proc->return_type;
+                }
+                else
+                {
+                    type_value.address = nullptr;
+                    type_value.type    = nullptr;
+                }
+                return type_value;
             }
-            else
-            {
-                type_value.address = nullptr;
-                type_value.type    = nullptr;
+            break;
+            case Symbol_Address::CCALL:{
+                node->address->ccall(interp, top);     ////passing to main
+
+                Find_Type_Value type_value;
+
+                auto            proc = (Code_Type_Procedure *)node->type;
+
+                if (proc->return_type)
+                {
+                    type_value.address = (uint8_t *)(interp->stack + top);
+                    type_value.type    = proc->return_type;
+                }
+                else
+                {
+                    type_value.address = nullptr;
+                    type_value.type    = nullptr;
+                }
+                return type_value;
+
+            }break;
             }
 
-            return type_value;
         }
     }
     break;
@@ -916,6 +971,7 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
         auto node   = (Code_Node_Return *)root;
         auto result = evaluate_expression(node->expression, interp, top);
         push_into_interp_stack(result, interp, top);
+        interp->call_stack_index -= 1;
         return result;
     }
     break;
@@ -977,6 +1033,8 @@ void evaluate_node_block(Code_Node_Block *root, Interp *interp, uint64_t top)
     {
         evaluate_node_statement(statement, interp, top);
         printf("STATEMENT  ::  %zu \n", statement->source_row);
+        if (interp->call_stack_count != interp->call_stack_index)
+            return;
     }
-    printf("Block %d statement executed\n", (int)root->statement_count);
+    interp->call_stack_index -= 1;
 }

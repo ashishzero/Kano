@@ -540,9 +540,18 @@ Code_Node_Return *code_resolve_return(Code_Type_Resolver *resolver, Symbol_Table
         auto return_type = *resolver->return_stack.last();
         if (!code_type_are_same(return_type, node->type))
         {
-            Unimplemented();
+            auto cast = code_type_cast(node->expression, return_type);
+            if (cast)
+            {
+                node->expression = cast;
+            }
+            else
+            {
+                Unimplemented();
+            }
         }
     }
+
     else
     {
         Unimplemented();
@@ -1857,6 +1866,28 @@ Array_View<Code_Node_Assignment *> code_resolve_global_scope(Code_Type_Resolver 
 
     return global_exe;
 }
+void ccall_allocate(Interp *interp, uint64_t top)
+{
+    void *   return_ptr = (interp->stack + top);
+    void *   arg_ptr    = (interp->stack + top + sizeof(void *));
+    Kano_Int size       = *(Kano_Int *)arg_ptr;
+    auto     ptr        = malloc(size);
+    memcpy(return_ptr, &ptr, sizeof(void *));
+}
+
+void ccall_free(Interp* interp, uint64_t top)
+{
+    void *   arg_ptr = (interp->stack + top);
+    auto ptr    =  *(uint8_t **)arg_ptr;
+    free(ptr);
+}
+
+void ccall_print(Interp* interp, uint64_t top)
+{
+    
+}
+
+
 
 int main()
 {
@@ -2112,7 +2143,7 @@ int main()
         sym->name            = "allocate";
         sym->type            = type;
         sym->address.kind    = Symbol_Address::CCALL;
-        sym->address.code  = nullptr;
+        sym->address.ccall   = ccall_allocate;
 
         symbol_table_put(&resolver.symbols, sym);
     }
@@ -2128,7 +2159,7 @@ int main()
         sym->name            = "free";
         sym->type            = type;
         sym->address.kind    = Symbol_Address::CCALL;
-        sym->address.code    = nullptr;
+        sym->address.ccall    = ccall_free;
 
         symbol_table_put(&resolver.symbols, sym);
     }
@@ -2146,7 +2177,7 @@ int main()
         sym->name            = "print";
         sym->type            = type;
         sym->address.kind    = Symbol_Address::CCALL;
-        sym->address.code    = nullptr;
+        sym->address.ccall    = ccall_print;
 
         symbol_table_put(&resolver.symbols, sym);
     }

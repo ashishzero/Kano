@@ -12,7 +12,7 @@ const Vec4 := struct {
 }
 
 const factorial := proc (var n: float) -> float {
-	if n < 1 then return n;
+	if n <= 1 then return 1;
 	return n * factorial(n - 1);
 }
 
@@ -90,11 +90,11 @@ const main := proc() {
 	var sum:= 0;
 
 	for var i:= 0; i < 100; i = i + 1 {
-		print("i: d%\n", i);
+		print("i: %d\n", i);
 		sum = sum + i;
 	}
 
-	print("sum: d%, number1: d%\n", sum, number1);
+	print("sum: %d, number1: %d\n", sum, number1);
 
 	while sum {
 		sum = sum - 1;

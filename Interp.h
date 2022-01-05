@@ -5,6 +5,8 @@
 struct Interp
 {
     uint8_t *stack;
+    int64_t  call_stack_count = 0;
+    int64_t  call_stack_index = 0;
 };
 
 struct Find_Type_Value
