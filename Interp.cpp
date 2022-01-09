@@ -77,10 +77,10 @@ Find_Type_Value evaluate_procedure(Code_Node_Procedure_Call *root, Interp *inter
         auto node = (Code_Type_Procedure *)root->paraments[i];
         top       = push_into_interp_stack(var, interp, top);
     }
-    interp->call_stack_count += 1;
-    interp->call_stack_index += 1;
+    //interp->call_stack_count += 1;
+    //interp->call_stack_index += 1;
     auto result = evaluate_expression((Code_Node *)root->procedure, interp, proc_top);
-    interp->call_stack_count -= 1;
+    //interp->call_stack_count -= 1;
     return result;
 }
 void evaluate_do_block(Code_Node_Do *root, Interp *interp, uint64_t top)
@@ -837,7 +837,7 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
             {
             case Symbol_Address::CODE: {
 
-                evaluate_node_block(node->address->code, interp, top);
+                evaluate_node_block(node->address->code, interp, top, true);
 
                 Find_Type_Value type_value;
 
@@ -858,6 +858,7 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
             break;
             case Symbol_Address::CCALL:{
                 node->address->ccall(interp, top);     ////passing to main
+              //  interp->call_stack_index -= 1;
 
                 Find_Type_Value type_value;
 
@@ -971,7 +972,9 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
         auto node   = (Code_Node_Return *)root;
         auto result = evaluate_expression(node->expression, interp, top);
         push_into_interp_stack(result, interp, top);
-        interp->call_stack_index -= 1;
+ 
+        interp->return_count += 1;
+       // interp->call_stack_index -= 1;
         return result;
     }
     break;
@@ -1004,7 +1007,7 @@ void evaluate_node_statement(Code_Node_Statement *root, Interp *interp, uint64_t
     }
     break;
     case CODE_NODE_BLOCK: {
-        evaluate_node_block((Code_Node_Block *)root->node, interp, top);
+        evaluate_node_block((Code_Node_Block *)root->node, interp, top, false);
     }
     break;
     case CODE_NODE_IF: {
@@ -1027,14 +1030,19 @@ void evaluate_node_statement(Code_Node_Statement *root, Interp *interp, uint64_t
     }
 }
 
-void evaluate_node_block(Code_Node_Block *root, Interp *interp, uint64_t top)
+void evaluate_node_block(Code_Node_Block *root, Interp *interp, uint64_t top, bool isproc)
 {
+    auto return_index = interp->return_count;
     for (auto statement = root->statement_head; statement; statement = statement->next)
     {
         evaluate_node_statement(statement, interp, top);
         printf("STATEMENT  ::  %zu \n", statement->source_row);
-        if (interp->call_stack_count != interp->call_stack_index)
-            return;
+        if (return_index != interp->return_count)
+        {
+            if (isproc)
+                interp->return_count -= 1;
+            break;
+        }
     }
-    interp->call_stack_index -= 1;
+   // interp->call_stack_index -= 1;
 }

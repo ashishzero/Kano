@@ -1877,14 +1877,25 @@ void ccall_allocate(Interp *interp, uint64_t top)
 
 void ccall_free(Interp* interp, uint64_t top)
 {
-    void *   arg_ptr = (interp->stack + top);
+     void *   arg_ptr = (interp->stack + top);
     auto ptr    =  *(uint8_t **)arg_ptr;
     free(ptr);
 }
 
 void ccall_print(Interp* interp, uint64_t top)
 {
-    
+    printf("hello\n");
+    char value = (char)(interp->stack + top);
+    while (value)
+    {
+        //if (value == "%")
+        //{
+        //            
+        //}
+        printf("%c\n", value);
+        top += 1;
+        value = (char)(interp->stack + top);
+    }
 }
 
 
@@ -2218,7 +2229,7 @@ int main()
                         fclose(fp);
                     }
 
-                    evaluate_node_block(proc, &interp, 0);
+                    evaluate_node_block(proc, &interp, 0, true);
                 }
                 else
                 {
