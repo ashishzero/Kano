@@ -29,6 +29,7 @@ void            interp_init(Interp *interp, size_t size)
 
 void print_values(Find_Type_Value result)
 {
+    return;
     if (result.type == NULL)
         return;
     switch (result.type->kind)
@@ -77,10 +78,7 @@ Find_Type_Value evaluate_procedure(Code_Node_Procedure_Call *root, Interp *inter
         auto node = (Code_Type_Procedure *)root->paraments[i];
         top       = push_into_interp_stack(var, interp, top);
     }
-    //interp->call_stack_count += 1;
-    //interp->call_stack_index += 1;
     auto result = evaluate_expression((Code_Node *)root->procedure, interp, proc_top);
-    //interp->call_stack_count -= 1;
     return result;
 }
 void evaluate_do_block(Code_Node_Do *root, Interp *interp, uint64_t top)
@@ -100,7 +98,7 @@ void evaluate_while_block(Code_Node_While *root, Interp *interp, uint64_t top)
     {
         evaluate_node_statement((Code_Node_Statement *)root->body, interp, top);
         cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
-        printf("statement executes:: %d\n", (int)TypeValue(cond, bool));
+      //  printf("statement executes:: %d\n", (int)TypeValue(cond, bool));
     }
 }
 
@@ -120,7 +118,7 @@ void evaluate_for_block(Code_Node_For *root, Interp *interp, uint64_t top)
 {
     evaluate_node_statement((Code_Node_Statement *)root->initialization, interp, top);
     auto cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
-    printf("statement executes:: %d\n", (int)TypeValue(cond, bool));
+    //printf("statement executes:: %d\n", (int)TypeValue(cond, bool));
     while (TypeValue(cond, bool))
     {
         evaluate_node_statement((Code_Node_Statement *)root->body, interp, top);
@@ -974,7 +972,6 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
         push_into_interp_stack(result, interp, top);
  
         interp->return_count += 1;
-       // interp->call_stack_index -= 1;
         return result;
     }
     break;
@@ -1036,7 +1033,7 @@ void evaluate_node_block(Code_Node_Block *root, Interp *interp, uint64_t top, bo
     for (auto statement = root->statement_head; statement; statement = statement->next)
     {
         evaluate_node_statement(statement, interp, top);
-        printf("STATEMENT  ::  %zu \n", statement->source_row);
+       // printf("STATEMENT  ::  %zu \n", statement->source_row);
         if (return_index != interp->return_count)
         {
             if (isproc)
@@ -1044,5 +1041,4 @@ void evaluate_node_block(Code_Node_Block *root, Interp *interp, uint64_t top, bo
             break;
         }
     }
-   // interp->call_stack_index -= 1;
 }

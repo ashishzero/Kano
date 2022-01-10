@@ -32,6 +32,13 @@ const accumulate := proc(var count: int, var args: ..) -> int {
 	return sum;
 }
 
+const main2 := proc() {
+print("number = %d", 6);
+
+}
+
+var global_var: int;
+ global_var = 5;
 const main := proc() { 
 	var color: [2] Vec4;
 
@@ -61,6 +68,8 @@ const main := proc() {
 
 	var number0: float = factorial(5);
 	var number1: int;
+	var x: int;
+	x = global_var;
 
 	{
 		var ptr: *float;
@@ -94,7 +103,6 @@ const main := proc() {
 	}
 
 	print("sum: %d, number1: %d\n", sum, number1);
-
 	while sum {
 		sum = sum - 1;
 	}

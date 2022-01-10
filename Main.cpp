@@ -1881,20 +1881,73 @@ void ccall_free(Interp* interp, uint64_t top)
     auto ptr    =  *(uint8_t **)arg_ptr;
     free(ptr);
 }
-
-void ccall_print(Interp* interp, uint64_t top)
+void ccall_print(Interp *interp, uint64_t top)
 {
-    printf("hello\n");
-    char value = (char)(interp->stack + top);
-    while (value)
+    auto fmt   = *((String *)(interp->stack + top));
+    auto args = ((uint8_t*)(interp->stack + top + sizeof(String)));
+    int64_t index = 0;
+    while (index<fmt.length)
     {
-        //if (value == "%")
-        //{
-        //            
-        //}
-        printf("%c\n", value);
-        top += 1;
-        value = (char)(interp->stack + top);
+        if (fmt[index] == '%')
+        {
+            index += 1;
+            if (index >=fmt.length)
+            {
+                printf("Syntax Error in print function::\n");
+                break;
+            }
+            if (fmt[index] == 'd')
+            {
+                index += 1;
+                auto value = (Kano_Int *)(args);
+                printf("%d", *value);
+                args += sizeof(Kano_Int);
+            }
+            else if (fmt[index] == 'f')
+            {
+                index += 1;
+                auto value = (Kano_Real *)(args);
+                printf("%f", *value);
+                args += sizeof(Kano_Real);
+            }
+            else if (fmt[index] == 'b')
+            {
+                index += 1;
+                auto value = (Kano_Bool *)(args);
+                if (*value)
+                    printf("true");
+                else
+                    printf("false");
+                args += sizeof(Kano_Bool);
+            }
+            else if (fmt[index] == '%') {
+                printf("%%");
+                index += 1;
+            }
+        }
+        else if (fmt[index] == '\\')
+        {
+            index += 1;
+            if (index >= fmt.length)
+            {
+                printf("Syntax Error in print function::\n");
+                break;
+            }
+            if (fmt[index] == 'n') {
+                index += 1;
+                printf("\n");
+            }
+            else if (fmt[index] == '\\')
+            {
+                printf("\\");
+                index += 1;
+            }
+        }
+        else
+        {
+        printf("%c", fmt[index]);
+            index += 1;        
+        }
     }
 }
 
