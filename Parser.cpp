@@ -1097,6 +1097,11 @@ Syntax_Node_Global_Scope *parse_global_scope(Parser *parser)
     {
         auto decl_node    = parse_declaration(parser);
 
+        if (!decl_node->initializer || decl_node->initializer->kind == SYNTAX_NODE_EXPRESSION)
+        {
+            parser_expect_token(parser, TOKEN_KIND_SEMICOLON);
+        }
+
         auto decl         = new Syntax_Node_Declaration_List;
         decl->declaration = decl_node;
         decl->next        = nullptr;

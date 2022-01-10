@@ -38,8 +38,8 @@ print("number = %d", 6);
 }
 
 var global_var: int;
- global_var = 5;
 const main := proc() { 
+ 	global_var = 5;
 	var color: [2] Vec4;
 
 	color[0].x = cast(int) 1.2;
