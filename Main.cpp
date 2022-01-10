@@ -1515,6 +1515,8 @@ Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolver, Sym
 
         if (symbol->type->kind != CODE_TYPE_PROCEDURE)
         {
+            Assert(resolver->address_kind < ArrayCount(resolver->virtual_address));
+            
             auto     address = resolver->virtual_address[resolver->address_kind];
 
             uint32_t size    = symbol->type->runtime_size;
@@ -1900,7 +1902,7 @@ void ccall_print(Interp *interp, uint64_t top)
             {
                 index += 1;
                 auto value = (Kano_Int *)(args);
-                printf("%d", *value);
+                printf("%zd", *value);
                 args += sizeof(Kano_Int);
             }
             else if (fmt[index] == 'f')

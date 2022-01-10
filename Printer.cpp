@@ -368,7 +368,7 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
             fprintf(fp, "Literal(float:%f)\n", node->data.real.value);
             break;
         case CODE_TYPE_INTEGER:
-            fprintf(fp, "Literal(int:%d)\n", node->data.integer.value);
+            fprintf(fp, "Literal(int:%zd)\n", node->data.integer.value);
             break;
         case CODE_TYPE_BOOL:
             fprintf(fp, "Literal(bool:%s)\n", node->data.boolean.value ? "true" : "false");

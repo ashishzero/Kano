@@ -43,7 +43,7 @@ void print_values(Find_Type_Value result)
     }
     break;
     case CODE_TYPE_INTEGER: {
-        printf("statement executes:: %d\n", TypeValue(result, Kano_Int));
+        printf("statement executes:: %zd\n", TypeValue(result, Kano_Int));
     }
     break;
     case CODE_TYPE_POINTER: {
