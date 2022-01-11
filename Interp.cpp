@@ -139,12 +139,20 @@ Find_Type_Value evaluate_code_node_assignment(Code_Node_Assignment *node, Interp
     auto offset  = destiny->offset;
     if (destiny->address)
     {
-        Assert(destiny->address->kind == Symbol_Address::STACK);
+       // Assert(destiny->address->kind == Symbol_Address::STACK);
         offset += (uint64_t)destiny->address->offset;
+       switch (destiny->address->kind)
+       {
+       case Symbol_Address::STACK: {
+           memcpy(interp->stack + top + offset, TypeValueRef(value, void *), value.type->runtime_size);
+       }
+       break;
+       case Symbol_Address::GLOBAL: {
+           memcpy(interp->global + top + offset, TypeValueRef(value, void *), value.type->runtime_size);
+       }
+       break;
+       }
     }
-
-    memcpy(interp->stack + top + offset, TypeValueRef(value, void *), value.type->runtime_size);
-
     return value;
 }
 
