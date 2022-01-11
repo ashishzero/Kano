@@ -2262,7 +2262,7 @@ int main()
     }
 
     Interp interp;
-    interp_init(&interp, 1024 * 1024 * 4);
+    interp_init(&interp, 1024 * 1024 * 4, resolver.virtual_address[Symbol_Address::GLOBAL]);
 
     for (auto expr : exprs)
         evaluate_code_node_assignment(expr, &interp, 0);

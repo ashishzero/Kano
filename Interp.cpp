@@ -22,9 +22,10 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
 Find_Type_Value evaluate_node_expression(Code_Node_Expression *root, Interp *interp, uint64_t top);
 void            evaluate_node_statement(Code_Node_Statement *root, Interp *interp, uint64_t top);
 
-void            interp_init(Interp *interp, size_t size)
+void            interp_init(Interp *interp, size_t stack_size, size_t bss_size)
 {
-    interp->stack = new uint8_t[size];
+    interp->stack  = new uint8_t[stack_size];
+    interp->global = new uint8_t[bss_size];
 }
 
 void print_values(Find_Type_Value result)

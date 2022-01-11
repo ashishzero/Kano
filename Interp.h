@@ -5,6 +5,7 @@
 struct Interp
 {
     uint8_t *stack;
+    uint8_t *global;
     int64_t  return_count = 0;
 };
 
@@ -29,6 +30,6 @@ struct Find_Type_Value
     Code_Type *type    = nullptr;
 };
 
-void            interp_init(Interp *interp, size_t size);
+void            interp_init(Interp *interp, size_t stack_size, size_t bss_size);
 Find_Type_Value evaluate_code_node_assignment(Code_Node_Assignment *node, Interp *interp, uint64_t top);
 void            evaluate_node_block(Code_Node_Block *root, Interp *stack, uint64_t top, bool isproc);
