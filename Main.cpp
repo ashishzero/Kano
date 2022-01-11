@@ -246,8 +246,8 @@ struct Code_Type_Resolver
 {
     Symbol_Table                     symbols;
 
-    uint32_t                         virtual_address[2];
-    Symbol_Address::Kind             address_kind;
+    uint32_t                         virtual_address[2] = {0, 0};
+    Symbol_Address::Kind             address_kind = Symbol_Address::CODE;
 
     Array<Code_Type *>               return_stack;
 
@@ -1282,7 +1282,7 @@ Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols
 
                 auto literal        = (Code_Node_Literal *)expr->child;
 
-                type->element_count = literal->data.integer.value;
+                type->element_count = (uint32_t)literal->data.integer.value;
                 type->runtime_size  = type->element_count * type->element_type->runtime_size;
 
                 return type;
@@ -1849,6 +1849,8 @@ Array_View<Code_Node_Assignment *> code_resolve_global_scope(Code_Type_Resolver 
                                                              Syntax_Node_Global_Scope *global)
 {
     Array<Code_Node_Assignment *> global_exe;
+
+    resolver->address_kind = Symbol_Address::GLOBAL;
 
     for (auto decl = global->declarations; decl; decl = decl->next)
     {
