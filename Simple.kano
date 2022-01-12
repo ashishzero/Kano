@@ -1,96 +1,5 @@
 
-const Node := struct {
-	var value: int;
-	var next: *Node;
-}
-
-const Vec4 := struct {
-	var x: float;
-	var y: float;
-	var z: float;
-	var w: float;
-}
-
-const factorial := proc (var n: float) -> float {
-	if n <= 1 then return n;
-	return n * factorial(n - 1);
-}
-const adder : proc (int, int) -> int = proc (var a: int, var b: int) -> int {
-	var result:= a + b;
-	return result;
-}
-
-const accumulate := proc(var count: int, var args: ..) -> int {
-	var ptr: *int = args;
-
-	var sum:= 0;
-	for var i:= 0; i < count; i += 1 {
-		sum += ?ptr;
-		ptr += size_of(int);
-	}
-
-	return sum;
-}
-
-var global_var: int;
-
 const main := proc() {
- 	global_var = 5;
-	var color: [2] Vec4;
-
-	color[0].x = cast(int) 1.2;
-	color[0].y = 1;
-	color[0].z = 0;
-	color[0].w = 1;
-
-	var test0 := accumulate(5, 1, 2, 3, 4, 5);
-	var test1 := accumulate(1, 1);
-	var test2 := accumulate(0);
-
-	var color_view: []Vec4 = color;
-
-	var name: string = "Zero";
-
-	var color_size := size_of(type_of(color));
-
-	var color_p : *void = allocate(1 * size_of(Vec4));
-	var color_p_1 := cast(*Vec4) color_p + 1;
-
-	var color_value := ?color_p_1;
-
-	free(color_p);
-
-	var count := color.count;
-
-	var number0: float = factorial(5);
-	var number1: int;
-	var x: int;
-	x = global_var;
-
-	{
-		var ptr: *float;
-		ptr = *number0;
-		number0 = ?ptr;
-	}
-
-	var is_even: bool;
-	is_even = !false;
-
-	number0 = 5 & ~number1;
-
-	number0 = - 5 + 6 * 3 / (5 - 8) + 5;
-	number1 = 9/3+2;
-
-	var number2: float;
-	number2 = number0 + number1;
-
-	if (number1 & 1) == 0 {
-		is_even = 0;
-	}
-	else if number1 != 0 {
-		is_even = true;
-	}
-
 	var sum:= 0;
 	
 	for var i:= 0; i < 100; i = i + 1 {
@@ -98,15 +7,6 @@ const main := proc() {
 		sum = sum + i;
 	}
 
-	print("sum: %d, number1: %d\n", sum, number1);
-	while sum {
-		sum = sum - 1;
-	}
+	print("sum: %d\n", sum);
 
-	var i:= 9;
-
-	do {
-		sum += 1;
-		i -= 1;
-	} while i >= 0;
 }

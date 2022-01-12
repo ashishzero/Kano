@@ -4,28 +4,28 @@
 
 struct Error_Node
 {
-    String          message;
-    Syntax_Location location;
-    Error_Node *    next;
+	String          message;
+	Syntax_Location location;
+	Error_Node *    next;
 };
 
 struct Error_List
 {
-    Error_Node  first;
-    Error_Node *last;
+	Error_Node  first;
+	Error_Node *last;
 };
 
 struct Parser
 {
-    Lexer           lexer;
-    Syntax_Location location;
-    Token_Value     value;
+	Lexer           lexer;
+	Syntax_Location location;
+	Token_Value     value;
 
-    Error_List      error;
-    uint64_t        error_count;
-    bool            parsing;
+	Error_List      error;
+	uint64_t        error_count;
+	bool            parsing;
 
-    String_Builder *builder;
+	String_Builder *builder;
 };
 
 Syntax_Node *             parse_subexpression(Parser *parser, uint32_t prec);
