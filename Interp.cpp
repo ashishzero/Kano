@@ -943,7 +943,6 @@ static Evaluation_Value interp_eval_expression(Code_Node *root, Interp *interp, 
 		case CODE_NODE_TYPE_CAST: return interp_eval_type_cast((Code_Node_Type_Cast *)root, interp, top);
 		case CODE_NODE_IF: return interp_eval_expression((Code_Node *)root, interp, top);
 		case CODE_NODE_PROCEDURE_CALL: return interp_eval_procedure((Code_Node_Procedure_Call *)root, interp, top);
-		//case CODE_NODE_EXPRESSION: return interp_eval_root_expression((Code_Node_Expression *)root, interp, top);
 		case CODE_NODE_RETURN: return interp_eval_return((Code_Node_Return *)root, interp, top);
 		
 		NoDefaultCase();
