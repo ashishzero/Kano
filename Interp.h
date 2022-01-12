@@ -4,8 +4,9 @@
 
 struct Interp
 {
-	uint8_t *stack;
-	uint8_t *global;
+	uint8_t *stack = nullptr;
+	uint8_t *global = nullptr;
+	//uint64_t stack_top = 0;
 	int64_t  return_count = 0;
 };
 

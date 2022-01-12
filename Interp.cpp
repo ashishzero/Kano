@@ -39,7 +39,7 @@ template <typename T> T *evaluation_value_pointer(Evaluation_Value &val)
 }
 #define EvaluationTypePointer(val, type) evaluation_value_pointer<type>(val)
 
-static uint64_t interp_push_into_stack(Interp *interp, Evaluation_Value var, uint64_t top)
+static inline uint64_t interp_push_into_stack(Interp *interp, Evaluation_Value var, uint64_t top)
 {
 	memcpy(interp->stack + top, EvaluationTypePointer(var, void *), var.type->runtime_size);
 	top += var.type->runtime_size;
@@ -50,6 +50,31 @@ static uint64_t interp_push_into_stack(Interp *interp, Evaluation_Value var, uin
 //
 //
 
+static inline uint8_t *interp_eval_data_address(Interp *interp, Code_Node_Address *node, uint64_t top)
+{
+	Assert(node->type->kind != CODE_TYPE_PROCEDURE);
+	
+	auto offset = node->offset;
+	auto memory = interp->stack;
+	
+	Assert(node->child == nullptr);
+	
+	if (node->address)
+	{
+		offset += node->address->offset;
+		
+		auto address_kind = node->address->kind;
+		Assert(address_kind == Symbol_Address::GLOBAL || address_kind == Symbol_Address::STACK);
+		
+		if (node->address->kind == Symbol_Address::GLOBAL)
+		{
+			memory = interp->global;
+		}
+	}
+
+	return memory + top + offset;
+}
+
 static void interp_eval_block(Code_Node_Block *root, Interp *interp, uint64_t top, bool isproc);
 
 static Evaluation_Value interp_eval_address(Code_Node_Address *node, Interp *interp, uint64_t top)
@@ -58,27 +83,7 @@ static Evaluation_Value interp_eval_address(Code_Node_Address *node, Interp *int
 	{
 		Evaluation_Value type_value;
 		type_value.type = node->type;
-		
-		auto offset     = node->offset;
-		auto memory     = interp->stack;
-		
-		Assert(node->child == nullptr);
-		
-		if (node->address)
-		{
-			offset += node->address->offset;
-			
-			auto address_kind = node->address->kind;
-			Assert(address_kind == Symbol_Address::GLOBAL || address_kind == Symbol_Address::STACK);
-			
-			if (node->address->kind == Symbol_Address::GLOBAL)
-			{
-				memory = interp->global;
-			}
-		}
-		
-		type_value.address = memory + top + offset;
-		
+		type_value.address = interp_eval_data_address(interp, node, top);
 		return type_value;
 	}
 
@@ -276,67 +281,21 @@ static Evaluation_Value interp_eval_unary_operator(Code_Node_Unary_Operator *roo
 		}
 		break;
 		
-		case UNARY_OPERATOR_DEREFERENCE: {
-			Assert(root->child->kind == CODE_NODE_ADDRESS);
-			
-			auto            address = (Code_Node_Address *)root->child;
-			Evaluation_Value type_value;
-			
-			Assert(address->child == nullptr);
-			
-			uint64_t offset = address->offset;
-			auto     memory = interp->stack;
-			
-			if (address->address)
-			{
-				offset += address->address->offset;
-				
-				auto address_kind = address->address->kind;
-				Assert(address_kind == Symbol_Address::GLOBAL || address_kind == Symbol_Address::STACK);
-				
-				if (address->address->kind == Symbol_Address::GLOBAL)
-				{
-					memory = interp->global;
-				}
-			}
-			
-			type_value.address = memory + top + offset;
-			type_value.type    = root->type;
-			
-			return type_value;
-		}
-		break;
-		
+		case UNARY_OPERATOR_DEREFERENCE: 
 		case UNARY_OPERATOR_POINTER_TO: {
 			Assert(root->child->kind == CODE_NODE_ADDRESS);
 			
-			auto            address = (Code_Node_Address *)root->child;
-			
+			auto address = (Code_Node_Address *)root->child;
+
 			Evaluation_Value type_value;
-			type_value.type = root->type;
+			type_value.type    = root->type;
+			type_value.address = interp_eval_data_address(interp, address, top);
 			
-			Assert(address->child == nullptr);
-			
-			auto offset = address->offset;
-			auto memory = interp->stack;
-			
-			if (address->address)
-			{
-				offset += address->address->offset;
-				
-				auto address_kind = address->address->kind;
-				Assert(address_kind == Symbol_Address::GLOBAL || address_kind == Symbol_Address::STACK);
-				
-				if (address->address->kind == Symbol_Address::GLOBAL)
-				{
-					memory = interp->global;
-				}
-			}
-			
-			type_value.address = memory + top + offset;
 			return type_value;
 		}
 		break;
+
+		NoDefaultCase();
 	}
 	
 	Unreachable();
