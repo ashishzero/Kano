@@ -61,6 +61,115 @@ bool print_error(Error_List *list)
 	return list->first.next != nullptr;
 }
 
+void print_type(Code_Type *type)
+{
+	switch (type->kind)
+	{
+		case CODE_TYPE_NULL: printf("void"); return;
+		case CODE_TYPE_INTEGER: printf("int"); return;
+		case CODE_TYPE_REAL: printf("float"); return;
+		case CODE_TYPE_BOOL: printf("bool"); return;
+
+		case CODE_TYPE_POINTER: {
+			printf("*"); 
+			print_type(((Code_Type_Pointer *)type)->base_type);
+			return;
+		}
+
+		case CODE_TYPE_PROCEDURE: {
+			auto proc = (Code_Type_Procedure *)type;
+			printf("proc (");
+			for (uint64_t index = 0; index < proc->argument_count; ++index)
+			{
+				print_type(proc->arguments[index]);
+				if (index < proc->argument_count - 1) printf(", ");
+			}
+			printf(")");
+
+			if (proc->return_type)
+			{
+				printf(" -> ");
+				print_type(proc->return_type);
+			}
+			return;
+		}
+
+		case CODE_TYPE_STRUCT: {
+			auto strt = (Code_Type_Struct *)type;
+			printf("%s", strt->name.data); 
+			return;
+		}
+
+		case CODE_TYPE_ARRAY_VIEW: {
+			auto arr = (Code_Type_Array_View *)type;
+			printf("[] ");
+			print_type(arr->element_type);
+			return;
+		}
+
+		case CODE_TYPE_STATIC_ARRAY: {
+			auto arr = (Code_Type_Static_Array *)type;
+			printf("[%u] ", arr->element_count);
+			print_type(arr->element_type);
+			return;
+		}
+	}
+}
+
+void print_value(Code_Type *type, void *data)
+{
+	switch (type->kind)
+	{
+		case CODE_TYPE_NULL: printf("null"); return;
+		case CODE_TYPE_INTEGER: printf("%zd", *(Kano_Int *)data); return;
+		case CODE_TYPE_REAL: printf("%f", *(Kano_Real *)data); return;
+		case CODE_TYPE_BOOL: printf("%s", (*(Kano_Bool *)data) ? "true" : "false"); return;
+
+		case CODE_TYPE_POINTER: {
+			return;
+		}
+
+		case CODE_TYPE_PROCEDURE: printf("%p", data); return;
+
+		case CODE_TYPE_STRUCT: {
+			return;
+		}
+
+		case CODE_TYPE_ARRAY_VIEW: {
+			return;
+		}
+
+		case CODE_TYPE_STATIC_ARRAY: {
+			return;
+		}
+	}
+}
+
+void intercept(Interpreter *interp, Code_Node_Statement *statement)
+{
+	printf("Executing statement: %zu\n", statement->source_row);
+
+	printf("%-15s %-15s %s\n", "Name", "Value", "Type");
+	for (auto symbols = statement->symbol_table; symbols; symbols = symbols->parent)
+	{
+		for (auto symbol : symbols->buffer)
+		{
+			if ((symbol->flags & SYMBOL_BIT_TYPE))
+				continue;
+
+			void *data = interp->stack + symbols->stack_offset + symbol->address.offset;
+
+			printf("%-15s ", symbol->name.data);
+			print_value(symbol->type, data);
+			printf("\t");
+			print_type(symbol->type);
+			printf("\n");
+		}
+	}
+
+	printf("\n\n");
+}
+
 int main()
 {
 	String content = read_entire_file("Simple.kano");
@@ -84,6 +193,7 @@ int main()
 	print("code.txt", exprs);
 
 	Interpreter interp;
+	interp.intercept = intercept;
 	interp_init(&interp, 1024 * 1024 * 4, code_type_resolver_bss_allocated(resolver));
 
 	interp_eval_globals(&interp, exprs);

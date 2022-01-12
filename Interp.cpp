@@ -1002,8 +1002,7 @@ static bool interp_eval_statement(Interpreter *interp, Code_Node_Statement *root
 {
 	Assert(root->symbol_table);
 
-	//interp->intercept(interp, top, root);
-	//printf("Executing line: %zu\n", root->source_row);
+	interp->intercept(interp, root);
 
 	Evaluation_Value value;
 	Evaluation_Value *dst = out_value ? out_value : &value;

@@ -197,6 +197,7 @@ struct Symbol_Table
 {
 	Symbol_Lookup   lookup;
 	Array<Symbol *> buffer;
+	uint64_t        stack_offset = 0;
 	Symbol_Table *  parent = nullptr;
 };
 

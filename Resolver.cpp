@@ -1593,6 +1593,7 @@ static Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver,
 			statement->node                = expression;
 			statement->type                = expression->type;
 			statement->symbol_table        = symbols;
+
 			return statement;
 		}
 		break;
@@ -1662,13 +1663,13 @@ static Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver,
 			auto cond_statement = new Code_Node_Statement;
 			cond_statement->source_row = for_node->condition->location.start_row;
 			cond_statement->node = condition;
-			cond_statement->symbol_table = symbols;
+			cond_statement->symbol_table = &for_code->symbols;
 			
 			auto increment = code_resolve_root_expression(resolver, &for_code->symbols, for_node->increment);
 			auto incr_statement = new Code_Node_Statement;
 			incr_statement->source_row = for_node->increment->location.start_row;
 			incr_statement->node = increment;
-			incr_statement->symbol_table = symbols;
+			incr_statement->symbol_table = &for_code->symbols;
 			
 			for_code->condition = cond_statement;
 			for_code->increment = incr_statement;
@@ -1679,7 +1680,7 @@ static Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver,
 			Code_Node_Statement *statement                   = new Code_Node_Statement;
 			statement->source_row                            = node->location.start_row;
 			statement->node                                  = for_code;
-			statement->symbol_table = symbols;
+			statement->symbol_table = &for_code->symbols;
 			return statement;
 		}
 		break;
@@ -1814,7 +1815,8 @@ static Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Symbol_
 	Code_Node_Statement  statement_stub_head;
 	Code_Node_Statement *parent_statement = &statement_stub_head;
 	
-	auto                 stack_top        = resolver->virtual_address[Symbol_Address::STACK];
+	auto stack_top = resolver->virtual_address[Symbol_Address::STACK];
+	block->symbols.stack_offset = stack_top;
 	
 	uint32_t             statement_count  = 0;
 	for (auto statement = root->statements; statement; statement = statement->next)

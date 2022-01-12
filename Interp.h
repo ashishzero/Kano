@@ -2,12 +2,17 @@
 #include "Printer.h"
 #include "Token.h"
 
+typedef void(*Intercep_Proc)(struct Interpreter *interp, struct Code_Node_Statement *statement);
+
+inline void intercept_default(struct Interpreter *interp, struct Code_Node_Statement *statement){};
+
 struct Interpreter
 {
 	uint8_t *stack = nullptr;
 	uint8_t *global = nullptr;
 	uint64_t stack_top = 0;
 	int64_t  return_count = 0;
+	Intercep_Proc intercept = intercept_default;
 };
 
 void            interp_init(Interpreter *interp, size_t stack_size, size_t bss_size);

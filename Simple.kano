@@ -1,9 +1,9 @@
 
 const main := proc() {
-	var sum:= 0;
+	var sum:= 5;
 	
-	for var i: type_of(sum) = 0; i < 100; i = i + 1 {
-		print("i: %d\n", i);
+	for var i:= 0; i < 1; i += 1 {
+		//print("i: %d\n", i);
 		sum = sum + i;
 	}
 
