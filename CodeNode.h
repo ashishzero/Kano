@@ -132,7 +132,7 @@ struct Code_Type_Static_Array : public Code_Type
 //
 //
 //
-typedef void (*CCall)(struct Interp *interp);
+typedef void (*CCall)(struct Interpreter *interp);
 struct Symbol_Address
 {
 	enum Kind

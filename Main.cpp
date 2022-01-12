@@ -83,7 +83,7 @@ int main()
 
 	print("code.txt", exprs);
 
-	Interp interp;
+	Interpreter interp;
 	interp_init(&interp, 1024 * 1024 * 4, code_type_resolver_bss_allocated(resolver));
 
 	interp_eval_globals(&interp, exprs);

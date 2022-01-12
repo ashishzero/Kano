@@ -1861,7 +1861,7 @@ static Array_View<Code_Node_Assignment *> code_resolve_global_scope(Code_Type_Re
 	return global_exe;
 }
 
-static void ccall_allocate(Interp *interp)
+static void ccall_allocate(Interpreter *interp)
 {
 	auto top = interp->stack_top;
 	void *   return_ptr = (interp->stack + top);
@@ -1871,7 +1871,7 @@ static void ccall_allocate(Interp *interp)
 	memcpy(return_ptr, &ptr, sizeof(void *));
 }
 
-static void ccall_free(Interp *interp)
+static void ccall_free(Interpreter *interp)
 {
 	auto top = interp->stack_top;
 	void *arg_ptr = (interp->stack + top);
@@ -1879,7 +1879,7 @@ static void ccall_free(Interp *interp)
 	free(ptr);
 }
 
-static void ccall_print(Interp *interp)
+static void ccall_print(Interpreter *interp)
 {
 	auto top = interp->stack_top;
 	auto fmt  = *((String *)(interp->stack + top));
