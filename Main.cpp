@@ -1627,6 +1627,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
 		statement->source_row          = node->location.start_row;
 		statement->node                = expression;
 		statement->type                = expression->type;
+		statement->symbol_table        = symbols;
 		return statement;
 	}
 	break;
@@ -1662,6 +1663,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
 		Code_Node_Statement *statement = new Code_Node_Statement;
 		statement->source_row          = node->location.start_row;
 		statement->node                = if_code;
+		statement->symbol_table = symbols;
 		return statement;
 	}
 	break;
@@ -1695,11 +1697,13 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
 		auto cond_statement = new Code_Node_Statement;
 		cond_statement->source_row = for_node->condition->location.start_row;
 		cond_statement->node = condition;
+		cond_statement->symbol_table = symbols;
 
 		auto increment = code_resolve_root_expression(resolver, &for_code->symbols, for_node->increment);
 		auto incr_statement = new Code_Node_Statement;
 		incr_statement->source_row = for_node->increment->location.start_row;
 		incr_statement->node = increment;
+		incr_statement->symbol_table = symbols;
 
 		for_code->condition = cond_statement;
 		for_code->increment = incr_statement;
@@ -1710,6 +1714,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
 		Code_Node_Statement *statement                   = new Code_Node_Statement;
 		statement->source_row                            = node->location.start_row;
 		statement->node                                  = for_code;
+		statement->symbol_table = symbols;
 		return statement;
 	}
 	break;
@@ -1736,6 +1741,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
 		auto cond_statement = new Code_Node_Statement;
 		cond_statement->source_row = while_node->condition->location.start_row;
 		cond_statement->node = condition;
+		cond_statement->symbol_table = symbols;
 
 		auto while_code                = new Code_Node_While;
 		while_code->condition          = cond_statement;
@@ -1744,6 +1750,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
 		Code_Node_Statement *statement = new Code_Node_Statement;
 		statement->source_row          = node->location.start_row;
 		statement->node                = while_code;
+		statement->symbol_table = symbols;
 		return statement;
 	}
 	break;
@@ -1779,6 +1786,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
 		auto cond_statement = new Code_Node_Statement;
 		cond_statement->source_row = do_node->condition->location.start_row;
 		cond_statement->node = condition;
+		cond_statement->symbol_table = symbols;
 
 		auto do_code                   = new Code_Node_Do;
 		do_code->body                  = body;
@@ -1787,6 +1795,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
 		Code_Node_Statement *statement = new Code_Node_Statement;
 		statement->source_row          = node->location.start_row;
 		statement->node                = do_code;
+		statement->symbol_table = symbols;
 		return statement;
 	}
 	break;
@@ -1799,6 +1808,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
 			Code_Node_Statement *statement = new Code_Node_Statement;
 			statement->source_row          = node->location.start_row;
 			statement->node                = initialization;
+			statement->symbol_table = symbols;
 			return statement;
 		}
 
@@ -1818,7 +1828,7 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
 		Code_Node_Statement *statement = new Code_Node_Statement;
 		statement->source_row          = node->location.start_row;
 		statement->node                = block;
-		statement->type                = nullptr;
+		statement->symbol_table = symbols;
 		return statement;
 	}
 	break;

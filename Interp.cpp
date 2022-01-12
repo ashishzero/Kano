@@ -1016,7 +1016,9 @@ Find_Type_Value evaluate_node_expression(Code_Node_Expression *root, Interp *int
 
 bool evaluate_node_statement(Code_Node_Statement *root, Interp *interp, uint64_t top, Find_Type_Value *value)
 {
+	//interp->intercept(interp, top, root);
 	printf("Executing line: %zu\n", root->source_row);
+	Assert(root->symbol_table);
 
 	switch (root->node->kind)
 	{

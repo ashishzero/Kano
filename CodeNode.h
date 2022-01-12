@@ -428,6 +428,8 @@ struct Code_Node_Statement : public Code_Node
 
 	Code_Node *          node       = nullptr;
 	Code_Node_Statement *next       = nullptr;
+
+	Symbol_Table *symbol_table = nullptr;
 };
 
 struct Code_Node_Procedure_Call : public Code_Node
