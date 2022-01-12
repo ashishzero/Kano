@@ -20,7 +20,7 @@ template <typename T> T *to_type_ptr(Find_Type_Value &val)
 
 Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t top);
 Find_Type_Value evaluate_node_expression(Code_Node_Expression *root, Interp *interp, uint64_t top);
-void            evaluate_node_statement(Code_Node_Statement *root, Interp *interp, uint64_t top);
+bool            evaluate_node_statement(Code_Node_Statement *root, Interp *interp, uint64_t top, Find_Type_Value *result = nullptr);
 
 void            interp_init(Interp *interp, size_t stack_size, size_t bss_size)
 {
@@ -63,21 +63,30 @@ Find_Type_Value evaluate_procedure(Code_Node_Procedure_Call *root, Interp *inter
 
 void evaluate_do_block(Code_Node_Do *root, Interp *interp, uint64_t top)
 {
+	auto do_cond = root->condition;
+	auto do_body = root->body;
+
 	Find_Type_Value cond;
+
 	do
 	{
-		evaluate_node_statement((Code_Node_Statement *)root->body, interp, top);
-		cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
+		evaluate_node_statement(do_body, interp, top);
+		Assert(evaluate_node_statement(do_cond, interp, top, &cond));
 	} while (TypeValue(cond, bool));
 }
 
 void evaluate_while_block(Code_Node_While *root, Interp *interp, uint64_t top)
 {
-	auto cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
+	auto while_cond = root->condition;
+	auto while_body = root->body;
+	
+	Find_Type_Value cond;
+	Assert(evaluate_node_statement(while_cond, interp, top, &cond));
+
 	while (TypeValue(cond, bool))
 	{
-		evaluate_node_statement((Code_Node_Statement *)root->body, interp, top);
-		cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
+		evaluate_node_statement(while_body, interp, top);
+		Assert(evaluate_node_statement(while_cond, interp, top, &cond));
 	}
 }
 
@@ -95,13 +104,21 @@ void evaluate_if_block(Code_Node_If *root, Interp *interp, uint64_t top)
 
 void evaluate_for_block(Code_Node_For *root, Interp *interp, uint64_t top)
 {
-	evaluate_node_statement((Code_Node_Statement *)root->initialization, interp, top);
-	auto cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
+	auto for_init = root->initialization;
+	auto for_cond = root->condition;
+	auto for_incr = root->increment;
+	auto for_body = root->body;
+
+	Find_Type_Value cond;
+
+	evaluate_node_statement(for_init, interp, top);
+	Assert(evaluate_node_statement(for_cond, interp, top, &cond));
+
 	while (TypeValue(cond, bool))
 	{
-		evaluate_node_statement((Code_Node_Statement *)root->body, interp, top);
-		auto incre = evaluate_node_expression((Code_Node_Expression *)root->increment, interp, top);
-		cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
+		evaluate_node_statement(for_body, interp, top);
+		Assert(evaluate_node_statement(for_incr, interp, top));
+		Assert(evaluate_node_statement(for_cond, interp, top, &cond));
 	}
 }
 
@@ -997,40 +1014,55 @@ Find_Type_Value evaluate_node_expression(Code_Node_Expression *root, Interp *int
 	return evaluate_expression(root->child, interp, top);
 }
 
-void evaluate_node_statement(Code_Node_Statement *root, Interp *interp, uint64_t top)
+bool evaluate_node_statement(Code_Node_Statement *root, Interp *interp, uint64_t top, Find_Type_Value *value)
 {
+	printf("Executing line: %zu\n", root->source_row);
+
 	switch (root->node->kind)
 	{
 	case CODE_NODE_EXPRESSION: {
 		auto result = evaluate_node_expression((Code_Node_Expression *)root->node, interp, top);
+		if (value) *value = result;
+		return true;
 	}
 	break;
+
 	case CODE_NODE_ASSIGNMENT: {
 		auto result = evaluate_code_node_assignment((Code_Node_Assignment *)root->node, interp, top);
+		if (value) *value = result;
+		return true;
 	}
 	break;
+
 	case CODE_NODE_BLOCK: {
 		evaluate_node_block((Code_Node_Block *)root->node, interp, top, false);
 	}
 	break;
+
 	case CODE_NODE_IF: {
 		evaluate_if_block((Code_Node_If *)root->node, interp, top);
 	}
 	break;
+
 	case CODE_NODE_FOR: {
 		evaluate_for_block((Code_Node_For *)root->node, interp, top);
 	}
 	break;
+
 	case CODE_NODE_WHILE: {
 		evaluate_while_block((Code_Node_While *)root->node, interp, top);
 	}
 	break;
+
 	case CODE_NODE_DO: {
 		evaluate_do_block((Code_Node_Do *)root->node, interp, top);
 	}
 	break;
+
 		NoDefaultCase();
 	}
+
+	return false;
 }
 
 void evaluate_node_block(Code_Node_Block *root, Interp *interp, uint64_t top, bool isproc)

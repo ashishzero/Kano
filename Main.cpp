@@ -1692,8 +1692,17 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
 			}
 		}
 
-		for_code->condition = condition;
-		for_code->increment = code_resolve_root_expression(resolver, &for_code->symbols, for_node->increment);
+		auto cond_statement = new Code_Node_Statement;
+		cond_statement->source_row = for_node->condition->location.start_row;
+		cond_statement->node = condition;
+
+		auto increment = code_resolve_root_expression(resolver, &for_code->symbols, for_node->increment);
+		auto incr_statement = new Code_Node_Statement;
+		incr_statement->source_row = for_node->increment->location.start_row;
+		incr_statement->node = increment;
+
+		for_code->condition = cond_statement;
+		for_code->increment = incr_statement;
 		for_code->body      = code_resolve_statement(resolver, &for_code->symbols, for_node->body);
 
 		resolver->virtual_address[Symbol_Address::STACK] = stack_top;
@@ -1724,8 +1733,12 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
 			}
 		}
 
+		auto cond_statement = new Code_Node_Statement;
+		cond_statement->source_row = while_node->condition->location.start_row;
+		cond_statement->node = condition;
+
 		auto while_code                = new Code_Node_While;
-		while_code->condition          = condition;
+		while_code->condition          = cond_statement;
 		while_code->body               = code_resolve_statement(resolver, symbols, while_node->body);
 
 		Code_Node_Statement *statement = new Code_Node_Statement;
@@ -1763,9 +1776,13 @@ Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver, Symbol
 			}
 		}
 
+		auto cond_statement = new Code_Node_Statement;
+		cond_statement->source_row = do_node->condition->location.start_row;
+		cond_statement->node = condition;
+
 		auto do_code                   = new Code_Node_Do;
 		do_code->body                  = body;
-		do_code->condition             = condition;
+		do_code->condition             = cond_statement;
 
 		Code_Node_Statement *statement = new Code_Node_Statement;
 		statement->source_row          = node->location.start_row;

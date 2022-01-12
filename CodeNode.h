@@ -476,9 +476,9 @@ struct Code_Node_For : public Code_Node
 		kind = CODE_NODE_FOR;
 	}
 
-	Code_Node_Statement * initialization = nullptr;
-	Code_Node_Expression *condition      = nullptr;
-	Code_Node_Expression *increment      = nullptr;
+	Code_Node_Statement *initialization = nullptr;
+	Code_Node_Statement *condition      = nullptr;
+	Code_Node_Statement *increment      = nullptr;
 
 	Code_Node_Statement * body           = nullptr;
 
@@ -492,9 +492,9 @@ struct Code_Node_While : public Code_Node
 		kind = CODE_NODE_WHILE;
 	}
 
-	Code_Node_Expression *condition = nullptr;
+	Code_Node_Statement *condition = nullptr;
 
-	Code_Node_Statement * body      = nullptr;
+	Code_Node_Statement *body      = nullptr;
 };
 
 struct Code_Node_Do : public Code_Node
@@ -504,9 +504,9 @@ struct Code_Node_Do : public Code_Node
 		kind = CODE_NODE_DO;
 	}
 
-	Code_Node_Statement * body      = nullptr;
+	Code_Node_Statement *body      = nullptr;
 
-	Code_Node_Expression *condition = nullptr;
+	Code_Node_Statement *condition = nullptr;
 };
 
 struct Code_Node_Block : public Code_Node
