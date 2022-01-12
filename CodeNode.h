@@ -439,7 +439,7 @@ struct Code_Node_Procedure_Call : public Code_Node
 		kind = CODE_NODE_PROCEDURE_CALL;
 	}
 
-	Code_Node *            procedure       = nullptr;
+	Code_Node_Expression * procedure       = nullptr;
 	uint64_t               parameter_count = 0;
 	Code_Node_Expression **paraments       = nullptr;
 	uint64_t               variadic_count  = 0;
