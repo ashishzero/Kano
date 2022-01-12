@@ -69,19 +69,24 @@ Find_Type_Value evaluate_procedure(Code_Node_Procedure_Call *root, Interp *inter
         auto var = evaluate_node_expression((Code_Node_Expression *)root->variadics[i], interp, prev_top);
         top      = push_into_interp_stack(var, interp, top);
     }
+
     // allocate for return type
     auto proc_top = top;
     if (root->type)
         top += root->type->runtime_size;
+
     for (int i = 0; i < root->parameter_count; i++)
     {
         auto var  = evaluate_node_expression((Code_Node_Expression *)root->paraments[i], interp, prev_top);
         auto node = (Code_Type_Procedure *)root->paraments[i];
         top       = push_into_interp_stack(var, interp, top);
     }
+
     auto result = evaluate_expression((Code_Node *)root->procedure, interp, proc_top);
+
     return result;
 }
+
 void evaluate_do_block(Code_Node_Do *root, Interp *interp, uint64_t top)
 {
     Find_Type_Value cond;
@@ -845,10 +850,10 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
             auto offset = node->offset;
             Find_Type_Value type_value;
 
+			Assert(node->child == nullptr);
+
             if (node->address)
             {
-                // TODO: SUPPORT!!
-                //Assert(!node->child && node->address->kind == Symbol_Address::STACK);
                 offset += node->address->offset;
                 switch (node->address->kind)
                 {
@@ -868,8 +873,6 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
         }
         else
         {
-            //Assert(!node->child && node->address->kind == Symbol_Address::CODE);
-
             switch (node->address->kind)
             {
             case Symbol_Address::CODE: {
@@ -894,8 +897,7 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
             }
             break;
             case Symbol_Address::CCALL:{
-                node->address->ccall(interp, top);     ////passing to main
-              //  interp->call_stack_index -= 1;
+                node->address->ccall(interp, top);
 
                 Find_Type_Value type_value;
 
@@ -1072,7 +1074,6 @@ void evaluate_node_block(Code_Node_Block *root, Interp *interp, uint64_t top, bo
     for (auto statement = root->statement_head; statement; statement = statement->next)
     {
         evaluate_node_statement(statement, interp, top);
-        printf("STATEMENT  ::  %zu \n", statement->source_row);
         if (return_index != interp->return_count)
         {
             if (isproc)

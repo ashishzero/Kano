@@ -1885,77 +1885,77 @@ void ccall_free(Interp* interp, uint64_t top)
     auto ptr    =  *(uint8_t **)arg_ptr;
     free(ptr);
 }
+
 void ccall_print(Interp *interp, uint64_t top)
 {
-    auto fmt   = *((String *)(interp->stack + top));
-    auto args = ((uint8_t*)(interp->stack + top + sizeof(String)));
-    int64_t index = 0;
-    while (index<fmt.length)
+    auto fmt  = *((String *)(interp->stack + top));
+    auto args = ((uint8_t *)(interp->stack + top + sizeof(String)));
+
+    for (int64_t index = 0; index < fmt.length; )
     {
         if (fmt[index] == '%')
         {
             index += 1;
-            if (index >=fmt.length)
-            {
-                printf("Syntax Error in print function::\n");
-                break;
-            }
-            if (fmt[index] == 'd')
-            {
-                index += 1;
-                auto value = (Kano_Int *)(args);
-                printf("%zd", *value);
-                args += sizeof(Kano_Int);
-            }
-            else if (fmt[index] == 'f')
-            {
-                index += 1;
-                auto value = (Kano_Real *)(args);
-                printf("%f", *value);
-                args += sizeof(Kano_Real);
-            }
-            else if (fmt[index] == 'b')
-            {
-                index += 1;
-                auto value = (Kano_Bool *)(args);
-                if (*value)
-                    printf("true");
-                else
-                    printf("false");
-                args += sizeof(Kano_Bool);
-            }
-            else if (fmt[index] == '%') {
-                printf("%%");
-                index += 1;
-            }
+			if (index < fmt.length)
+			{
+				if (fmt[index] == 'd')
+				{
+					index += 1;
+					auto value = (Kano_Int *)(args);
+					printf("%zd", *value);
+					args += sizeof(Kano_Int);
+				}
+				else if (fmt[index] == 'f')
+				{
+					index += 1;
+					auto value = (Kano_Real *)(args);
+					printf("%f", *value);
+					args += sizeof(Kano_Real);
+				}
+				else if (fmt[index] == 'b')
+				{
+					index += 1;
+					auto value = (Kano_Bool *)(args);
+					printf("%s", *value ? "true" : "false");
+					args += sizeof(Kano_Bool);
+				}
+				else if (fmt[index] == '%') {
+					printf("%%");
+					index += 1;
+				}
+			}
+			else
+			{
+				printf("%%");
+			}
         }
         else if (fmt[index] == '\\')
         {
             index += 1;
-            if (index >= fmt.length)
-            {
-                printf("Syntax Error in print function::\n");
-                break;
-            }
-            if (fmt[index] == 'n') {
-                index += 1;
-                printf("\n");
-            }
-            else if (fmt[index] == '\\')
-            {
-                printf("\\");
-                index += 1;
-            }
+			if (index < fmt.length)
+			{
+				if (fmt[index] == 'n') {
+					index += 1;
+					printf("\n");
+				}
+				else if (fmt[index] == '\\')
+				{
+					printf("\\");
+					index += 1;
+				}
+			}
+			else
+			{
+				printf("\\");
+			}
         }
         else
         {
-        printf("%c", fmt[index]);
-            index += 1;        
-        }
-    }
+			printf("%c", fmt[index]);
+			index += 1;
+		}
+	}
 }
-
-
 
 int main()
 {
