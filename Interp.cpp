@@ -221,20 +221,30 @@ Find_Type_Value evaluate_unary_operator(Code_Node_Unary_Operator *root, Interp *
         Assert(root->child->kind == CODE_NODE_ADDRESS);
 
         auto     address = (Code_Node_Address *)root->child;
+        Find_Type_Value type_value;
 
         uint64_t offset  = address->offset;
         if (address->address)
         {
-            Assert(address->address->kind == Symbol_Address::STACK);
+           // Assert(address->address->kind == Symbol_Address::STACK);
             offset += address->address->offset;
+            switch (address->address->kind)
+            {
+            case Symbol_Address::STACK: {
+                auto address_value = (uint8_t *)(interp->stack + top + offset);
+                type_value.address = address_value;
+            }
+            break;
+            case Symbol_Address::GLOBAL: {
+                auto address_value = (uint8_t *)(interp->global + top + offset);
+                type_value.address = address_value;
+            }
+            break;
+            }
         }
-
-        auto            address_value = (uint8_t *)(interp->stack + top + offset);
-
-        Find_Type_Value type_value;
-        type_value.address = address_value;
         type_value.type    = root->type;
         return type_value;
+
     }
     break;
 
@@ -250,9 +260,19 @@ Find_Type_Value evaluate_unary_operator(Code_Node_Unary_Operator *root, Interp *
         if (address->address)
         {
             offset += address->address->offset;
-        }
+            switch (address->address->kind)
+            {
+            case Symbol_Address::STACK: {
+                type_value.address = (uint8_t *)(interp->stack + offset + top);
 
-        type_value.address = (uint8_t *)(interp->stack + offset + top);
+            }
+            break;
+            case Symbol_Address::GLOBAL: {
+                type_value.address = (uint8_t *)(interp->global + offset + top);
+            }
+            break;
+            }
+        }
         return type_value;
     }
     break;
@@ -823,17 +843,27 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
         if (node->type->kind != CODE_TYPE_PROCEDURE)
         {
             auto offset = node->offset;
+            Find_Type_Value type_value;
 
             if (node->address)
             {
                 // TODO: SUPPORT!!
-                Assert(!node->child && node->address->kind == Symbol_Address::STACK);
+                //Assert(!node->child && node->address->kind == Symbol_Address::STACK);
                 offset += node->address->offset;
+                switch (node->address->kind)
+                {
+                case Symbol_Address::STACK: {
+                    type_value.type    = root->type;
+                    type_value.address = (uint8_t *)(interp->stack + top + offset);
+                }
+                break;
+                case Symbol_Address::GLOBAL: {
+                    type_value.type    = root->type;
+                    type_value.address = (uint8_t *)(interp->global + top + offset);
+                }
+                break;
+                }
             }
-
-            Find_Type_Value type_value;
-            type_value.type    = root->type;
-            type_value.address = (uint8_t *)(interp->stack + top + offset);
             return type_value;
         }
         else
@@ -1042,7 +1072,7 @@ void evaluate_node_block(Code_Node_Block *root, Interp *interp, uint64_t top, bo
     for (auto statement = root->statement_head; statement; statement = statement->next)
     {
         evaluate_node_statement(statement, interp, top);
-       // printf("STATEMENT  ::  %zu \n", statement->source_row);
+        printf("STATEMENT  ::  %zu \n", statement->source_row);
         if (return_index != interp->return_count)
         {
             if (isproc)
