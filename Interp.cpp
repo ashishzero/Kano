@@ -1081,3 +1081,18 @@ void evaluate_node_block(Code_Node_Block *root, Interp *interp, uint64_t top, bo
 		}
 	}
 }
+
+//
+//
+//
+
+void interp_eval_globals(Interp *interp, Array_View<Code_Node_Assignment *> exprs)
+{
+	for (auto expr : exprs)
+		evaluate_code_node_assignment(expr, interp, 0);
+}
+
+void interp_eval_procedure(Interp *interp, Code_Node_Block *proc)
+{
+	evaluate_node_block(proc, interp, 0, true);
+}

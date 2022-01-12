@@ -86,8 +86,7 @@ int main()
 	Interp interp;
 	interp_init(&interp, 1024 * 1024 * 4, code_type_resolver_bss_allocated(resolver));
 
-	for (auto expr : exprs)
-		evaluate_code_node_assignment(expr, &interp, 0);
+	interp_eval_globals(&interp, exprs);
 
 	auto main_proc = code_type_resolver_find(resolver, "main");
 	if (main_proc)
@@ -108,7 +107,7 @@ int main()
 						fclose(fp);
 					}
 
-					evaluate_node_block(proc, &interp, 0, true);
+					interp_eval_procedure(&interp, proc);
 				}
 				else
 				{
