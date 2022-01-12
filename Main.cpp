@@ -123,7 +123,7 @@ int main()
 		fclose(fp);
 	}
 		
-	interp_eval_procedure(&interp, proc);
+	interp_eval_procedure_call(&interp, proc);
 
 	return 0;
 }

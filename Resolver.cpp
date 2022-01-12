@@ -1861,8 +1861,9 @@ static Array_View<Code_Node_Assignment *> code_resolve_global_scope(Code_Type_Re
 	return global_exe;
 }
 
-static void ccall_allocate(Interp *interp, uint64_t top)
+static void ccall_allocate(Interp *interp)
 {
+	auto top = interp->stack_top;
 	void *   return_ptr = (interp->stack + top);
 	void *   arg_ptr    = (interp->stack + top + sizeof(void *));
 	Kano_Int size       = *(Kano_Int *)arg_ptr;
@@ -1870,15 +1871,17 @@ static void ccall_allocate(Interp *interp, uint64_t top)
 	memcpy(return_ptr, &ptr, sizeof(void *));
 }
 
-static void ccall_free(Interp *interp, uint64_t top)
+static void ccall_free(Interp *interp)
 {
+	auto top = interp->stack_top;
 	void *arg_ptr = (interp->stack + top);
 	auto  ptr     = *(uint8_t **)arg_ptr;
 	free(ptr);
 }
 
-static void ccall_print(Interp *interp, uint64_t top)
+static void ccall_print(Interp *interp)
 {
+	auto top = interp->stack_top;
 	auto fmt  = *((String *)(interp->stack + top));
 	auto args = ((uint8_t *)(interp->stack + top + sizeof(String)));
 	
