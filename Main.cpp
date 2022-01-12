@@ -89,45 +89,41 @@ int main()
 	interp_eval_globals(&interp, exprs);
 
 	auto main_proc = code_type_resolver_find(resolver, "main");
-	if (main_proc)
-	{
-		if (main_proc->flags & SYMBOL_BIT_CONSTANT && main_proc->address.kind == Symbol_Address::CODE)
-		{
-			auto type = main_proc->type;
-			if (type->kind == CODE_TYPE_PROCEDURE)
-			{
-				auto proc_type = (Code_Type_Procedure *)type;
-				if (proc_type->argument_count == 0 && !proc_type->return_type)
-				{
-					auto proc = main_proc->address.code;
 
-					{
-						auto fp = fopen("code.txt", "ab");
-						print_code(proc, fp);
-						fclose(fp);
-					}
-
-					interp_eval_procedure(&interp, proc);
-				}
-				else
-				{
-					fprintf(stderr, "The \"main\" procedure must not take any arguments and should return nothing!\n");
-				}
-			}
-			else
-			{
-				fprintf(stderr, "The \"main\" symbol must be a procedure!\n");
-			}
-		}
-		else
-		{
-			fprintf(stderr, "The \"main\" procedure must be constant!\n");
-		}
-	}
-	else
+	if (!main_proc)
 	{
 		fprintf(stderr, "\"main\" procedure not defined!\n");
+		return 1;
 	}
+
+	if (!(main_proc->flags & SYMBOL_BIT_CONSTANT) || main_proc->address.kind != Symbol_Address::CODE)
+	{
+		fprintf(stderr, "The \"main\" procedure must be constant!\n");
+		return 1;
+	}
+
+	if (main_proc->type->kind != CODE_TYPE_PROCEDURE)
+	{
+		fprintf(stderr, "The \"main\" symbol must be a procedure!\n");
+		return 1;
+	}
+
+	auto proc_type = (Code_Type_Procedure *)main_proc->type;
+	if (proc_type->argument_count != 0 || proc_type->return_type)
+	{
+		fprintf(stderr, "The \"main\" procedure must not take any arguments and should return nothing!\n");
+		return 1;
+	}
+
+	auto proc = main_proc->address.code;
+		
+	{
+		auto fp = fopen("code.txt", "ab");
+		print_code(proc, fp);
+		fclose(fp);
+	}
+		
+	interp_eval_procedure(&interp, proc);
 
 	return 0;
 }
