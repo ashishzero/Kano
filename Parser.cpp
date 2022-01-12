@@ -3,30 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static inline String string_vprint(const char *fmt, va_list list)
-{
-	va_list args;
-	va_copy(args, list);
-	int   len = 1 + vsnprintf(NULL, 0, fmt, args);
-	char *buf = (char *)malloc(len);
-	vsnprintf(buf, len, fmt, list);
-	va_end(args);
-	return String((uint8_t *)buf, len - 1);
-}
-
-static inline String string_print(const char *fmt, ...)
-{
-	va_list args;
-	va_start(args, fmt);
-	String string = string_vprint(fmt, args);
-	va_end(args);
-	return string;
-}
-
-//
-//
-//
-
 static bool     ParseTableInitialize = false;
 
 static uint32_t UnaryOperatorPrecedence[_TOKEN_KIND_COUNT];
@@ -93,28 +69,22 @@ static void     parser_init_precedence()
 
 static inline void parser_error(Parser *parser, Token *token, const char *fmt, ...)
 {
+	Syntax_Location location;
+	location.start_row     = token->row;
+	location.start_column  = token->column;
+	location.finish_row    = token->row;
+	location.finish_column = token->column;
+	location.start         = token->offset;
+	location.finish        = token->offset + token->content.length;
+
 	va_list args;
 	va_start(args, fmt);
-	String message = string_vprint(fmt, args);
+
+	error_vfmt(&parser->error, location, fmt, args);
+
 	va_end(args);
 
-	auto error                    = new Error_Node;
-	error->message                = message;
-	error->next                   = nullptr;
-
-	error->location.start_row     = token->row;
-	error->location.start_column  = token->column;
-	error->location.finish_row    = token->row;
-	error->location.finish_column = token->column;
-	error->location.start         = token->offset;
-	error->location.finish        = token->offset + token->content.length;
-
-	parser->error.last->next      = error;
-	parser->error.last            = error;
-
-	parser->error_count += 1;
-
-	DebugTriggerbreakpoint();
+	// DebugTriggerbreakpoint();
 }
 
 //
@@ -1131,7 +1101,6 @@ void parser_init(Parser *parser, String content, String_Builder *builder)
 	parser->error.first.next    = nullptr;
 
 	parser->error.last          = &parser->error.first;
-	parser->error_count         = 0;
 	parser->parsing             = true;
 
 	if (!ParseTableInitialize)

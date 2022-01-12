@@ -1,19 +1,7 @@
 #include "Lexer.h"
 #include "SyntaxNode.h"
 #include "StringBuilder.h"
-
-struct Error_Node
-{
-	String          message;
-	Syntax_Location location;
-	Error_Node *    next;
-};
-
-struct Error_List
-{
-	Error_Node  first;
-	Error_Node *last;
-};
+#include "Error.h"
 
 struct Parser
 {
@@ -22,7 +10,6 @@ struct Parser
 	Token_Value     value;
 
 	Error_List      error;
-	uint64_t        error_count;
 	bool            parsing;
 
 	String_Builder *builder;

@@ -153,16 +153,19 @@
   <ItemGroup>
     <ClInclude Include="CodeNode.h" />
     <ClInclude Include="Common.h" />
+    <ClInclude Include="Error.h" />
     <ClInclude Include="Flags.h" />
     <ClInclude Include="Interp.h" />
     <ClInclude Include="Lexer.h" />
     <ClInclude Include="Parser.h" />
+    <ClInclude Include="Resolver.h" />
     <ClInclude Include="StringBuilder.h" />
     <ClInclude Include="SyntaxNode.h" />
     <ClInclude Include="Printer.h" />
     <ClInclude Include="Token.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Resolver.cpp" />
     <ClCompile Include="Interp.cpp" />
     <ClCompile Include="Lexer.cpp" />
     <ClCompile Include="Main.cpp" />
