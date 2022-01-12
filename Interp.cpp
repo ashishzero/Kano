@@ -2,7 +2,28 @@
 #include "CodeNode.h"
 #include <stdlib.h>
 
-template <typename T> T to_type(Find_Type_Value &val)
+struct Evaluation_Value
+{
+	struct Kano_Array
+	{
+		Kano_Int length;
+		uint8_t *data;
+	};
+	
+	union {
+		Kano_Int   int_value;
+		Kano_Real  real_value;
+		Kano_Bool  bool_value;
+		uint8_t *  pointer_value;
+		Kano_Array array_value;
+		
+	} imm;
+	
+	uint8_t *  address = nullptr;
+	Code_Type *type    = nullptr;
+};
+
+template <typename T> T to_type(Evaluation_Value &val)
 {
 	if (val.address)
 		return *(T *)val.address;
@@ -10,7 +31,7 @@ template <typename T> T to_type(Find_Type_Value &val)
 }
 #define TypeValue(val, type) to_type<type>(val)
 
-template <typename T> T *to_type_ptr(Find_Type_Value &val)
+template <typename T> T *to_type_ptr(Evaluation_Value &val)
 {
 	if (val.address)
 		return (T *)val.address;
@@ -18,24 +39,20 @@ template <typename T> T *to_type_ptr(Find_Type_Value &val)
 }
 #define TypeValueRef(val, type) to_type_ptr<type>(val)
 
-Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t top);
-Find_Type_Value evaluate_node_expression(Code_Node_Expression *root, Interp *interp, uint64_t top);
-bool            evaluate_node_statement(Code_Node_Statement *root, Interp *interp, uint64_t top, Find_Type_Value *result = nullptr);
+Evaluation_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t top);
+Evaluation_Value evaluate_node_expression(Code_Node_Expression *root, Interp *interp, uint64_t top);
+bool            evaluate_node_statement(Code_Node_Statement *root, Interp *interp, uint64_t top, Evaluation_Value *result = nullptr);
+Evaluation_Value evaluate_code_node_assignment(Code_Node_Assignment *node, Interp *interp, uint64_t top);
+void            evaluate_node_block(Code_Node_Block *root, Interp *stack, uint64_t top, bool isproc);
 
-void            interp_init(Interp *interp, size_t stack_size, size_t bss_size)
-{
-	interp->stack  = new uint8_t[stack_size];
-	interp->global = new uint8_t[bss_size];
-}
-
-uint64_t push_into_interp_stack(Find_Type_Value var, Interp *interp, uint64_t top)
+uint64_t push_into_interp_stack(Evaluation_Value var, Interp *interp, uint64_t top)
 {
 	memcpy(interp->stack + top, TypeValueRef(var, void *), var.type->runtime_size);
 	top += var.type->runtime_size;
 	return top;
 }
 
-Find_Type_Value evaluate_procedure(Code_Node_Procedure_Call *root, Interp *interp, uint64_t prev_top)
+Evaluation_Value evaluate_procedure(Code_Node_Procedure_Call *root, Interp *interp, uint64_t prev_top)
 {
 	auto top = root->stack_top + prev_top;
 	for (int i = 0; i < root->variadic_count; i++)
@@ -66,7 +83,7 @@ void evaluate_do_block(Code_Node_Do *root, Interp *interp, uint64_t top)
 	auto do_cond = root->condition;
 	auto do_body = root->body;
 
-	Find_Type_Value cond;
+	Evaluation_Value cond;
 
 	do
 	{
@@ -80,7 +97,7 @@ void evaluate_while_block(Code_Node_While *root, Interp *interp, uint64_t top)
 	auto while_cond = root->condition;
 	auto while_body = root->body;
 	
-	Find_Type_Value cond;
+	Evaluation_Value cond;
 	Assert(evaluate_node_statement(while_cond, interp, top, &cond));
 
 	while (TypeValue(cond, bool))
@@ -109,7 +126,7 @@ void evaluate_for_block(Code_Node_For *root, Interp *interp, uint64_t top)
 	auto for_incr = root->increment;
 	auto for_body = root->body;
 
-	Find_Type_Value cond;
+	Evaluation_Value cond;
 
 	evaluate_node_statement(for_init, interp, top);
 	Assert(evaluate_node_statement(for_cond, interp, top, &cond));
@@ -122,7 +139,7 @@ void evaluate_for_block(Code_Node_For *root, Interp *interp, uint64_t top)
 	}
 }
 
-Find_Type_Value evaluate_code_node_assignment(Code_Node_Assignment *node, Interp *interp, uint64_t top)
+Evaluation_Value evaluate_code_node_assignment(Code_Node_Assignment *node, Interp *interp, uint64_t top)
 {
 	auto value = evaluate_node_expression((Code_Node_Expression *)node->value, interp, top);
 
@@ -146,11 +163,11 @@ Find_Type_Value evaluate_code_node_assignment(Code_Node_Assignment *node, Interp
 	return value;
 }
 
-Find_Type_Value evaluate_node_literal(Code_Node_Literal *root, Interp *interp, uint64_t top)
+Evaluation_Value evaluate_node_literal(Code_Node_Literal *root, Interp *interp, uint64_t top)
 {
 	auto            node       = root;
 	auto            check_kind = (Code_Node *)root;
-	Find_Type_Value type_value;
+	Evaluation_Value type_value;
 
 	type_value.address = (uint8_t *)&node->data.boolean.value;
 	type_value.type    = node->type;
@@ -158,7 +175,7 @@ Find_Type_Value evaluate_node_literal(Code_Node_Literal *root, Interp *interp, u
 	return type_value;
 }
 
-Find_Type_Value evaluate_unary_operator(Code_Node_Unary_Operator *root, Interp *interp, uint64_t top)
+Evaluation_Value evaluate_unary_operator(Code_Node_Unary_Operator *root, Interp *interp, uint64_t top)
 {
 	switch (root->op_kind)
 	{
@@ -190,14 +207,14 @@ Find_Type_Value evaluate_unary_operator(Code_Node_Unary_Operator *root, Interp *
 		if (value.type->kind == CODE_TYPE_INTEGER)
 		{
 
-			Find_Type_Value r;
+			Evaluation_Value r;
 			r.imm.int_value = -TypeValue(value, Kano_Int);
 			r.type          = root->type;
 			return r;
 		}
 		else if (value.type->kind == CODE_TYPE_REAL)
 		{
-			Find_Type_Value r;
+			Evaluation_Value r;
 			r.imm.real_value = -TypeValue(value, Kano_Real);
 			r.type           = root->type;
 			return r;
@@ -211,7 +228,7 @@ Find_Type_Value evaluate_unary_operator(Code_Node_Unary_Operator *root, Interp *
 		Assert(root->child->kind == CODE_NODE_ADDRESS);
 
 		auto            address = (Code_Node_Address *)root->child;
-		Find_Type_Value type_value;
+		Evaluation_Value type_value;
 
 		Assert(address->child == nullptr);
 
@@ -243,7 +260,7 @@ Find_Type_Value evaluate_unary_operator(Code_Node_Unary_Operator *root, Interp *
 
 		auto            address = (Code_Node_Address *)root->child;
 
-		Find_Type_Value type_value;
+		Evaluation_Value type_value;
 		type_value.type = root->type;
 
 		Assert(address->child == nullptr);
@@ -271,16 +288,16 @@ Find_Type_Value evaluate_unary_operator(Code_Node_Unary_Operator *root, Interp *
 	}
 
 	Unreachable();
-	return Find_Type_Value{};
+	return Evaluation_Value{};
 }
 
-typedef Find_Type_Value (*BinaryOperatorProc)(Find_Type_Value a, Find_Type_Value b, Code_Type *type);
+typedef Evaluation_Value (*BinaryOperatorProc)(Evaluation_Value a, Evaluation_Value b, Code_Type *type);
 
 typedef Kano_Int (*BinaryOperatorIntProc)(Kano_Int a, Kano_Int b);
 
-Find_Type_Value binary_add(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_add(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
-	Find_Type_Value r;
+	Evaluation_Value r;
 	r.type = type;
 
 	switch (type->kind)
@@ -310,9 +327,9 @@ Find_Type_Value binary_add(Find_Type_Value a, Find_Type_Value b, Code_Type *type
 	return r;
 }
 
-Find_Type_Value binary_sub(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_sub(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
-	Find_Type_Value r;
+	Evaluation_Value r;
 	r.type = type;
 
 	switch (type->kind)
@@ -342,9 +359,9 @@ Find_Type_Value binary_sub(Find_Type_Value a, Find_Type_Value b, Code_Type *type
 	return r;
 }
 
-Find_Type_Value binary_mul(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_mul(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
-	Find_Type_Value r;
+	Evaluation_Value r;
 	r.type = type;
 
 	switch (type->kind)
@@ -368,9 +385,9 @@ Find_Type_Value binary_mul(Find_Type_Value a, Find_Type_Value b, Code_Type *type
 	return r;
 }
 
-Find_Type_Value binary_div(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_div(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
-	Find_Type_Value r;
+	Evaluation_Value r;
 	r.type = type;
 
 	switch (type->kind)
@@ -394,62 +411,62 @@ Find_Type_Value binary_div(Find_Type_Value a, Find_Type_Value b, Code_Type *type
 	return r;
 }
 
-Find_Type_Value binary_mod(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_mod(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
-	Find_Type_Value r;
+	Evaluation_Value r;
 	r.type = type;
 	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
 	r.imm.int_value = TypeValue(a, Kano_Int) % TypeValue(b, Kano_Int);
 	return r;
 }
 
-Find_Type_Value binary_rs(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_rs(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
-	Find_Type_Value r;
+	Evaluation_Value r;
 	r.type = type;
 	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
 	r.imm.int_value = TypeValue(a, Kano_Int) >> TypeValue(b, Kano_Int);
 	return r;
 }
 
-Find_Type_Value binary_ls(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_ls(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
-	Find_Type_Value r;
+	Evaluation_Value r;
 	r.type = type;
 	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
 	r.imm.int_value = TypeValue(a, Kano_Int) << TypeValue(b, Kano_Int);
 	return r;
 }
 
-Find_Type_Value binary_and(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_and(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
-	Find_Type_Value r;
+	Evaluation_Value r;
 	r.type = type;
 	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
 	r.imm.int_value = TypeValue(a, Kano_Int) & TypeValue(b, Kano_Int);
 	return r;
 }
-Find_Type_Value binary_xor(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_xor(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
-	Find_Type_Value r;
+	Evaluation_Value r;
 	r.type = type;
 	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
 	r.imm.int_value = TypeValue(a, Kano_Int) ^ TypeValue(b, Kano_Int);
 	return r;
 }
 
-Find_Type_Value binary_or(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_or(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
-	Find_Type_Value r;
+	Evaluation_Value r;
 	r.type = type;
 	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
 	r.imm.int_value = TypeValue(a, Kano_Int) | TypeValue(b, Kano_Int);
 	return r;
 }
 
-Find_Type_Value binary_gt(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_gt(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
-	Find_Type_Value r;
+	Evaluation_Value r;
 	r.type = type;
 
 	switch (a.type->kind)
@@ -473,9 +490,9 @@ Find_Type_Value binary_gt(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
 	return r;
 }
 
-Find_Type_Value binary_lt(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_lt(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
-	Find_Type_Value r;
+	Evaluation_Value r;
 	r.type = type;
 
 	switch (a.type->kind)
@@ -499,9 +516,9 @@ Find_Type_Value binary_lt(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
 	return r;
 }
 
-Find_Type_Value binary_ge(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_ge(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
-	Find_Type_Value r;
+	Evaluation_Value r;
 	r.type = type;
 
 	switch (a.type->kind)
@@ -525,9 +542,9 @@ Find_Type_Value binary_ge(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
 	return r;
 }
 
-Find_Type_Value binary_le(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_le(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
-	Find_Type_Value r;
+	Evaluation_Value r;
 	r.type = type;
 
 	switch (a.type->kind)
@@ -551,9 +568,9 @@ Find_Type_Value binary_le(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
 	return r;
 }
 
-Find_Type_Value binary_cmp(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_cmp(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
-	Find_Type_Value r;
+	Evaluation_Value r;
 	r.type = type;
 
 	switch (a.type->kind)
@@ -584,9 +601,9 @@ Find_Type_Value binary_cmp(Find_Type_Value a, Find_Type_Value b, Code_Type *type
 	return r;
 }
 
-Find_Type_Value binary_ncmp(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_ncmp(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
-	Find_Type_Value r;
+	Evaluation_Value r;
 	r.type = type;
 
 	switch (a.type->kind)
@@ -617,7 +634,7 @@ Find_Type_Value binary_ncmp(Find_Type_Value a, Find_Type_Value b, Code_Type *typ
 	return r;
 }
 
-Find_Type_Value binary_cadd(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_cadd(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
 	a.type = type;
 
@@ -649,10 +666,10 @@ Find_Type_Value binary_cadd(Find_Type_Value a, Find_Type_Value b, Code_Type *typ
 	}
 
 	Unreachable();
-	return Find_Type_Value{};
+	return Evaluation_Value{};
 }
 
-Find_Type_Value binary_csub(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_csub(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
 	a.type = type;
 
@@ -683,10 +700,10 @@ Find_Type_Value binary_csub(Find_Type_Value a, Find_Type_Value b, Code_Type *typ
 	}
 
 	Unreachable();
-	return Find_Type_Value{};
+	return Evaluation_Value{};
 }
 
-Find_Type_Value binary_cmul(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_cmul(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
 	a.type = type;
 
@@ -710,10 +727,10 @@ Find_Type_Value binary_cmul(Find_Type_Value a, Find_Type_Value b, Code_Type *typ
 	}
 
 	Unreachable();
-	return Find_Type_Value{};
+	return Evaluation_Value{};
 }
 
-Find_Type_Value binary_cdiv(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_cdiv(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
 	a.type = type;
 
@@ -737,10 +754,10 @@ Find_Type_Value binary_cdiv(Find_Type_Value a, Find_Type_Value b, Code_Type *typ
 	}
 
 	Unreachable();
-	return Find_Type_Value{};
+	return Evaluation_Value{};
 }
 
-Find_Type_Value binary_cmod(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_cmod(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
 	a.type = type;
 	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
@@ -749,7 +766,7 @@ Find_Type_Value binary_cmod(Find_Type_Value a, Find_Type_Value b, Code_Type *typ
 	return a;
 }
 
-Find_Type_Value binary_crs(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_crs(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
 	a.type = type;
 	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
@@ -758,7 +775,7 @@ Find_Type_Value binary_crs(Find_Type_Value a, Find_Type_Value b, Code_Type *type
 	return a;
 }
 
-Find_Type_Value binary_cls(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_cls(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
 	a.type = type;
 	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
@@ -767,7 +784,7 @@ Find_Type_Value binary_cls(Find_Type_Value a, Find_Type_Value b, Code_Type *type
 	return a;
 }
 
-Find_Type_Value binary_cand(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_cand(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
 	a.type = type;
 	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
@@ -776,7 +793,7 @@ Find_Type_Value binary_cand(Find_Type_Value a, Find_Type_Value b, Code_Type *typ
 	return a;
 }
 
-Find_Type_Value binary_cxor(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_cxor(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
 	a.type = type;
 	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
@@ -785,7 +802,7 @@ Find_Type_Value binary_cxor(Find_Type_Value a, Find_Type_Value b, Code_Type *typ
 	return a;
 }
 
-Find_Type_Value binary_cor(Find_Type_Value a, Find_Type_Value b, Code_Type *type)
+Evaluation_Value binary_cor(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
 	a.type = type;
 	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
@@ -799,7 +816,7 @@ static BinaryOperatorProc BinaryOperators[] = {
     binary_or,   binary_gt,   binary_lt,   binary_ge,  binary_le,  binary_cmp,  binary_ncmp, binary_cadd, binary_csub,
     binary_cmul, binary_cdiv, binary_cmod, binary_crs, binary_cls, binary_cadd, binary_cxor, binary_cor};
 
-Find_Type_Value evaluate_binary_operator(Code_Node_Binary_Operator *node, Interp *interp, uint64_t top)
+Evaluation_Value evaluate_binary_operator(Code_Node_Binary_Operator *node, Interp *interp, uint64_t top)
 {
 	auto a = evaluate_expression(node->left, interp, top);
 	auto b = evaluate_expression(node->right, interp, top);
@@ -809,7 +826,7 @@ Find_Type_Value evaluate_binary_operator(Code_Node_Binary_Operator *node, Interp
 	return BinaryOperators[node->op_kind](a, b, node->type);
 }
 
-Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t top)
+Evaluation_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t top)
 {
 	switch (root->kind)
 	{
@@ -833,7 +850,7 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
 
 		if (node->type->kind != CODE_TYPE_PROCEDURE)
 		{
-			Find_Type_Value type_value;
+			Evaluation_Value type_value;
 			type_value.type = root->type;
 
 			auto offset     = node->offset;
@@ -866,7 +883,7 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
 
 				evaluate_node_block(node->address->code, interp, top, true);
 
-				Find_Type_Value type_value;
+				Evaluation_Value type_value;
 
 				auto            proc = (Code_Type_Procedure *)node->type;
 
@@ -886,7 +903,7 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
 			case Symbol_Address::CCALL: {
 				node->address->ccall(interp, top);
 
-				Find_Type_Value type_value;
+				Evaluation_Value type_value;
 
 				auto            proc = (Code_Type_Procedure *)node->type;
 
@@ -916,7 +933,7 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
 	case CODE_NODE_TYPE_CAST: {
 		auto            cast  = (Code_Node_Type_Cast *)root;
 		auto            value = evaluate_node_expression(cast->child, interp, top);
-		Find_Type_Value type_value;
+		Evaluation_Value type_value;
 		type_value.type = cast->type;
 
 		switch (cast->type->kind)
@@ -1006,15 +1023,15 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
 	}
 
 	Unreachable();
-	return Find_Type_Value{};
+	return Evaluation_Value{};
 }
 
-Find_Type_Value evaluate_node_expression(Code_Node_Expression *root, Interp *interp, uint64_t top)
+Evaluation_Value evaluate_node_expression(Code_Node_Expression *root, Interp *interp, uint64_t top)
 {
 	return evaluate_expression(root->child, interp, top);
 }
 
-bool evaluate_node_statement(Code_Node_Statement *root, Interp *interp, uint64_t top, Find_Type_Value *value)
+bool evaluate_node_statement(Code_Node_Statement *root, Interp *interp, uint64_t top, Evaluation_Value *value)
 {
 	//interp->intercept(interp, top, root);
 	printf("Executing line: %zu\n", root->source_row);
@@ -1085,6 +1102,12 @@ void evaluate_node_block(Code_Node_Block *root, Interp *interp, uint64_t top, bo
 //
 //
 //
+
+void interp_init(Interp *interp, size_t stack_size, size_t bss_size)
+{
+	interp->stack  = new uint8_t[stack_size];
+	interp->global = new uint8_t[bss_size];
+}
 
 void interp_eval_globals(Interp *interp, Array_View<Code_Node_Assignment *> exprs)
 {
