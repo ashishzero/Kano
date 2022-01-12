@@ -28,32 +28,6 @@ void            interp_init(Interp *interp, size_t stack_size, size_t bss_size)
 	interp->global = new uint8_t[bss_size];
 }
 
-void print_values(Find_Type_Value result)
-{
-	return;
-	if (result.type == NULL)
-		return;
-	switch (result.type->kind)
-	{
-	case CODE_TYPE_BOOL: {
-		printf("statement executes:: %d\n", (int)TypeValue(result, Kano_Bool));
-	}
-	break;
-	case CODE_TYPE_REAL: {
-		printf("statement executes:: %f\n", TypeValue(result, Kano_Real));
-	}
-	break;
-	case CODE_TYPE_INTEGER: {
-		printf("statement executes:: %zd\n", TypeValue(result, Kano_Int));
-	}
-	break;
-	case CODE_TYPE_POINTER: {
-		printf("statement executes:: %p\n", TypeValue(result, void *));
-	}
-	break;
-	}
-}
-
 uint64_t push_into_interp_stack(Find_Type_Value var, Interp *interp, uint64_t top)
 {
 	memcpy(interp->stack + top, TypeValueRef(var, void *), var.type->runtime_size);
@@ -104,7 +78,6 @@ void evaluate_while_block(Code_Node_While *root, Interp *interp, uint64_t top)
 	{
 		evaluate_node_statement((Code_Node_Statement *)root->body, interp, top);
 		cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
-		//  printf("statement executes:: %d\n", (int)TypeValue(cond, bool));
 	}
 }
 
@@ -124,12 +97,10 @@ void evaluate_for_block(Code_Node_For *root, Interp *interp, uint64_t top)
 {
 	evaluate_node_statement((Code_Node_Statement *)root->initialization, interp, top);
 	auto cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
-	// printf("statement executes:: %d\n", (int)TypeValue(cond, bool));
 	while (TypeValue(cond, bool))
 	{
 		evaluate_node_statement((Code_Node_Statement *)root->body, interp, top);
 		auto incre = evaluate_node_expression((Code_Node_Expression *)root->increment, interp, top);
-		print_values(incre);
 		cond = evaluate_node_expression((Code_Node_Expression *)root->condition, interp, top);
 	}
 }
@@ -1001,7 +972,6 @@ Find_Type_Value evaluate_expression(Code_Node *root, Interp *interp, uint64_t to
 	break;
 	case CODE_NODE_EXPRESSION: {
 		auto result = evaluate_node_expression((Code_Node_Expression *)root, interp, top);
-		print_values(result);
 		return result;
 	}
 	break;
@@ -1033,13 +1003,10 @@ void evaluate_node_statement(Code_Node_Statement *root, Interp *interp, uint64_t
 	{
 	case CODE_NODE_EXPRESSION: {
 		auto result = evaluate_node_expression((Code_Node_Expression *)root->node, interp, top);
-		print_values(result);
 	}
 	break;
 	case CODE_NODE_ASSIGNMENT: {
 		auto result = evaluate_code_node_assignment((Code_Node_Assignment *)root->node, interp, top);
-		print_values(result);
-		// Unimplemented();
 	}
 	break;
 	case CODE_NODE_BLOCK: {
