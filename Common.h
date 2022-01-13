@@ -514,7 +514,7 @@ template <typename T> struct Array
 template <typename T> inline void array_free(Array<T> *a)
 {
 	if (a->data)
-		free(a->data, &a->allocator);
+		free(a->data);
 }
 
 template <typename T, uint32_t N> struct Bucket_Array

@@ -303,39 +303,82 @@ static void ccall_print(Interpreter *interp)
 	}
 }
 
+struct Procedure_Builder
+{
+	Code_Type_Resolver *resolver = nullptr;
+	Array<Code_Type *> arguments;
+	Code_Type *return_type = nullptr;
+	bool is_variadic = false;
+
+	Procedure_Builder(Code_Type_Resolver *type_resolver = nullptr)
+	{
+		resolver = type_resolver;
+	}
+};
+
+void proc_builder_argument(Procedure_Builder *builder, String name)
+{
+	Assert(builder->is_variadic == false);
+	auto type = code_type_resolver_find_type(builder->resolver, name);
+	Assert(type);
+	builder->arguments.add(type);
+}
+
+void proc_builder_variadic(Procedure_Builder *builder)
+{
+	Assert(builder->is_variadic == false);
+	builder->is_variadic = true;
+	auto type = code_type_resolver_find_type(builder->resolver, "*void");
+	Assert(type);
+	builder->arguments.add(type);
+}
+
+void proc_builder_return(Procedure_Builder *builder, String name)
+{
+	Assert(builder->return_type == nullptr);
+	auto type = code_type_resolver_find_type(builder->resolver, name);
+	Assert(type);
+	builder->return_type = type;
+}
+
+void proc_builder_register(Procedure_Builder *builder, String name, CCall ccall)
+{
+	auto type = new Code_Type_Procedure;
+	type->argument_count = builder->arguments.count;
+	type->arguments = new Code_Type *[type->argument_count];
+	memcpy(type->arguments, builder->arguments.data, sizeof(type->arguments[0]) * type->argument_count);
+	type->return_type = builder->return_type;
+	type->is_variadic = builder->is_variadic;
+	
+	Assert(code_type_resolver_register_ccall(builder->resolver, name, ccall, type));
+
+	builder->arguments.reset();
+	builder->return_type = nullptr;
+}
+
+void proc_builder_free(Procedure_Builder *builder)
+{
+	array_free(&builder->arguments);
+	builder->return_type = nullptr;
+	builder->resolver = nullptr;
+}
+
 void include_basic(Code_Type_Resolver *resolver)
 {
-	{
-		auto type = new Code_Type_Procedure;
-		type->argument_count = 1;
-		type->arguments = new Code_Type *;
-		type->arguments[0] = code_type_resolver_find_type(resolver, "int");
-		type->return_type = code_type_resolver_find_type(resolver, "*void");
-		
-		Assert(code_type_resolver_register_ccall(resolver, "allocate", ccall_allocate, type));
-	}
+	Procedure_Builder builder(resolver);
+
+	proc_builder_argument(&builder, "int");
+	proc_builder_return(&builder, "*void");
+	proc_builder_register(&builder, "allocate", ccall_allocate);
+
+	proc_builder_argument(&builder, "*void");
+	proc_builder_register(&builder, "free", ccall_free);
 	
-	{
-		auto type            = new Code_Type_Procedure;
-		type->argument_count = 1;
-		type->arguments      = new Code_Type *;
-		type->arguments[0]   = code_type_resolver_find_type(resolver, "*void");
-		type->return_type    = nullptr;
-		
-		Assert(code_type_resolver_register_ccall(resolver, "free", ccall_free, type));
-	}
-	
-	{
-		auto type            = new Code_Type_Procedure;
-		type->argument_count = 2;
-		type->arguments      = new Code_Type *[type->argument_count];
-		type->arguments[0]   = code_type_resolver_find_type(resolver, "string");
-		type->arguments[1]   = code_type_resolver_find_type(resolver, "*void");
-		type->return_type    = nullptr;
-		type->is_variadic    = true;
-		
-		Assert(code_type_resolver_register_ccall(resolver, "print", ccall_print, type));
-	}
+	proc_builder_argument(&builder, "string");
+	proc_builder_variadic(&builder);
+	proc_builder_register(&builder, "print", ccall_print);
+
+	proc_builder_free(&builder);
 }
 
 int main()
