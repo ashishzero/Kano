@@ -126,20 +126,64 @@ void print_value(Code_Type *type, void *data)
 		case CODE_TYPE_BOOL: printf("%s", (*(Kano_Bool *)data) ? "true" : "false"); return;
 
 		case CODE_TYPE_POINTER: {
+			auto pointer = (Code_Type_Pointer *)type;
+			printf("%p { ", data);
+			print_value(pointer->base_type, *(uint8_t **)data);
+			printf(" }");
 			return;
 		}
 
 		case CODE_TYPE_PROCEDURE: printf("%p", data); return;
 
 		case CODE_TYPE_STRUCT: {
+			auto _struct = (Code_Type_Struct *)type;
+			printf("{ ");
+			
+			for (uint64_t index = 0; index < _struct->member_count; ++index)
+			{
+				auto member = &_struct->members[index];
+				printf("%s: ", member->name.data);
+				print_value(member->type, (uint8_t *)data + member->offset);
+				if (index < _struct->member_count - 1)
+					printf(", ");
+			}
+
+			printf(" }");
 			return;
 		}
 
 		case CODE_TYPE_ARRAY_VIEW: {
+			auto arr_type = (Code_Type_Array_View *)type;
+			
+			auto arr_count = *(Kano_Int *)data;
+			auto arr_data = (uint8_t *)data + sizeof(Kano_Int);
+			
+			printf("[ ");
+			for (int64_t index = 0; index < arr_count; ++index)
+			{
+				print_value(arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
+				if (index < arr_count - 1)
+					printf(", ");
+			}
+			printf(" ]");
+
 			return;
 		}
 
 		case CODE_TYPE_STATIC_ARRAY: {
+			auto arr_type = (Code_Type_Static_Array *)type;
+
+			auto arr_data = (uint8_t *)data;
+
+			printf("[ ");
+			for (int64_t index = 0; index < arr_type->element_count; ++index)
+			{
+				print_value(arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
+				if (index < arr_type->element_count - 1)
+					printf(", ");
+			}
+			printf(" ]");
+
 			return;
 		}
 	}
@@ -147,10 +191,9 @@ void print_value(Code_Type *type, void *data)
 
 void intercept(Interpreter *interp, Code_Node_Statement *statement)
 {
-	return;
 	printf("Executing statement: %zu\n", statement->source_row);
 
-	printf("%-15s %-15s %s\n", "Name", "Value", "Type");
+	printf("%-15s %s\n", "Name", "Value");
 	for (auto symbols = statement->symbol_table; symbols; symbols = symbols->parent)
 	{
 		for (auto symbol : symbols->buffer)
@@ -161,9 +204,8 @@ void intercept(Interpreter *interp, Code_Node_Statement *statement)
 			void *data = interp->stack + symbols->stack_offset + symbol->address.offset;
 
 			printf("%-15s ", symbol->name.data);
+			//print_type(symbol->type);
 			print_value(symbol->type, data);
-			printf("\t");
-			print_type(symbol->type);
 			printf("\n");
 		}
 	}
