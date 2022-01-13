@@ -1863,29 +1863,30 @@ static Array_View<Code_Node_Assignment *> code_resolve_global_scope(Code_Type_Re
 	return global_exe;
 }
 
+#define InterpProcStart(interp) (interp->stack + interp->stack_top)
+#define InterpProcNext(arg, type) *(type *)arg; arg += sizeof(type)
+
 static void ccall_allocate(Interpreter *interp)
 {
-	auto top = interp->stack_top;
-	void *   return_ptr = (interp->stack + top);
-	void *   arg_ptr    = (interp->stack + top + sizeof(void *));
-	Kano_Int size       = *(Kano_Int *)arg_ptr;
-	auto     ptr        = malloc(size);
+	auto arg = InterpProcStart(interp);
+	auto return_ptr = InterpProcNext(arg, void *);
+	auto size = InterpProcNext(arg, Kano_Int);
+	auto ptr = malloc(size);
 	memcpy(return_ptr, &ptr, sizeof(void *));
 }
 
 static void ccall_free(Interpreter *interp)
 {
-	auto top = interp->stack_top;
-	void *arg_ptr = (interp->stack + top);
-	auto  ptr     = *(uint8_t **)arg_ptr;
+	auto arg = InterpProcStart(interp);
+	auto ptr = InterpProcNext(arg, uint8_t *);
 	free(ptr);
 }
 
 static void ccall_print(Interpreter *interp)
 {
-	auto top = interp->stack_top;
-	auto fmt  = *((String *)(interp->stack + top));
-	auto args = *((uint8_t **)(interp->stack + top + sizeof(String)));
+	auto arg = InterpProcStart(interp);
+	auto fmt = InterpProcNext(arg, String);
+	auto args = InterpProcNext(arg, uint8_t *);
 	
 	for (int64_t index = 0; index < fmt.length;)
 	{
