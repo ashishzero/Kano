@@ -2,7 +2,8 @@
 #include "Printer.h"
 #include "Token.h"
 
-#define InterpProcStart(interp) (interp->stack + interp->stack_top) 
+#define InterpProcStart(interp) (interp->stack + interp->stack_top)
+#define InterpProcReturn(arg, type) (type *)arg; arg += sizeof(type)
 #define InterpProcNext(arg, type) *(type *)arg; arg += sizeof(type)
 
 typedef void(*Intercep_Proc)(struct Interpreter *interp, struct Code_Node_Statement *statement);

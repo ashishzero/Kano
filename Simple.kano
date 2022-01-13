@@ -10,4 +10,8 @@ const main := proc() {
 	for var i:= 0; i < 5; i += 1 {
 		print("sum[%d]: %d\n", i, sum[i]);
 	}
+
+	print("sin of 3.14: %f\n", sin(3.14));
+
+	print_magic("hello", "world");
 }
