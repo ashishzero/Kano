@@ -213,6 +213,131 @@ void intercept(Interpreter *interp, Code_Node_Statement *statement)
 	printf("\n\n");
 }
 
+static void ccall_allocate(Interpreter *interp)
+{
+	auto arg = InterpProcStart(interp);
+	auto return_ptr = InterpProcNext(arg, void *);
+	auto size = InterpProcNext(arg, Kano_Int);
+	auto ptr = malloc(size);
+	memcpy(return_ptr, &ptr, sizeof(void *));
+}
+
+static void ccall_free(Interpreter *interp)
+{
+	auto arg = InterpProcStart(interp);
+	auto ptr = InterpProcNext(arg, uint8_t *);
+	free(ptr);
+}
+
+static void ccall_print(Interpreter *interp)
+{
+	auto arg = InterpProcStart(interp);
+	auto fmt = InterpProcNext(arg, String);
+	auto args = InterpProcNext(arg, uint8_t *);
+	
+	for (int64_t index = 0; index < fmt.length;)
+	{
+		if (fmt[index] == '%')
+		{
+			index += 1;
+			if (index < fmt.length)
+			{
+				if (fmt[index] == 'd')
+				{
+					index += 1;
+					auto value = (Kano_Int *)(args);
+					printf("%zd", *value);
+					args += sizeof(Kano_Int);
+				}
+				else if (fmt[index] == 'f')
+				{
+					index += 1;
+					auto value = (Kano_Real *)(args);
+					printf("%f", *value);
+					args += sizeof(Kano_Real);
+				}
+				else if (fmt[index] == 'b')
+				{
+					index += 1;
+					auto value = (Kano_Bool *)(args);
+					printf("%s", *value ? "true" : "false");
+					args += sizeof(Kano_Bool);
+				}
+				else if (fmt[index] == '%')
+				{
+					printf("%%");
+					index += 1;
+				}
+			}
+			else
+			{
+				printf("%%");
+			}
+		}
+		else if (fmt[index] == '\\')
+		{
+			index += 1;
+			if (index < fmt.length)
+			{
+				if (fmt[index] == 'n')
+				{
+					index += 1;
+					printf("\n");
+				}
+				else if (fmt[index] == '\\')
+				{
+					printf("\\");
+					index += 1;
+				}
+			}
+			else
+			{
+				printf("\\");
+			}
+		}
+		else
+		{
+			printf("%c", fmt[index]);
+			index += 1;
+		}
+	}
+}
+
+void include_basic(Code_Type_Resolver *resolver)
+{
+	{
+		auto type = new Code_Type_Procedure;
+		type->argument_count = 1;
+		type->arguments = new Code_Type *;
+		type->arguments[0] = code_type_resolver_find_type(resolver, "int");
+		type->return_type = code_type_resolver_find_type(resolver, "*void");
+		
+		Assert(code_type_resolver_register_ccall(resolver, "allocate", ccall_allocate, type));
+	}
+	
+	{
+		auto type            = new Code_Type_Procedure;
+		type->argument_count = 1;
+		type->arguments      = new Code_Type *;
+		type->arguments[0]   = code_type_resolver_find_type(resolver, "*void");
+		type->return_type    = nullptr;
+		
+		Assert(code_type_resolver_register_ccall(resolver, "free", ccall_free, type));
+	}
+	
+	{
+		auto type            = new Code_Type_Procedure;
+		type->argument_count = 2;
+		type->arguments      = new Code_Type *[type->argument_count];
+		type->arguments[0]   = code_type_resolver_find_type(resolver, "string");
+		type->arguments[1]   = code_type_resolver_find_type(resolver, "*void");
+		type->return_type    = nullptr;
+		type->is_variadic    = true;
+		
+		Assert(code_type_resolver_register_ccall(resolver, "print", ccall_print, type));
+	}
+}
+
 int main()
 {
 	String content = read_entire_file("Simple.kano");
@@ -230,6 +355,8 @@ int main()
 	print("syntax.txt", node);
 
 	auto resolver = code_type_resolver_create();
+
+	include_basic(resolver);
 
 	auto exprs = code_type_resolve(resolver, node);
 

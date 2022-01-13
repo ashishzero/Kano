@@ -2,6 +2,7 @@
 #include "CodeNode.h"
 #include "Parser.h"
 #include "Interp.h"
+#include "Resolver.h"
 
 static inline uint32_t murmur_32_scramble(uint32_t k)
 {
@@ -1863,99 +1864,6 @@ static Array_View<Code_Node_Assignment *> code_resolve_global_scope(Code_Type_Re
 	return global_exe;
 }
 
-#define InterpProcStart(interp) (interp->stack + interp->stack_top)
-#define InterpProcNext(arg, type) *(type *)arg; arg += sizeof(type)
-
-static void ccall_allocate(Interpreter *interp)
-{
-	auto arg = InterpProcStart(interp);
-	auto return_ptr = InterpProcNext(arg, void *);
-	auto size = InterpProcNext(arg, Kano_Int);
-	auto ptr = malloc(size);
-	memcpy(return_ptr, &ptr, sizeof(void *));
-}
-
-static void ccall_free(Interpreter *interp)
-{
-	auto arg = InterpProcStart(interp);
-	auto ptr = InterpProcNext(arg, uint8_t *);
-	free(ptr);
-}
-
-static void ccall_print(Interpreter *interp)
-{
-	auto arg = InterpProcStart(interp);
-	auto fmt = InterpProcNext(arg, String);
-	auto args = InterpProcNext(arg, uint8_t *);
-	
-	for (int64_t index = 0; index < fmt.length;)
-	{
-		if (fmt[index] == '%')
-		{
-			index += 1;
-			if (index < fmt.length)
-			{
-				if (fmt[index] == 'd')
-				{
-					index += 1;
-					auto value = (Kano_Int *)(args);
-					printf("%zd", *value);
-					args += sizeof(Kano_Int);
-				}
-				else if (fmt[index] == 'f')
-				{
-					index += 1;
-					auto value = (Kano_Real *)(args);
-					printf("%f", *value);
-					args += sizeof(Kano_Real);
-				}
-				else if (fmt[index] == 'b')
-				{
-					index += 1;
-					auto value = (Kano_Bool *)(args);
-					printf("%s", *value ? "true" : "false");
-					args += sizeof(Kano_Bool);
-				}
-				else if (fmt[index] == '%')
-				{
-					printf("%%");
-					index += 1;
-				}
-			}
-			else
-			{
-				printf("%%");
-			}
-		}
-		else if (fmt[index] == '\\')
-		{
-			index += 1;
-			if (index < fmt.length)
-			{
-				if (fmt[index] == 'n')
-				{
-					index += 1;
-					printf("\n");
-				}
-				else if (fmt[index] == '\\')
-				{
-					printf("\\");
-					index += 1;
-				}
-			}
-			else
-			{
-				printf("\\");
-			}
-		}
-		else
-		{
-			printf("%c", fmt[index]);
-			index += 1;
-		}
-	}
-}
-
 //
 //
 //
@@ -2175,56 +2083,6 @@ Code_Type_Resolver *code_type_resolver_create()
 		resolver->binary_operators[BINARY_OPERATOR_COMPARE_EQUAL].add(binary_operator_real);
 		resolver->binary_operators[BINARY_OPERATOR_COMPARE_NOT_EQUAL].add(binary_operator_real);
 	}
-	
-	{
-		auto type            = new Code_Type_Procedure;
-		type->argument_count = 1;
-		type->arguments      = new Code_Type *;
-		type->arguments[0]   = symbol_table_get(&resolver->symbols, "int")->type;
-		type->return_type    = symbol_table_get(&resolver->symbols, "*void")->type;
-		
-		auto sym             = resolver->symbols_allocator.add();
-		sym->name            = "allocate";
-		sym->type            = type;
-		sym->address.kind    = Symbol_Address::CCALL;
-		sym->address.ccall   = ccall_allocate;
-		
-		symbol_table_put(&resolver->symbols, sym);
-	}
-	
-	{
-		auto type            = new Code_Type_Procedure;
-		type->argument_count = 1;
-		type->arguments      = new Code_Type *;
-		type->arguments[0]   = symbol_table_get(&resolver->symbols, "*void")->type;
-		type->return_type    = nullptr;
-		
-		auto sym             = resolver->symbols_allocator.add();
-		sym->name            = "free";
-		sym->type            = type;
-		sym->address.kind    = Symbol_Address::CCALL;
-		sym->address.ccall   = ccall_free;
-		
-		symbol_table_put(&resolver->symbols, sym);
-	}
-	
-	{
-		auto type            = new Code_Type_Procedure;
-		type->argument_count = 2;
-		type->arguments      = new Code_Type *[type->argument_count];
-		type->arguments[0]   = symbol_table_get(&resolver->symbols, "string")->type;
-		type->arguments[1]   = symbol_table_get(&resolver->symbols, "*void")->type;
-		type->return_type    = nullptr;
-		type->is_variadic    = true;
-		
-		auto sym             = resolver->symbols_allocator.add();
-		sym->name            = "print";
-		sym->type            = type;
-		sym->address.kind    = Symbol_Address::CCALL;
-		sym->address.ccall   = ccall_print;
-		
-		symbol_table_put(&resolver->symbols, sym);
-	}
 
 	return resolver;
 }
@@ -2247,4 +2105,30 @@ Array_View<Code_Node_Assignment *> code_type_resolve(Code_Type_Resolver *resolve
 const Symbol *code_type_resolver_find(Code_Type_Resolver *resolver, String name)
 {
 	return symbol_table_get(&resolver->symbols, name, false);
+}
+
+Code_Type *code_type_resolver_find_type(Code_Type_Resolver *resolver, String name)
+{
+	auto symbol = code_type_resolver_find(resolver, name);
+	if (symbol->flags & symbol->flags & SYMBOL_BIT_TYPE)
+	{
+		return symbol->type;
+	}
+	return nullptr;
+}
+
+bool code_type_resolver_register_ccall(Code_Type_Resolver *resolver, String name, CCall proc, Code_Type_Procedure *type)
+{
+	if (!code_type_resolver_find(resolver, name))
+	{
+		auto sym             = resolver->symbols_allocator.add();
+		sym->name            = name;
+		sym->type            = type;
+		sym->address.kind    = Symbol_Address::CCALL;
+		sym->address.ccall   = proc;
+
+		symbol_table_put(&resolver->symbols, sym);
+		return true;
+	}
+	return false;
 }

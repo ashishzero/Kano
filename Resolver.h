@@ -11,3 +11,6 @@ uint64_t code_type_resolver_bss_allocated(Code_Type_Resolver *resolver);
 Array_View<Code_Node_Assignment *> code_type_resolve(Code_Type_Resolver *resolver, Syntax_Node_Global_Scope *code_node);
 
 const Symbol *code_type_resolver_find(Code_Type_Resolver *resolver, String name);
+Code_Type *code_type_resolver_find_type(Code_Type_Resolver *resolver, String name);
+
+bool code_type_resolver_register_ccall(Code_Type_Resolver *resolver, String name, CCall proc, Code_Type_Procedure *type);
