@@ -2132,3 +2132,55 @@ bool code_type_resolver_register_ccall(Code_Type_Resolver *resolver, String name
 	}
 	return false;
 }
+
+//
+//
+//
+
+void proc_builder_argument(Procedure_Builder *builder, String name)
+{
+	Assert(builder->is_variadic == false);
+	auto type = code_type_resolver_find_type(builder->resolver, name);
+	Assert(type);
+	builder->arguments.add(type);
+}
+
+void proc_builder_variadic(Procedure_Builder *builder)
+{
+	Assert(builder->is_variadic == false);
+	builder->is_variadic = true;
+	auto type = code_type_resolver_find_type(builder->resolver, "*void");
+	Assert(type);
+	builder->arguments.add(type);
+}
+
+void proc_builder_return(Procedure_Builder *builder, String name)
+{
+	Assert(builder->return_type == nullptr);
+	auto type = code_type_resolver_find_type(builder->resolver, name);
+	Assert(type);
+	builder->return_type = type;
+}
+
+void proc_builder_register(Procedure_Builder *builder, String name, CCall ccall)
+{
+	auto type = new Code_Type_Procedure;
+	type->argument_count = builder->arguments.count;
+	type->arguments = new Code_Type *[type->argument_count];
+	memcpy(type->arguments, builder->arguments.data, sizeof(type->arguments[0]) * type->argument_count);
+	type->return_type = builder->return_type;
+	type->is_variadic = builder->is_variadic;
+	
+	Assert(code_type_resolver_register_ccall(builder->resolver, name, ccall, type));
+
+	builder->arguments.reset();
+	builder->return_type = nullptr;
+	builder->is_variadic = false;
+}
+
+void proc_builder_free(Procedure_Builder *builder)
+{
+	array_free(&builder->arguments);
+	builder->return_type = nullptr;
+	builder->resolver = nullptr;
+}

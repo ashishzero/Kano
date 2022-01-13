@@ -215,120 +215,8 @@ void intercept(Interpreter *interp, Code_Node_Statement *statement)
 
 #include <math.h>
 
-struct Interp_Proc_Arg
+static void basic_print(String fmt, uint8_t *args)
 {
-	uint8_t *arg;
-
-	Interp_Proc_Arg(Interpreter *interp) 
-	{ 
-		arg = interp->stack + interp->stack_top; 
-	}
-
-	template <typename T> T deserialize_arg()
-	{ 
-		T value = *(T *)arg; 
-		arg += sizeof(T); 
-		return value;
-	}
-
-	template <typename ReturnType, typename... ArgumentTypes>
-	void execute(ReturnType(*proc)(ArgumentTypes...))
-	{
-		auto ptr = arg;
-		arg += sizeof(ReturnType);
-		ReturnType result = proc(deserialize_arg<ArgumentTypes>()...);
-		memcpy(ptr, &result, sizeof(ReturnType));
-	}
-
-	template <typename... ArgumentTypes>
-	void execute(void(*proc)(ArgumentTypes...))
-	{
-		proc(deserialize_arg<ArgumentTypes>()...);
-	}
-};
-
-#define InterpMorphProc(proc) \
-	[](Interpreter *interp) { \
-		Interp_Proc_Arg arg(interp); \
-		arg.execute(proc); \
-	}
-
-struct Procedure_Builder
-{
-	Code_Type_Resolver *resolver = nullptr;
-	Array<Code_Type *> arguments;
-	Code_Type *return_type = nullptr;
-	bool is_variadic = false;
-
-	Procedure_Builder(Code_Type_Resolver *type_resolver = nullptr)
-	{
-		resolver = type_resolver;
-	}
-};
-
-void proc_builder_argument(Procedure_Builder *builder, String name)
-{
-	Assert(builder->is_variadic == false);
-	auto type = code_type_resolver_find_type(builder->resolver, name);
-	Assert(type);
-	builder->arguments.add(type);
-}
-
-void proc_builder_variadic(Procedure_Builder *builder)
-{
-	Assert(builder->is_variadic == false);
-	builder->is_variadic = true;
-	auto type = code_type_resolver_find_type(builder->resolver, "*void");
-	Assert(type);
-	builder->arguments.add(type);
-}
-
-void proc_builder_return(Procedure_Builder *builder, String name)
-{
-	Assert(builder->return_type == nullptr);
-	auto type = code_type_resolver_find_type(builder->resolver, name);
-	Assert(type);
-	builder->return_type = type;
-}
-
-void proc_builder_register(Procedure_Builder *builder, String name, CCall ccall)
-{
-	auto type = new Code_Type_Procedure;
-	type->argument_count = builder->arguments.count;
-	type->arguments = new Code_Type *[type->argument_count];
-	memcpy(type->arguments, builder->arguments.data, sizeof(type->arguments[0]) * type->argument_count);
-	type->return_type = builder->return_type;
-	type->is_variadic = builder->is_variadic;
-	
-	Assert(code_type_resolver_register_ccall(builder->resolver, name, ccall, type));
-
-	builder->arguments.reset();
-	builder->return_type = nullptr;
-	builder->is_variadic = false;
-}
-
-void proc_builder_free(Procedure_Builder *builder)
-{
-	array_free(&builder->arguments);
-	builder->return_type = nullptr;
-	builder->resolver = nullptr;
-}
-
-//
-//
-//
-
-static void print_hello(String str, String args)
-{
-	printf("%s %s\n", str.data, args.data);
-}
-
-static void basic_print(Interpreter *interp)
-{
-	auto arg = InterpProcStart(interp);
-	auto fmt = InterpProcNext(arg, String);
-	auto args = InterpProcNext(arg, uint8_t *);
-	
 	for (int64_t index = 0; index < fmt.length;)
 	{
 		if (fmt[index] == '%')
@@ -400,6 +288,8 @@ static void basic_print(Interpreter *interp)
 static void *basic_allocate(Kano_Int size) { return malloc(size); }
 static void basic_free(void *ptr) { free(ptr); }
 static double basic_sin(double x) { return sin(x); }
+static double basic_cos(double x) { return cos(x); }
+static double basic_tan(double x) { return tan(x); }
 
 void include_basic(Code_Type_Resolver *resolver)
 {
@@ -407,12 +297,7 @@ void include_basic(Code_Type_Resolver *resolver)
 	
 	proc_builder_argument(&builder, "string");
 	proc_builder_variadic(&builder);
-	proc_builder_register(&builder, "print", basic_print);
-
-	proc_builder_argument(&builder, "string");
-	proc_builder_argument(&builder, "string");
-	//proc_builder_variadic(&builder);
-	proc_builder_register(&builder, "print_magic", InterpMorphProc(print_hello));
+	proc_builder_register(&builder, "print", InterpMorphProc(basic_print));
 
 	proc_builder_argument(&builder, "int");
 	proc_builder_return(&builder, "*void");
@@ -424,6 +309,14 @@ void include_basic(Code_Type_Resolver *resolver)
 	proc_builder_argument(&builder, "float");
 	proc_builder_return(&builder, "float");
 	proc_builder_register(&builder, "sin", InterpMorphProc(basic_sin));
+
+	proc_builder_argument(&builder, "float");
+	proc_builder_return(&builder, "float");
+	proc_builder_register(&builder, "cos", InterpMorphProc(basic_cos));
+
+	proc_builder_argument(&builder, "float");
+	proc_builder_return(&builder, "float");
+	proc_builder_register(&builder, "tan", InterpMorphProc(basic_tan));
 
 	proc_builder_free(&builder);
 }

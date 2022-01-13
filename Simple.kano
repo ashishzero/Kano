@@ -12,6 +12,4 @@ const main := proc() {
 	}
 
 	print("sin of 3.14: %f\n", sin(3.14));
-
-	print_magic("hello", "world");
 }

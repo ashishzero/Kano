@@ -2,10 +2,6 @@
 #include "Printer.h"
 #include "Token.h"
 
-#define InterpProcStart(interp) (interp->stack + interp->stack_top)
-#define InterpProcReturn(arg, type) (type *)arg; arg += sizeof(type)
-#define InterpProcNext(arg, type) *(type *)arg; arg += sizeof(type)
-
 typedef void(*Intercep_Proc)(struct Interpreter *interp, struct Code_Node_Statement *statement);
 
 inline void intercept_default(struct Interpreter *interp, struct Code_Node_Statement *statement){};
@@ -23,3 +19,46 @@ void            interp_init(Interpreter *interp, size_t stack_size, size_t bss_s
 
 void interp_eval_globals(Interpreter *interp, Array_View<Code_Node_Assignment *> exprs);
 void interp_eval_procedure_call(Interpreter *interp, Code_Node_Block *proc);
+
+//
+//
+//
+
+struct Interp_Proc_Arg
+{
+	uint8_t *arg;
+
+	Interp_Proc_Arg(Interpreter *interp) 
+	{ 
+		arg = interp->stack + interp->stack_top; 
+	}
+
+	template <typename T> T deserialize_arg()
+	{
+		arg -= sizeof(T);
+		T value = *(T *)arg; 
+		return value;
+	}
+
+	template <typename ReturnType, typename... ArgumentTypes>
+	void execute(ReturnType(*proc)(ArgumentTypes...))
+	{
+		auto ptr = arg;
+		arg += sizeof(ReturnType) + (sizeof(ArgumentTypes)+...);
+		ReturnType result = proc(deserialize_arg<ArgumentTypes>()...);
+		memcpy(ptr, &result, sizeof(ReturnType));
+	}
+
+	template <typename... ArgumentTypes>
+	void execute(void(*proc)(ArgumentTypes...))
+	{
+		arg += (sizeof(ArgumentTypes)+...);
+		proc(deserialize_arg<ArgumentTypes>()...);
+	}
+};
+
+#define InterpMorphProc(proc) \
+	[](Interpreter *interp) { \
+		Interp_Proc_Arg arg(interp); \
+		arg.execute(proc); \
+	}

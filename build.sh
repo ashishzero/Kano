@@ -15,4 +15,4 @@ fi
 
 mkdir -p bin
 
-${COMPILER} -g -DASSERTION_HANDLED Main.cpp Lexer.cpp Parser.cpp Resolver.cpp Printer.cpp StringBuilder.cpp Interp.cpp -o bin/Kano
+${COMPILER} -g -std=c++17 -DASSERTION_HANDLED Main.cpp Lexer.cpp Parser.cpp Resolver.cpp Printer.cpp StringBuilder.cpp Interp.cpp -o bin/Kano
