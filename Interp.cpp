@@ -50,35 +50,70 @@ static inline uint64_t interp_push_into_stack(Interpreter *interp, Evaluation_Va
 //
 //
 
+static Evaluation_Value interp_eval_root_expression(Interpreter *interp, Code_Node_Expression *expression);
+
 static inline uint8_t *interp_eval_data_address(Interpreter *interp, Code_Node_Address *node)
 {
 	Assert(node->type->kind != CODE_TYPE_PROCEDURE);
 	
-	auto offset = node->offset;
-	auto memory = interp->stack;
-	
-	Assert(node->child == nullptr);
-	
-	if (node->address)
+	if (node->subscript)
 	{
-		offset += node->address->offset;
-		auto address_kind = node->address->kind;
+		Assert(node->address == nullptr);
 
-		if (address_kind == Symbol_Address::STACK)
+		auto expression = interp_eval_root_expression(interp, node->subscript->expression);
+		auto subscript = interp_eval_root_expression(interp, node->subscript->subscript);
+
+		Assert(subscript.type->kind == CODE_TYPE_INTEGER);
+
+		uint8_t *address = nullptr;
+
+		auto expr_type = expression.type->kind;
+		if (expr_type == CODE_TYPE_STATIC_ARRAY)
 		{
-			offset += interp->stack_top;
-		}
-		else if (address_kind == Symbol_Address::GLOBAL)
-		{
-			memory = interp->global;
+			address = EvaluationTypePointer(expression, uint8_t);
 		}
 		else
 		{
-			Unreachable();
+			Assert(expr_type == CODE_TYPE_ARRAY_VIEW);
+			auto arr = EvaluationTypeValue(expression, Array_View<uint8_t>);
+			address = arr.data;
 		}
-	}
 
-	return memory + offset;
+		Assert(address);
+
+		auto index = EvaluationTypeValue(subscript, Kano_Int);
+
+		address += node->offset;
+		address += node->type->runtime_size * index;
+
+		return address;
+	}
+	else
+	{
+		auto offset = node->offset;
+		auto memory = interp->stack;
+
+		if (node->address)
+		{
+			offset += node->address->offset;
+			auto address_kind = node->address->kind;
+			
+			if (address_kind == Symbol_Address::STACK)
+			{
+				offset += interp->stack_top;
+			}
+			else if (address_kind == Symbol_Address::GLOBAL)
+			{
+				memory = interp->global;
+			}
+			else
+			{
+				Unreachable();
+			}
+		}
+		
+		return memory + offset;
+	}
 }
 
 static void interp_eval_block(Interpreter *interp, Code_Node_Block *root, bool isproc);
@@ -288,8 +323,7 @@ static Evaluation_Value interp_eval_unary_operator(Interpreter *interp, Code_Nod
 		}
 		break;
 		
-		case UNARY_OPERATOR_DEREFERENCE: 
-		case UNARY_OPERATOR_POINTER_TO: {
+		case UNARY_OPERATOR_DEREFERENCE:  {
 			Assert(root->child->kind == CODE_NODE_ADDRESS);
 			
 			auto address = (Code_Node_Address *)root->child;
@@ -297,6 +331,19 @@ static Evaluation_Value interp_eval_unary_operator(Interpreter *interp, Code_Nod
 			Evaluation_Value type_value;
 			type_value.type    = root->type;
 			type_value.address = interp_eval_data_address(interp, address);
+			
+			return type_value;
+		}
+		break;
+
+		case UNARY_OPERATOR_POINTER_TO: {
+			Assert(root->child->kind == CODE_NODE_ADDRESS);
+			
+			auto address = (Code_Node_Address *)root->child;
+			
+			Evaluation_Value type_value;
+			type_value.type = root->type;
+			type_value.imm.pointer_value = interp_eval_data_address(interp, address);
 			
 			return type_value;
 		}
@@ -1068,6 +1115,8 @@ void interp_init(Interpreter *interp, size_t stack_size, size_t bss_size)
 {
 	interp->stack  = new uint8_t[stack_size];
 	interp->global = new uint8_t[bss_size];
+	memset(interp->stack, 0, stack_size);
+	memset(interp->global, 0, bss_size);
 }
 
 void interp_eval_globals(Interpreter *interp, Array_View<Code_Node_Assignment *> exprs)

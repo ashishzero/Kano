@@ -393,10 +393,10 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
 		if (node->address)
 			Assert(node->address->kind < ArrayCount(SymbolAddressNames));
 
-		if (node->child)
+		if (node->subscript)
 		{
 			fprintf(fp, "Address(+0x%zx)\n", node->offset);
-			print_code(node->child, fp, child_indent, "Child");
+			print_code(node->subscript, fp, child_indent, "Subscript");
 		}
 		else if (node->address)
 		{

@@ -1,12 +1,13 @@
 
 const main := proc() {
-	var sum:= 5;
+	var sum: [5]int;
 	
-	for var i:= 0; i < 1; i += 1 {
-		//print("i: %d\n", i);
-		sum = sum + i;
+	sum[0] = 0;
+	for var i:= 1; i < 5; i += 1 {
+		sum[i] = sum[i-1] + i;
 	}
 
-	print("sum: %d\n", sum);
-
+	for var i:= 0; i < 5; i += 1 {
+		print("sum[%d]: %d\n", i, sum[i]);
+	}
 }

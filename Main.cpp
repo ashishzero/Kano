@@ -147,6 +147,7 @@ void print_value(Code_Type *type, void *data)
 
 void intercept(Interpreter *interp, Code_Node_Statement *statement)
 {
+	return;
 	printf("Executing statement: %zu\n", statement->source_row);
 
 	printf("%-15s %-15s %s\n", "Name", "Value", "Type");

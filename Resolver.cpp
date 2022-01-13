@@ -608,7 +608,7 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 				
 				auto address         = new Code_Node_Address;
 				address->type        = symbol_table_get(&resolver->symbols, "*void")->type;
-				address->child       = nullptr;
+				address->subscript   = nullptr;
 				address->offset      = stack_top;
 				
 				auto pointer_to      = new Code_Node_Unary_Operator;
@@ -689,7 +689,7 @@ static Code_Node_Address *code_resolve_subscript(Code_Type_Resolver *resolver, S
 			auto address   = new Code_Node_Address;
 			address->type  = node->type;
 			address->flags = node->flags;
-			address->child = node;
+			address->subscript = node;
 			
 			return address;
 		}
@@ -1885,7 +1885,7 @@ static void ccall_print(Interpreter *interp)
 {
 	auto top = interp->stack_top;
 	auto fmt  = *((String *)(interp->stack + top));
-	auto args = ((uint8_t *)(interp->stack + top + sizeof(String)));
+	auto args = *((uint8_t **)(interp->stack + top + sizeof(String)));
 	
 	for (int64_t index = 0; index < fmt.length;)
 	{

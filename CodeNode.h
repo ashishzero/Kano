@@ -287,7 +287,8 @@ struct Code_Node_Address : public Code_Node
 		kind = CODE_NODE_ADDRESS;
 	}
 
-	Code_Node *           child   = nullptr; // If child is null, then address is valid
+	// If subscript is null, then address is valid
+	struct Code_Node_Subscript *subscript = nullptr;
 
 	const Symbol_Address *address = nullptr;
 
