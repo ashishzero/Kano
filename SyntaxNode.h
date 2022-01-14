@@ -174,7 +174,7 @@ struct Syntax_Node_Procedure_Prototype : public Syntax_Node
 	}
 
 	Syntax_Node_Procedure_Prototype_Argument *arguments_type = nullptr;
-	uint64_t                                  argument_count = 0;
+	int64_t                                  argument_count = 0;
 	Syntax_Node_Type *                        return_type    = nullptr;
 };
 
@@ -286,7 +286,7 @@ struct Syntax_Node_Procedure_Call : public Syntax_Node
 	}
 
 	Syntax_Node_Expression *         procedure       = nullptr;
-	uint64_t                         parameter_count = 0;
+	int64_t                         parameter_count = 0;
 	Syntax_Node_Procedure_Parameter *parameters      = nullptr;
 };
 
@@ -368,7 +368,7 @@ struct Syntax_Node_Procedure : public Syntax_Node
 	}
 
 	Syntax_Node_Procedure_Argument *arguments      = nullptr;
-	uint64_t                        argument_count = 0;
+	int64_t                        argument_count = 0;
 	Syntax_Node_Type *              return_type    = nullptr;
 
 	Syntax_Node_Block *             body           = nullptr;
@@ -400,7 +400,7 @@ struct Syntax_Node_Struct : public Syntax_Node
 		kind = SYNTAX_NODE_STRUCT;
 	}
 
-	uint64_t                      member_count = 0;
+	int64_t                      member_count = 0;
 	Syntax_Node_Declaration_List *members      = nullptr;
 };
 
@@ -444,7 +444,7 @@ struct Syntax_Node_Block : public Syntax_Node
 	}
 
 	Syntax_Node_Statement *statements      = nullptr;
-	uint64_t               statement_count = 0;
+	int64_t               statement_count = 0;
 };
 
 struct Syntax_Node_Global_Scope : public Syntax_Node
@@ -454,6 +454,6 @@ struct Syntax_Node_Global_Scope : public Syntax_Node
 		kind = SYNTAX_NODE_GLOBAL_SCOPE;
 	}
 
-	uint64_t                      declaration_count = 0;
+	int64_t                      declaration_count = 0;
 	Syntax_Node_Declaration_List *declarations      = nullptr;
 };

@@ -46,6 +46,13 @@ static inline uint64_t interp_push_into_stack(Interpreter *interp, Evaluation_Va
 	return offset;
 }
 
+static inline uint64_t interp_push_into_stack_reduced(Interpreter *interp, Evaluation_Value var, uint64_t offset)
+{
+	offset -= var.type->runtime_size;
+	memcpy(interp->stack + interp->stack_top + offset, EvaluationTypePointer(var, void *), var.type->runtime_size);
+	return offset;
+}
+
 //
 //
 //
@@ -922,31 +929,40 @@ static Evaluation_Value interp_eval_assignment(Interpreter *interp, Code_Node_As
 static Evaluation_Value interp_eval_procedure_call(Interpreter *interp, Code_Node_Procedure_Call *root)
 {
 	auto prev_top = interp->stack_top;
+
 	auto new_top = root->stack_top + prev_top;
 
-	uint64_t offset = 0;
-	for (int i = 0; i < root->variadic_count; i++)
+	uint64_t variadics_args_size = 0;
+	for (int64_t i = 0; i < root->variadic_count; ++i)
+		variadics_args_size += root->variadics[i]->type->runtime_size;
+
+	uint64_t offset = variadics_args_size;
+	for (int64_t i = root->variadic_count - 1; i >= 0; --i)
 	{
 		interp->stack_top = prev_top;
 		auto var = interp_eval_root_expression(interp, (Code_Node_Expression *)root->variadics[i]);
-
 		interp->stack_top = new_top;
-		offset   = interp_push_into_stack(interp, var, offset);
+		offset = interp_push_into_stack_reduced(interp, var, offset);
 	}
 	
-	new_top += offset;
-	offset = 0;
+	new_top += variadics_args_size;
+
+	uint64_t parameters_size = 0;
+	for (int64_t i = 0; i < root->parameter_count; ++i)
+		parameters_size += root->parameters[i]->type->runtime_size;
+
+	offset = parameters_size;
 
 	if (root->type)
 		offset += root->type->runtime_size;
-	
-	for (int i = 0; i < root->parameter_count; i++)
+
+	for (int64_t i = root->parameter_count - 1; i >= 0; --i)
 	{
 		interp->stack_top = prev_top;
-		auto var   = interp_eval_root_expression(interp, (Code_Node_Expression *)root->paraments[i]);
-
+		auto var   = interp_eval_root_expression(interp, (Code_Node_Expression *)root->parameters[i]);
+		
 		interp->stack_top = new_top;
-		offset     = interp_push_into_stack(interp, var, offset);
+		offset     = interp_push_into_stack_reduced(interp, var, offset);
 	}
 	
 	interp->intercept(interp, INTERCEPT_PROCEDURE_CALL, root);

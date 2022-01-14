@@ -1,11 +1,11 @@
 
 
 const factorial := proc(var n: float) -> float {
-	if n < 1 then return 1;
+	if n <= 1 then return 1;
 	return n * factorial(n - 1);
 }
 
 const main := proc() {
-	var n: float = 6;
+	var n: float = 5;
 	print("Factorial of %f is %f\n", n, factorial(n));
 }

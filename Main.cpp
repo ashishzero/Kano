@@ -57,7 +57,7 @@ void print_type(Code_Type *type)
 		case CODE_TYPE_PROCEDURE: {
 			auto proc = (Code_Type_Procedure *)type;
 			printf("proc (");
-			for (uint64_t index = 0; index < proc->argument_count; ++index)
+			for (int64_t index = 0; index < proc->argument_count; ++index)
 			{
 				print_type(proc->arguments[index]);
 				if (index < proc->argument_count - 1) printf(", ");
@@ -117,7 +117,7 @@ void print_value(Code_Type *type, void *data)
 			auto _struct = (Code_Type_Struct *)type;
 			printf("{ ");
 			
-			for (uint64_t index = 0; index < _struct->member_count; ++index)
+			for (int64_t index = 0; index < _struct->member_count; ++index)
 			{
 				auto member = &_struct->members[index];
 				printf("%s: ", member->name.data);

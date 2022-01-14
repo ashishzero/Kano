@@ -81,7 +81,7 @@ struct Code_Type_Procedure : public Code_Type
 	String name = "anonymous";
 
 	Code_Type **arguments      = nullptr;
-	uint64_t    argument_count = 0;
+	int64_t    argument_count = 0;
 	bool        is_variadic    = false;
 
 	Code_Type * return_type    = nullptr;
@@ -102,7 +102,7 @@ struct Code_Type_Struct : public Code_Type
 	};
 
 	String   name;
-	uint64_t member_count;
+	int64_t member_count;
 	Member * members;
 
 	uint64_t id;
@@ -444,9 +444,9 @@ struct Code_Node_Procedure_Call : public Code_Node
 	}
 
 	Code_Node_Expression * procedure       = nullptr;
-	uint64_t               parameter_count = 0;
-	Code_Node_Expression **paraments       = nullptr;
-	uint64_t               variadic_count  = 0;
+	int64_t               parameter_count = 0;
+	Code_Node_Expression **parameters       = nullptr;
+	int64_t               variadic_count  = 0;
 	Code_Node_Expression **variadics       = nullptr;
 
 	Code_Type_Procedure *procedure_type = nullptr;
@@ -526,7 +526,7 @@ struct Code_Node_Block : public Code_Node
 	}
 
 	Code_Node_Statement *statement_head  = nullptr;
-	uint64_t             statement_count = 0;
+	int64_t             statement_count = 0;
 
 	Symbol_Table         symbols;
 };

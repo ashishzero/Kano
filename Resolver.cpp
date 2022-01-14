@@ -330,6 +330,8 @@ static Code_Node_Type_Cast *code_type_cast(Code_Node *node, Code_Type *to_type, 
 
 static bool code_type_are_same(Code_Type *a, Code_Type *b, bool recurse_pointer_type)
 {
+	Assert(a && b);
+
 	if (a == b)
 		return true;
 	
@@ -369,7 +371,7 @@ static bool code_type_are_same(Code_Type *a, Code_Type *b, bool recurse_pointer_
 				auto b_args    = b_proc->arguments;
 				auto arg_count = a_proc->argument_count;
 				
-				for (uint64_t arg_index = 0; arg_index < arg_count; ++arg_index)
+				for (int64_t arg_index = 0; arg_index < arg_count; ++arg_index)
 				{
 					if (!code_type_are_same(a_args[arg_index], b_args[arg_index], recurse_pointer_type))
 						return false;
@@ -543,12 +545,17 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 			node->type            = proc->return_type;
 			
 			node->parameter_count = root->parameter_count;
-			node->paraments       = new Code_Node_Expression *[node->parameter_count];
+			node->parameters       = new Code_Node_Expression *[node->parameter_count];
 			
 			uint32_t param_index  = 0;
 			for (auto param = root->parameters; param; param = param->next, ++param_index)
 			{
 				auto code_param = code_resolve_root_expression(resolver, symbols, param->expression);
+
+				if (!code_param->type)
+				{
+					Unimplemented();
+				}
 				
 				if (!code_type_are_same(proc->arguments[param_index], code_param->type))
 				{
@@ -564,7 +571,7 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 					}
 				}
 				
-				node->paraments[param_index] = code_param;
+				node->parameters[param_index] = code_param;
 			}
 			
 			node->stack_top = resolver->virtual_address[Symbol_Address::STACK];
@@ -580,13 +587,18 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 			node->type            = proc->return_type;
 			
 			node->parameter_count = proc->argument_count;
-			node->paraments       = new Code_Node_Expression *[node->parameter_count];
+			node->parameters       = new Code_Node_Expression *[node->parameter_count];
 			
 			uint32_t param_index  = 0;
 			auto     param        = root->parameters;
 			for (; param_index < proc->argument_count - 1; param = param->next, ++param_index)
 			{
 				auto code_param = code_resolve_root_expression(resolver, symbols, param->expression);
+
+				if (!code_param->type)
+				{
+					Unimplemented();
+				}
 				
 				if (!code_type_are_same(proc->arguments[param_index], code_param->type))
 				{
@@ -602,7 +614,7 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 					}
 				}
 				
-				node->paraments[param_index] = code_param;
+				node->parameters[param_index] = code_param;
 			}
 			
 			Code_Node *child = nullptr;
@@ -627,11 +639,17 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 				node->variadic_count = va_arg_count;
 				node->variadics      = new Code_Node_Expression *[va_arg_count];
 				
-				uint64_t index       = 0;
+				int64_t index       = 0;
 				for (; param; param = param->next, ++index)
 				{
 					Assert(index < va_arg_count);
 					auto code_param        = code_resolve_root_expression(resolver, symbols, param->expression);
+
+					if (!code_param->type)
+					{
+						Unimplemented();
+					}
+
 					node->variadics[index] = code_param;
 				}
 			}
@@ -649,7 +667,7 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 			va_arg->type                               = child->type;
 			va_arg->child                              = child;
 			
-			node->paraments[node->parameter_count - 1] = va_arg;
+			node->parameters[node->parameter_count - 1] = va_arg;
 			
 			return node;
 		}

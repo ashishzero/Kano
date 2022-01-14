@@ -460,9 +460,9 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
 		fprintf(fp, "Procedure-Call()\n");
 		print_code(node->procedure, fp, child_indent, "Procedure-Id");
 
-		for (uint64_t index = 0; index < node->parameter_count; ++index)
+		for (int64_t index = 0; index < node->parameter_count; ++index)
 		{
-			print_code(node->paraments[index], fp, child_indent);
+			print_code(node->parameters[index], fp, child_indent);
 		}
 	}
 	break;
