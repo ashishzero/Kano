@@ -447,6 +447,8 @@ struct Code_Node_Procedure_Call : public Code_Node
 	uint64_t               variadic_count  = 0;
 	Code_Node_Expression **variadics       = nullptr;
 
+	uint64_t source_row = -1;
+
 	uint64_t               stack_top       = 0;
 };
 

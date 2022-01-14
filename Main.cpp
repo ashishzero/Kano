@@ -26,28 +26,6 @@ String read_entire_file(const char *file)
 	return String(string, (int64_t)fsize);
 }
 
-void print(const char *filename, Syntax_Node *node)
-{
-	auto fp = fopen(filename, "wb");
-	print_syntax(node, fp);
-	fclose(fp);
-}
-
-void print(const char *filename, Array_View<Code_Node_Assignment *> exprs)
-{
-	auto fp = fopen(filename, "wb");
-	for (auto expr : exprs)
-		print_code(expr, fp);
-	fclose(fp);
-}
-
-void print(const char *filename, Code_Node *code)
-{
-	auto fp = fopen(filename, "wb");
-	print_code(code, fp);
-	fclose(fp);
-}
-
 bool print_error(Error_List *list)
 {
 	for (auto error = list->first.next; error; error = error->next)
@@ -189,28 +167,48 @@ void print_value(Code_Type *type, void *data)
 	}
 }
 
-void intercept(Interpreter *interp, Code_Node_Statement *statement)
+void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 {
-	printf("Executing statement: %zu\n", statement->source_row);
-
-	printf("%-15s %s\n", "Name", "Value");
-	for (auto symbols = statement->symbol_table; symbols; symbols = symbols->parent)
+	if (intercept == INTERCEPT_PROCEDURE_CALL)
 	{
-		for (auto symbol : symbols->buffer)
-		{
-			if ((symbol->flags & SYMBOL_BIT_TYPE))
-				continue;
-
-			void *data = interp->stack + symbols->stack_offset + symbol->address.offset;
-
-			printf("%-15s ", symbol->name.data);
-			//print_type(symbol->type);
-			print_value(symbol->type, data);
-			printf("\n");
-		}
+		auto proc = (Code_Node_Procedure_Call *)node;
+		printf("Procedure Call: %zu\n", proc->source_row);
 	}
+	else if (intercept == INTERCEPT_PROCEDURE_RETURN)
+	{
+		auto proc = (Code_Node_Procedure_Call *)node;
+		printf("Procedure Return: %zu\n", proc->source_row);
+	}
+	if (intercept == INTERCEPT_STATEMENT)
+	{
+		auto statement = (Code_Node_Statement *)node;
+		printf("Executing statement: %zu\n", statement->source_row);
 
-	printf("\n\n");
+		printf("%-15s %s\n", "Name", "Value");
+		for (auto symbols = statement->symbol_table; symbols; symbols = symbols->parent)
+		{
+			for (auto symbol : symbols->buffer)
+			{
+				if ((symbol->flags & SYMBOL_BIT_TYPE))
+					continue;
+
+				if (symbol->type->kind == CODE_TYPE_PROCEDURE && (symbol->flags & SYMBOL_BIT_CONSTANT))
+					continue;
+
+				if (symbol->address.kind == Symbol_Address::CCALL)
+					continue;
+
+				void *data = interp->stack + symbols->stack_offset + symbol->address.offset;
+
+				printf("%-15s ", symbol->name.data);
+				//print_type(symbol->type);
+				print_value(symbol->type, data);
+				printf("\n");
+			}
+		}
+
+		printf("\n\n");
+	}
 }
 
 #include <math.h>
@@ -335,58 +333,18 @@ int main()
 	if (print_error(&parser.error))
 		return 1;
 
-	print("syntax.txt", node);
-
 	auto resolver = code_type_resolver_create();
 
 	include_basic(resolver);
 
 	auto exprs = code_type_resolve(resolver, node);
 
-	print("code.txt", exprs);
-
 	Interpreter interp;
 	interp.intercept = intercept;
 	interp_init(&interp, 1024 * 1024 * 4, code_type_resolver_bss_allocated(resolver));
 
 	interp_eval_globals(&interp, exprs);
+	int result = interp_eval_main(&interp, resolver);
 
-	auto main_proc = code_type_resolver_find(resolver, "main");
-
-	if (!main_proc)
-	{
-		fprintf(stderr, "\"main\" procedure not defined!\n");
-		return 1;
-	}
-
-	if (!(main_proc->flags & SYMBOL_BIT_CONSTANT) || main_proc->address.kind != Symbol_Address::CODE)
-	{
-		fprintf(stderr, "The \"main\" procedure must be constant!\n");
-		return 1;
-	}
-
-	if (main_proc->type->kind != CODE_TYPE_PROCEDURE)
-	{
-		fprintf(stderr, "The \"main\" symbol must be a procedure!\n");
-		return 1;
-	}
-
-	auto proc_type = (Code_Type_Procedure *)main_proc->type;
-	if (proc_type->argument_count != 0 || proc_type->return_type)
-	{
-		fprintf(stderr, "The \"main\" procedure must not take any arguments and should return nothing!\n");
-		return 1;
-	}
-
-	auto proc = main_proc->address.code;
-		
-	{
-		auto fp = fopen("code.txt", "ab");
-		print_code(proc, fp);
-		fclose(fp);
-	}
-		
-	interp_eval_procedure_call(&interp, proc);
-
-	return 0;
+	return result;
 }

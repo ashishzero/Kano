@@ -537,6 +537,7 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 		if (proc->argument_count == root->parameter_count && !proc->is_variadic)
 		{
 			auto node             = new Code_Node_Procedure_Call;
+			node->source_row      = root->procedure->location.start_row;
 			node->procedure       = procedure;
 			node->type            = proc->return_type;
 			
@@ -572,6 +573,7 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 		else if (proc->is_variadic && root->parameter_count >= proc->argument_count - 1)
 		{
 			auto node             = new Code_Node_Procedure_Call;
+			node->source_row      = root->procedure->location.start_row;
 			node->procedure       = procedure;
 			node->type            = proc->return_type;
 			

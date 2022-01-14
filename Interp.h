@@ -2,9 +2,16 @@
 #include "Printer.h"
 #include "Token.h"
 
-typedef void(*Intercep_Proc)(struct Interpreter *interp, struct Code_Node_Statement *statement);
+enum Intercept_Kind
+{
+	INTERCEPT_STATEMENT,
+	INTERCEPT_PROCEDURE_CALL,
+	INTERCEPT_PROCEDURE_RETURN
+};
 
-inline void intercept_default(struct Interpreter *interp, struct Code_Node_Statement *statement){};
+typedef void(*Intercep_Proc)(struct Interpreter *interp, Intercept_Kind intercept, struct Code_Node *node);
+
+inline void intercept_default(struct Interpreter *interp, Intercept_Kind intercept, struct Code_Node *statement){};
 
 struct Interpreter
 {
@@ -18,7 +25,7 @@ struct Interpreter
 void            interp_init(Interpreter *interp, size_t stack_size, size_t bss_size);
 
 void interp_eval_globals(Interpreter *interp, Array_View<Code_Node_Assignment *> exprs);
-void interp_eval_procedure_call(Interpreter *interp, Code_Node_Block *proc);
+int interp_eval_main(Interpreter *interp, struct Code_Type_Resolver *resolver);
 
 //
 //

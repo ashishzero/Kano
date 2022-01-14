@@ -949,9 +949,12 @@ static Evaluation_Value interp_eval_procedure_call(Interpreter *interp, Code_Nod
 		offset     = interp_push_into_stack(interp, var, offset);
 	}
 	
-	auto result = interp_eval_root_expression(interp, root->procedure);
+	interp->intercept(interp, INTERCEPT_PROCEDURE_CALL, root);
 
+	auto result = interp_eval_root_expression(interp, root->procedure);
 	interp->stack_top = prev_top;
+
+	interp->intercept(interp, INTERCEPT_PROCEDURE_RETURN, root);
 	
 	return result;
 }
@@ -1049,7 +1052,7 @@ static bool interp_eval_statement(Interpreter *interp, Code_Node_Statement *root
 {
 	Assert(root->symbol_table);
 
-	interp->intercept(interp, root);
+	interp->intercept(interp, INTERCEPT_STATEMENT, root);
 
 	Evaluation_Value value;
 	Evaluation_Value *dst = out_value ? out_value : &value;
@@ -1111,6 +1114,8 @@ static void interp_eval_block(Interpreter *interp, Code_Node_Block *root, bool i
 //
 //
 
+#include "Resolver.h"
+
 void interp_init(Interpreter *interp, size_t stack_size, size_t bss_size)
 {
 	interp->stack  = new uint8_t[stack_size];
@@ -1125,7 +1130,52 @@ void interp_eval_globals(Interpreter *interp, Array_View<Code_Node_Assignment *>
 		interp_eval_assignment(interp, expr);
 }
 
-void interp_eval_procedure_call(Interpreter *interp, Code_Node_Block *proc)
+int interp_eval_main(Interpreter *interp, Code_Type_Resolver *resolver)
 {
-	interp_eval_block(interp, proc, true);
+	auto main_proc = code_type_resolver_find(resolver, "main");
+	
+	if (!main_proc)
+	{
+		fprintf(stderr, "\"main\" procedure not defined!\n");
+		return 1;
+	}
+	
+	if (!(main_proc->flags & SYMBOL_BIT_CONSTANT) || main_proc->address.kind != Symbol_Address::CODE)
+	{
+		fprintf(stderr, "The \"main\" procedure must be constant!\n");
+		return 1;
+	}
+	
+	if (main_proc->type->kind != CODE_TYPE_PROCEDURE)
+	{
+		fprintf(stderr, "The \"main\" symbol must be a procedure!\n");
+		return 1;
+	}
+	
+	auto proc_type = (Code_Type_Procedure *)main_proc->type;
+	if (proc_type->argument_count != 0 || proc_type->return_type || proc_type->is_variadic)
+	{
+		fprintf(stderr, "The \"main\" procedure must not take any arguments and should return nothing!\n");
+		return 1;
+	}
+	
+	auto proc = (Code_Type_Procedure *)main_proc->type;
+
+	auto address = new Code_Node_Address;
+	address->type = proc;
+	address->address = &main_proc->address;
+
+	auto expr = new Code_Node_Expression;
+	expr->type = proc;
+	expr->child = address;
+
+	auto proc_call = new Code_Node_Procedure_Call;
+	proc_call->type = proc->return_type;
+	proc_call->source_row = main_proc->location.start_row;
+	proc_call->flags = main_proc->flags;
+	proc_call->procedure = expr;
+
+	interp_eval_procedure_call(interp, proc_call);
+
+	return 0;
 }
