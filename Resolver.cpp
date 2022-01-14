@@ -537,6 +537,7 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 		if (proc->argument_count == root->parameter_count && !proc->is_variadic)
 		{
 			auto node             = new Code_Node_Procedure_Call;
+			node->procedure_type  = proc;
 			node->source_row      = root->procedure->location.start_row;
 			node->procedure       = procedure;
 			node->type            = proc->return_type;
@@ -573,6 +574,7 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 		else if (proc->is_variadic && root->parameter_count >= proc->argument_count - 1)
 		{
 			auto node             = new Code_Node_Procedure_Call;
+			node->procedure_type  = proc;
 			node->source_row      = root->procedure->location.start_row;
 			node->procedure       = procedure;
 			node->type            = proc->return_type;
@@ -1306,6 +1308,7 @@ static Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolv
 		auto ResolveProcedure = [&resolver, &type, &procedure_body, symbols, symbol](Syntax_Node_Procedure *proc) {
 			auto proc_type            = new Code_Type_Procedure;
 			
+			proc_type->name = symbol->name;
 			proc_type->argument_count = proc->argument_count;
 			proc_type->arguments      = new Code_Type *[proc_type->argument_count];
 			
@@ -2167,6 +2170,7 @@ void proc_builder_return(Procedure_Builder *builder, String name)
 void proc_builder_register(Procedure_Builder *builder, String name, CCall ccall)
 {
 	auto type = new Code_Type_Procedure;
+	type->name = name;
 	type->argument_count = builder->arguments.count;
 	type->arguments = new Code_Type *[type->argument_count];
 	memcpy(type->arguments, builder->arguments.data, sizeof(type->arguments[0]) * type->argument_count);

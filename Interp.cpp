@@ -1171,6 +1171,7 @@ int interp_eval_main(Interpreter *interp, Code_Type_Resolver *resolver)
 
 	auto proc_call = new Code_Node_Procedure_Call;
 	proc_call->type = proc->return_type;
+	proc_call->procedure_type = proc_type;
 	proc_call->source_row = main_proc->location.start_row;
 	proc_call->flags = main_proc->flags;
 	proc_call->procedure = expr;

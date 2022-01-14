@@ -78,6 +78,8 @@ struct Code_Type_Procedure : public Code_Type
 		alignment    = sizeof(void *);
 	}
 
+	String name = "anonymous";
+
 	Code_Type **arguments      = nullptr;
 	uint64_t    argument_count = 0;
 	bool        is_variadic    = false;
@@ -447,6 +449,7 @@ struct Code_Node_Procedure_Call : public Code_Node
 	uint64_t               variadic_count  = 0;
 	Code_Node_Expression **variadics       = nullptr;
 
+	Code_Type_Procedure *procedure_type = nullptr;
 	uint64_t source_row = -1;
 
 	uint64_t               stack_top       = 0;

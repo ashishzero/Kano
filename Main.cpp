@@ -172,12 +172,12 @@ void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 	if (intercept == INTERCEPT_PROCEDURE_CALL)
 	{
 		auto proc = (Code_Node_Procedure_Call *)node;
-		printf("Procedure Call: %zu\n", proc->source_row);
+		printf("Procedure Call: %s: %zu\n", proc->procedure_type->name.data, proc->source_row);
 	}
 	else if (intercept == INTERCEPT_PROCEDURE_RETURN)
 	{
 		auto proc = (Code_Node_Procedure_Call *)node;
-		printf("Procedure Return: %zu\n", proc->source_row);
+		printf("Procedure Return: %s: %zu\n", proc->procedure_type->name.data, proc->source_row);
 	}
 	if (intercept == INTERCEPT_STATEMENT)
 	{
