@@ -179,7 +179,7 @@ void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 		auto proc = (Code_Node_Procedure_Call *)node;
 		printf("Procedure Return: %s: %zu\n", proc->procedure_type->name.data, proc->source_row);
 	}
-	if (intercept == INTERCEPT_STATEMENT)
+	else if (intercept == INTERCEPT_STATEMENT)
 	{
 		auto statement = (Code_Node_Statement *)node;
 		printf("Executing statement: %zu\n", statement->source_row);
@@ -206,7 +206,6 @@ void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 				printf("\n");
 			}
 		}
-
 		printf("\n\n");
 	}
 }

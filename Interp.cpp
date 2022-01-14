@@ -1139,26 +1139,26 @@ int interp_eval_main(Interpreter *interp, Code_Type_Resolver *resolver)
 		fprintf(stderr, "\"main\" procedure not defined!\n");
 		return 1;
 	}
-	
+
 	if (!(main_proc->flags & SYMBOL_BIT_CONSTANT) || main_proc->address.kind != Symbol_Address::CODE)
 	{
 		fprintf(stderr, "The \"main\" procedure must be constant!\n");
 		return 1;
 	}
-	
+
 	if (main_proc->type->kind != CODE_TYPE_PROCEDURE)
 	{
 		fprintf(stderr, "The \"main\" symbol must be a procedure!\n");
 		return 1;
 	}
-	
+
 	auto proc_type = (Code_Type_Procedure *)main_proc->type;
 	if (proc_type->argument_count != 0 || proc_type->return_type || proc_type->is_variadic)
 	{
 		fprintf(stderr, "The \"main\" procedure must not take any arguments and should return nothing!\n");
 		return 1;
 	}
-	
+
 	auto proc = (Code_Type_Procedure *)main_proc->type;
 
 	auto address = new Code_Node_Address;
