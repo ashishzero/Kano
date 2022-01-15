@@ -288,7 +288,7 @@ static double basic_sin(double x) { return sin(x); }
 static double basic_cos(double x) { return cos(x); }
 static double basic_tan(double x) { return tan(x); }
 
-void include_basic(Code_Type_Resolver *resolver)
+static void include_basic(Code_Type_Resolver *resolver)
 {
 	Procedure_Builder builder(resolver);
 	
