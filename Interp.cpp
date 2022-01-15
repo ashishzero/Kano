@@ -887,6 +887,9 @@ static Evaluation_Value interp_eval_procedure_call(Interpreter *interp, Code_Nod
 	// @Note: We do not align variadics to simplify the variadics routine
 
 	uint64_t offset = 0;
+
+	auto return_stack = interp->return_stack;
+
 	for (int64_t i = 0; i < root->variadic_count; ++i)
 	{
 		auto param = root->variadics[i];
@@ -896,7 +899,10 @@ static Evaluation_Value interp_eval_procedure_call(Interpreter *interp, Code_Nod
 
 		interp->stack_top = new_top;
 		offset = interp_push_into_stack(interp, var, offset);
+		interp->return_stack += param->type->runtime_size;
 	}
+
+	interp->return_stack = return_stack;
 	
 	new_top += offset;
 
@@ -912,6 +918,7 @@ static Evaluation_Value interp_eval_procedure_call(Interpreter *interp, Code_Nod
 		new_top = AlignPower2Up(new_top, root->parameters[0]->type->alignment);
 	}
 
+	return_stack = interp->return_stack;
 	for (int64_t i = 0; i < root->parameter_count; ++i)
 	{
 		auto param = root->parameters[i];
@@ -922,7 +929,10 @@ static Evaluation_Value interp_eval_procedure_call(Interpreter *interp, Code_Nod
 		interp->stack_top = new_top;
 		offset = AlignPower2Up(offset, param->type->alignment);
 		offset = interp_push_into_stack(interp, var, offset);
+		interp->return_stack += param->type->runtime_size;
 	}
+
+	interp->return_stack = return_stack;
 
 	interp->stack_top = prev_top;
 	auto proc_expr = interp_eval_root_expression(interp, root->procedure);
