@@ -29,7 +29,7 @@ const main := proc() {
 	var numbers: [2]int;
 	numbers[0] = 6;
 	numbers[1] = 9;
-	var result:= execute(numbers[0], numbers[1], adder);
+	var result:= execute(numbers[0], numbers[1], proc(var a: int, var b: int) -> int { return a * b; });
 	print("%d op %d is %d\n", numbers[0], numbers[1], result);
-	print("Fib of %d is %d\n", numbers[0], fib(numbers[0]));
+	//print("Fib of %d is %d\n", numbers[0], fib(numbers[0]));
 }

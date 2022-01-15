@@ -174,6 +174,8 @@ static void parser_finish_syntax_node(Parser *parser, Syntax_Node *ast)
 //
 //
 
+Syntax_Node_Procedure *parse_procedure(Parser *parser);
+
 Syntax_Node *parse_subexpression(Parser *parser, uint32_t prec)
 {
 	if (parser_accept_token(parser, TOKEN_KIND_OPEN_BRACKET))
@@ -232,6 +234,11 @@ Syntax_Node *parse_subexpression(Parser *parser, uint32_t prec)
 		node->value.data.boolean = false;
 		parser_finish_syntax_node(parser, node);
 		return node;
+	}
+
+	if (parser_peek_token(parser, TOKEN_KIND_PROC))
+	{
+		return parse_procedure(parser);
 	}
 
 	if (parser_accept_token(parser, TOKEN_KIND_NULL))

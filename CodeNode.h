@@ -71,7 +71,7 @@ struct Code_Type_Pointer : public Code_Type
 
 typedef void (*CCall)(struct Interpreter *interp);
 
-struct Procedure_Pointer
+struct Code_Value_Procedure
 {
 	struct Code_Node_Block *block;
 	CCall ccall;
@@ -82,7 +82,7 @@ struct Code_Type_Procedure : public Code_Type
 	Code_Type_Procedure()
 	{
 		kind         = CODE_TYPE_PROCEDURE;
-		runtime_size = sizeof(Procedure_Pointer);
+		runtime_size = sizeof(Code_Value_Procedure);
 		alignment    = sizeof(void *);
 	}
 
@@ -275,6 +275,7 @@ union Code_Value {
 	Code_Value_Real    real;
 	Code_Value_Bool    boolean;
 	Code_Value_Pointer pointer;
+	Code_Value_Procedure procedure;
 
 	Code_Value(){};
 };

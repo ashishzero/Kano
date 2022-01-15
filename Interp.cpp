@@ -16,7 +16,7 @@ struct Evaluation_Value
 		Kano_Bool  bool_value;
 		uint8_t *  pointer_value;
 		Kano_Array array_value;
-		Procedure_Pointer procedure_value;
+		Code_Value_Procedure procedure_value;
 	} imm;
 	
 	uint8_t *  address = nullptr;
@@ -936,7 +936,7 @@ static Evaluation_Value interp_eval_procedure_call(Interpreter *interp, Code_Nod
 
 	interp->stack_top = prev_top;
 	auto proc_expr = interp_eval_root_expression(interp, root->procedure);
-	auto procedure = EvaluationTypeValue(proc_expr, Procedure_Pointer);
+	auto procedure = EvaluationTypeValue(proc_expr, Code_Value_Procedure);
 	
 	auto prev_proc = interp->current_procedure;
 	interp->stack_top = new_top;
