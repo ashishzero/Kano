@@ -21,8 +21,7 @@ struct Interpreter
 	int64_t  return_count = 0;
 	struct Code_Type_Procedure *current_procedure = nullptr;
 	Intercep_Proc intercept = intercept_default;
-	uint8_t *scratch = nullptr;
-	uint64_t scratch_size = 0;
+	uint64_t return_stack = 0;
 };
 
 void            interp_init(Interpreter *interp, size_t stack_size, size_t bss_size);

@@ -16,7 +16,7 @@ struct Evaluation_Value
 		Kano_Bool  bool_value;
 		uint8_t *  pointer_value;
 		Kano_Array array_value;
-		
+		Procedure_Pointer procedure_value;
 	} imm;
 	
 	uint8_t *  address = nullptr;
@@ -46,23 +46,14 @@ static inline uint64_t interp_push_into_stack(Interpreter *interp, Evaluation_Va
 	return offset;
 }
 
-static inline uint64_t interp_push_into_stack_reduced(Interpreter *interp, Evaluation_Value var, uint64_t offset)
-{
-	offset -= var.type->runtime_size;
-	memcpy(interp->stack + interp->stack_top + offset, EvaluationTypePointer(var, void *), var.type->runtime_size);
-	return offset;
-}
-
 //
 //
 //
 
 static Evaluation_Value interp_eval_root_expression(Interpreter *interp, Code_Node_Expression *expression);
 
-static inline uint8_t *interp_eval_data_address(Interpreter *interp, Code_Node_Address *node)
+static Evaluation_Value interp_eval_address(Interpreter *interp, Code_Node_Address *node)
 {
-	Assert(node->type->kind != CODE_TYPE_PROCEDURE);
-	
 	if (node->subscript)
 	{
 		Assert(node->address == nullptr);
@@ -93,7 +84,10 @@ static inline uint8_t *interp_eval_data_address(Interpreter *interp, Code_Node_A
 		address += node->offset;
 		address += node->type->runtime_size * index;
 
-		return address;
+		Evaluation_Value type_value;
+		type_value.type = node->type;
+		type_value.address = address;
+		return type_value;
 	}
 	else
 	{
@@ -113,82 +107,28 @@ static inline uint8_t *interp_eval_data_address(Interpreter *interp, Code_Node_A
 			{
 				memory = interp->global;
 			}
-			else
+			else if (address_kind == Symbol_Address::CODE)
 			{
-				Unreachable();
+				Evaluation_Value type_value;
+				type_value.type = node->type;
+				type_value.imm.procedure_value.block = node->address->code;
+				type_value.imm.procedure_value.ccall = nullptr;
+				return type_value;
+			}
+			else if (address_kind == Symbol_Address::CCALL)
+			{
+				Evaluation_Value type_value;
+				type_value.type = node->type;
+				type_value.imm.procedure_value.ccall = node->address->ccall;
+				type_value.imm.procedure_value.block = nullptr;
+				return type_value;
 			}
 		}
-		
-		return memory + offset;
-	}
-}
 
-static void interp_eval_block(Interpreter *interp, Code_Node_Block *root, bool isproc);
-
-static Evaluation_Value interp_eval_address(Interpreter *interp, Code_Node_Address *node)
-{
-	if (node->type->kind != CODE_TYPE_PROCEDURE)
-	{
 		Evaluation_Value type_value;
 		type_value.type = node->type;
-		type_value.address = interp_eval_data_address(interp, node);
+		type_value.address = memory + offset;
 		return type_value;
-	}
-
-	else
-	{
-		switch (node->address->kind)
-		{
-			case Symbol_Address::CODE: 
-			{
-				interp_eval_block(interp, node->address->code, true);
-				
-				auto proc = (Code_Type_Procedure *)node->type;
-				
-				Evaluation_Value type_value;
-
-				if (proc->return_type)
-				{
-					type_value.address = (uint8_t *)(interp->stack + interp->stack_top);
-					type_value.type    = proc->return_type;
-				}
-				else
-				{
-					type_value.address = nullptr;
-					type_value.type    = nullptr;
-				}
-
-				return type_value;
-			}
-			break;
-
-			case Symbol_Address::CCALL:
-			{
-				node->address->ccall(interp);
-				
-				auto proc = (Code_Type_Procedure *)node->type;
-				
-				Evaluation_Value type_value;
-				
-				if (proc->return_type)
-				{
-					type_value.address = (uint8_t *)(interp->stack + interp->stack_top);
-					type_value.type    = proc->return_type;
-				}
-				else
-				{
-					type_value.address = nullptr;
-					type_value.type    = nullptr;
-				}
-				return type_value;
-			}
-			break;
-
-			NoDefaultCase();
-		}
-
-		Unreachable();
-		return Evaluation_Value{};
 	}
 }
 
@@ -335,9 +275,12 @@ static Evaluation_Value interp_eval_unary_operator(Interpreter *interp, Code_Nod
 			
 			auto address = (Code_Node_Address *)root->child;
 
+			auto pointer = interp_eval_address(interp, address);
+			Assert(pointer.address);
+
 			Evaluation_Value type_value;
 			type_value.type    = root->type;
-			type_value.address = interp_eval_data_address(interp, address);
+			type_value.address = pointer.address;
 			
 			return type_value;
 		}
@@ -347,10 +290,13 @@ static Evaluation_Value interp_eval_unary_operator(Interpreter *interp, Code_Nod
 			Assert(root->child->kind == CODE_NODE_ADDRESS);
 			
 			auto address = (Code_Node_Address *)root->child;
+
+			auto pointer = interp_eval_address(interp, address);
+			Assert(pointer.address);
 			
 			Evaluation_Value type_value;
 			type_value.type = root->type;
-			type_value.imm.pointer_value = interp_eval_data_address(interp, address);
+			type_value.imm.pointer_value = pointer.address;
 			
 			return type_value;
 		}
@@ -892,28 +838,14 @@ static BinaryOperatorProc BinaryOperators[] = {
 static Evaluation_Value interp_eval_expression(Interpreter *interp, Code_Node *root);
 static Evaluation_Value interp_eval_root_expression(Interpreter *interp, Code_Node_Expression *root);
 
-static Evaluation_Value interp_store_temporarily(Interpreter *interp, Evaluation_Value in)
-{
-	if (in.address)
-	{
-		if (interp->scratch_size < in.type->runtime_size)
-		{
-			interp->scratch_size = in.type->runtime_size * 2;
-			interp->stack = (uint8_t *)malloc(interp->scratch_size);
-		}
-		memcpy(interp->stack, in.address, in.type->runtime_size);
-		in.address = interp->stack;
-	}
-
-	return in;
-}
-
 static Evaluation_Value interp_eval_binary_operator(Interpreter *interp, Code_Node_Binary_Operator *node)
 {
+	auto return_stack = interp->return_stack;
 	auto b = interp_eval_expression(interp, node->right);
-	//b = interp_store_temporarily(interp, b);
-	
+	interp->return_stack += b.type->runtime_size;
+
 	auto a = interp_eval_expression(interp, node->left);
+	interp->return_stack = return_stack;
 
 	Assert(node->op_kind < ArrayCount(BinaryOperators));
 	
@@ -944,56 +876,83 @@ static Evaluation_Value interp_eval_assignment(Interpreter *interp, Code_Node_As
 	return value;
 }
 
+static void interp_eval_block(Interpreter *interp, Code_Node_Block *root, bool isproc);
+
 static Evaluation_Value interp_eval_procedure_call(Interpreter *interp, Code_Node_Procedure_Call *root)
 {
 	auto prev_top = interp->stack_top;
 
-	auto new_top = root->stack_top + prev_top;
+	auto new_top = root->stack_top + prev_top + interp->return_stack;
 
-	uint64_t variadics_args_size = 0;
+	// @Note: We do not align variadics to simplify the variadics routine
+
+	uint64_t offset = 0;
 	for (int64_t i = 0; i < root->variadic_count; ++i)
-		variadics_args_size += root->variadics[i]->type->runtime_size;
-
-	uint64_t offset = variadics_args_size;
-	for (int64_t i = root->variadic_count - 1; i >= 0; --i)
 	{
+		auto param = root->variadics[i];
+
 		interp->stack_top = prev_top;
-		auto var = interp_eval_root_expression(interp, (Code_Node_Expression *)root->variadics[i]);
+		auto var = interp_eval_root_expression(interp, param);
+
 		interp->stack_top = new_top;
-		offset = interp_push_into_stack_reduced(interp, var, offset);
+		offset = interp_push_into_stack(interp, var, offset);
 	}
 	
-	new_top += variadics_args_size;
+	new_top += offset;
 
-	uint64_t parameters_size = 0;
-	for (int64_t i = 0; i < root->parameter_count; ++i)
-		parameters_size += root->parameters[i]->type->runtime_size;
-
-	offset = parameters_size;
+	offset = 0;
 
 	if (root->type)
-		offset += root->type->runtime_size;
-
-	for (int64_t i = root->parameter_count - 1; i >= 0; --i)
 	{
-		interp->stack_top = prev_top;
-		auto var   = interp_eval_root_expression(interp, (Code_Node_Expression *)root->parameters[i]);
-		
-		interp->stack_top = new_top;
-		offset     = interp_push_into_stack_reduced(interp, var, offset);
+		new_top = AlignPower2Up(new_top, root->type->alignment);
+		offset += root->type->runtime_size;
+	}
+	else if (root->parameter_count)
+	{
+		new_top = AlignPower2Up(new_top, root->parameters[0]->type->alignment);
 	}
 
-	auto prev_proc = interp->current_procedure;
-	interp->current_procedure = root->procedure_type;
+	for (int64_t i = 0; i < root->parameter_count; ++i)
+	{
+		auto param = root->parameters[i];
 
+		interp->stack_top = prev_top;
+		auto var = interp_eval_root_expression(interp, param);
+
+		interp->stack_top = new_top;
+		offset = AlignPower2Up(offset, param->type->alignment);
+		offset = interp_push_into_stack(interp, var, offset);
+	}
+
+	interp->stack_top = prev_top;
+	auto proc_expr = interp_eval_root_expression(interp, root->procedure);
+	auto procedure = EvaluationTypeValue(proc_expr, Procedure_Pointer);
+	
+	auto prev_proc = interp->current_procedure;
+	interp->stack_top = new_top;
+	interp->current_procedure = root->procedure_type;
 	interp->intercept(interp, INTERCEPT_PROCEDURE_CALL, root);
 
-	auto result = interp_eval_root_expression(interp, root->procedure);
-	interp->stack_top = prev_top;
+	if (procedure.block)
+		interp_eval_block(interp, procedure.block, true);
+	else
+		procedure.ccall(interp);
+
+	Evaluation_Value result;
+	if (root->type)
+	{
+		result.address = (uint8_t *)(interp->stack + interp->stack_top);
+		result.type    = root->type;
+	}
+	else
+	{
+		result.address = nullptr;
+		result.type    = nullptr;
+	}
 
 	interp->intercept(interp, INTERCEPT_PROCEDURE_RETURN, root);
-
 	interp->current_procedure = prev_proc;
+	interp->stack_top = prev_top;
 	
 	return result;
 }

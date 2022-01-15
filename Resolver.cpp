@@ -477,6 +477,7 @@ static Code_Node_Address *code_resolve_identifier(Code_Type_Resolver *resolver, 
 	if (symbol)
 	{
 		auto address     = new Code_Node_Address;
+		
 		address->address = &symbol->address;
 		address->flags   = symbol->flags;
 		
@@ -1392,7 +1393,6 @@ static Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolv
 			resolver->address_kind                           = Symbol_Address::STACK;
 			resolver->virtual_address[Symbol_Address::STACK] = 0;
 			
-			// @@Cleanup: Confirm if we need to set the stack offset for the struct symbols or not?
 			auto block                                       = new Code_Node_Block;
 			auto struct_symbols                              = &block->symbols;
 			struct_symbols->parent                           = symbols;
@@ -1560,38 +1560,41 @@ static Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolv
 				address_offset += size;
 				
 				resolver->virtual_address[resolver->address_kind] = address_offset;
+
+				if (procedure_body)
+				{
+					auto address                                      = new Code_Node_Address;
+					address->address                                  = &symbol->address;
+					address->flags                                    = symbol->flags;
+					address->flags |= SYMBOL_BIT_LVALUE;
+					address->type           = symbol->type;
 				
-				auto address                                      = new Code_Node_Address;
-				address->address                                  = &symbol->address;
-				address->flags                                    = symbol->flags;
-				address->flags |= SYMBOL_BIT_LVALUE;
-				address->type           = symbol->type;
+					auto destination        = new Code_Node_Expression;
+					destination->child      = address;
+					destination->flags      = address->flags;
+					destination->type       = address->type;
 				
-				auto destination        = new Code_Node_Expression;
-				destination->child      = address;
-				destination->flags      = address->flags;
-				destination->type       = address->type;
+					auto sym_addr           = new Symbol_Address;
+					*sym_addr               = symbol_address_code(procedure_body);
 				
-				auto sym_addr           = new Symbol_Address;
-				*sym_addr               = symbol_address_code(procedure_body);
+					auto source             = new Code_Node_Address;
+					source->type            = symbol->type;
+					source->flags           = symbol->flags;
+					source->address         = sym_addr;
 				
-				auto source             = new Code_Node_Address;
-				source->type            = symbol->type;
-				source->flags           = symbol->flags;
-				source->address         = sym_addr;
+					auto value              = new Code_Node_Expression;
+					value->flags            = source->flags;
+					value->type             = source->type;
+					value->child            = source;
 				
-				auto value              = new Code_Node_Expression;
-				value->flags            = source->flags;
-				value->type             = source->type;
-				value->child            = source;
+					auto assignment         = new Code_Node_Assignment;
+					assignment->type        = destination->type;
+					assignment->destination = destination;
+					assignment->value       = value;
+					assignment->flags |= destination->flags;
 				
-				auto assignment         = new Code_Node_Assignment;
-				assignment->type        = destination->type;
-				assignment->destination = destination;
-				assignment->value       = value;
-				assignment->flags |= destination->flags;
-				
-				return assignment;
+					return assignment;
+				}
 			}
 			
 			return nullptr;

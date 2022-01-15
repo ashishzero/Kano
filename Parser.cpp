@@ -493,8 +493,15 @@ Syntax_Node_Expression *parse_root_expression(Parser *parser)
 	}
 	else
 	{
+		auto token = lexer_current_token(&parser->lexer);
 		expression->child = parse_expression(parser, 0);
-		Assert(expression->child);
+		
+		if (!expression->child) 
+		{
+			parser_error(parser, token, "Expected expression");
+			expression->child = parser_new_syntax_node<Syntax_Node>(parser);
+			parser_finish_syntax_node(parser, expression->child);
+		}
 	}
 
 	parser_finish_syntax_node(parser, expression);
