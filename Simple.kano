@@ -41,6 +41,8 @@ const vec2_add := proc(var a: Vec2, var b: Vec2) -> Vec2 {
 	return r;
 }
 
+const get_two := proc() -> int { return 2; }
+
 const main := proc() {
 	//var a: Vec2;
 	//a.x = 7;
@@ -58,8 +60,8 @@ const main := proc() {
 	var numbers: [2]int;
 	numbers[0] = 6;
 	numbers[1] = 9;
-	var result:= execute(numbers[0], numbers[1], proc(var a: int, var b: int) -> int { return a * b; });
-	//var result:= execute(numbers[0], numbers[1], adder);
+	//var result:= execute(numbers[0], numbers[1], proc(var a: int, var b: int) -> int { return a * b; });
+	var result:= get_two() + execute(numbers[0], numbers[1], adder) + get_two();
 	print("%d op %d is %d\n", numbers[0], numbers[1], result);
 
 	//var number: int = 6; print("number: %d\n", number);

@@ -847,12 +847,16 @@ static Evaluation_Value interp_eval_root_expression(Interpreter *interp, Code_No
 
 static Evaluation_Value interp_eval_binary_operator(Interpreter *interp, Code_Node_Binary_Operator *node)
 {
-	//auto return_stack = interp->return_stack;
-	auto a = interp_eval_expression(interp, node->left);
 	auto b = interp_eval_expression(interp, node->right);
-	//interp->return_stack += b.type->runtime_size;
 
-	//interp->return_stack = return_stack;
+	// Copy to imm value, so that it doesn't change changed if procedures are being called when solving for a
+	if (b.address)
+	{
+		memcpy(&b.imm, b.address, b.type->runtime_size);
+		b.address = nullptr;
+	}
+
+	auto a = interp_eval_expression(interp, node->left);
 
 	Assert(node->op_kind < ArrayCount(BinaryOperators));
 	
