@@ -69,12 +69,20 @@ struct Code_Type_Pointer : public Code_Type
 	Code_Type *base_type = nullptr;
 };
 
+typedef void (*CCall)(struct Interpreter *interp);
+
+struct Code_Value_Procedure
+{
+	struct Code_Node_Block *block;
+	CCall ccall;
+};
+
 struct Code_Type_Procedure : public Code_Type
 {
 	Code_Type_Procedure()
 	{
 		kind         = CODE_TYPE_PROCEDURE;
-		runtime_size = sizeof(void *);
+		runtime_size = sizeof(Code_Value_Procedure);
 		alignment    = sizeof(void *);
 	}
 
@@ -134,7 +142,6 @@ struct Code_Type_Static_Array : public Code_Type
 //
 //
 //
-typedef void (*CCall)(struct Interpreter *interp);
 struct Symbol_Address
 {
 	enum Kind
@@ -268,6 +275,7 @@ union Code_Value {
 	Code_Value_Real    real;
 	Code_Value_Bool    boolean;
 	Code_Value_Pointer pointer;
+	Code_Value_Procedure procedure;
 
 	Code_Value(){};
 };

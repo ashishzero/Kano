@@ -477,6 +477,7 @@ static Code_Node_Address *code_resolve_identifier(Code_Type_Resolver *resolver, 
 	if (symbol)
 	{
 		auto address     = new Code_Node_Address;
+		
 		address->address = &symbol->address;
 		address->flags   = symbol->flags;
 		
@@ -756,6 +757,75 @@ static Code_Node_Literal *code_resolve_size_of(Code_Type_Resolver *resolver, Sym
 	return node;
 }
 
+static Code_Node_Block *code_resolve_procedure(Code_Type_Resolver *resolver, Syntax_Node_Procedure *proc, Code_Type_Procedure **type)
+{
+	auto proc_type = new Code_Type_Procedure;
+
+	proc_type->argument_count = proc->argument_count;
+	proc_type->arguments = new Code_Type *[proc_type->argument_count];
+
+	if (proc->return_type)
+	{
+		proc_type->return_type = code_resolve_type(resolver, &resolver->symbols, proc->return_type);
+	}
+
+	auto proc_symbols = new Symbol_Table;
+	proc_symbols->parent = &resolver->symbols;
+
+	auto stack_top = resolver->virtual_address[Symbol_Address::STACK];
+	auto address_kind = resolver->address_kind;
+
+	if (proc_type->return_type)
+		resolver->virtual_address[Symbol_Address::STACK] = proc_type->return_type->runtime_size;
+	else
+		resolver->virtual_address[Symbol_Address::STACK] = 0;
+
+	resolver->address_kind = Symbol_Address::STACK;
+
+	auto last_index = proc_type->argument_count - 1;
+
+	uint64_t arg_index = 0;
+	for (auto arg = proc->arguments; arg; arg = arg->next, ++arg_index)
+	{
+		auto assign = code_resolve_declaration(resolver, proc_symbols, arg->declaration,
+											   &proc_type->arguments[arg_index]);
+		Assert(assign == nullptr);
+
+		auto decl_type = arg->declaration->type;
+		if (arg_index == last_index)
+		{
+			proc_type->is_variadic = (decl_type->id == Syntax_Node_Type::VARIADIC_ARGUMENT);
+		}
+		else if (decl_type->id == Syntax_Node_Type::VARIADIC_ARGUMENT)
+		{
+			Unimplemented();
+		}
+	}
+
+	resolver->return_stack.add(proc_type->return_type);
+	auto procedure_body = code_resolve_block(resolver, proc_symbols, proc->body);
+	resolver->return_stack.count -= 1;
+
+	resolver->virtual_address[Symbol_Address::STACK] = stack_top;
+	resolver->address_kind = address_kind;
+
+	*type = proc_type;
+	
+	return procedure_body;
+}
+
+static Code_Node_Literal *code_resolve_procedure_literal(Code_Type_Resolver *resolver, Syntax_Node_Procedure *proc)
+{
+	Code_Type_Procedure *type = nullptr;
+	auto block = code_resolve_procedure(resolver, proc, &type);
+
+	auto node = new Code_Node_Literal;
+	node->type = type;
+	node->flags |= (SYMBOL_BIT_CONST_EXPR | SYMBOL_BIT_CONSTANT);
+	node->data.procedure.block = block;
+	return node;
+}
+
 static Code_Node *code_resolve_expression(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node *root)
 {
 	switch (root->kind)
@@ -789,6 +859,9 @@ static Code_Node *code_resolve_expression(Code_Type_Resolver *resolver, Symbol_T
 			
 		case SYNTAX_NODE_SIZE_OF:
 			return code_resolve_size_of(resolver, symbols, (Syntax_Node_Size_Of *)root);
+
+		case SYNTAX_NODE_PROCEDURE:
+			return code_resolve_procedure_literal(resolver, (Syntax_Node_Procedure *)root);
 			
 			NoDefaultCase();
 	}
@@ -1559,38 +1632,41 @@ static Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolv
 				address_offset += size;
 				
 				resolver->virtual_address[resolver->address_kind] = address_offset;
+
+				if (procedure_body)
+				{
+					auto address                                      = new Code_Node_Address;
+					address->address                                  = &symbol->address;
+					address->flags                                    = symbol->flags;
+					address->flags |= SYMBOL_BIT_LVALUE;
+					address->type           = symbol->type;
 				
-				auto address                                      = new Code_Node_Address;
-				address->address                                  = &symbol->address;
-				address->flags                                    = symbol->flags;
-				address->flags |= SYMBOL_BIT_LVALUE;
-				address->type           = symbol->type;
+					auto destination        = new Code_Node_Expression;
+					destination->child      = address;
+					destination->flags      = address->flags;
+					destination->type       = address->type;
 				
-				auto destination        = new Code_Node_Expression;
-				destination->child      = address;
-				destination->flags      = address->flags;
-				destination->type       = address->type;
+					auto sym_addr           = new Symbol_Address;
+					*sym_addr               = symbol_address_code(procedure_body);
 				
-				auto sym_addr           = new Symbol_Address;
-				*sym_addr               = symbol_address_code(procedure_body);
+					auto source             = new Code_Node_Address;
+					source->type            = symbol->type;
+					source->flags           = symbol->flags;
+					source->address         = sym_addr;
 				
-				auto source             = new Code_Node_Address;
-				source->type            = symbol->type;
-				source->flags           = symbol->flags;
-				source->address         = sym_addr;
+					auto value              = new Code_Node_Expression;
+					value->flags            = source->flags;
+					value->type             = source->type;
+					value->child            = source;
 				
-				auto value              = new Code_Node_Expression;
-				value->flags            = source->flags;
-				value->type             = source->type;
-				value->child            = source;
+					auto assignment         = new Code_Node_Assignment;
+					assignment->type        = destination->type;
+					assignment->destination = destination;
+					assignment->value       = value;
+					assignment->flags |= destination->flags;
 				
-				auto assignment         = new Code_Node_Assignment;
-				assignment->type        = destination->type;
-				assignment->destination = destination;
-				assignment->value       = value;
-				assignment->flags |= destination->flags;
-				
-				return assignment;
+					return assignment;
+				}
 			}
 			
 			return nullptr;
