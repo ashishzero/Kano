@@ -964,13 +964,18 @@ static Evaluation_Value interp_eval_procedure_call(Interpreter *interp, Code_Nod
 		interp->stack_top = new_top;
 		offset     = interp_push_into_stack_reduced(interp, var, offset);
 	}
-	
+
+	auto prev_proc = interp->current_procedure;
+	interp->current_procedure = root->procedure_type;
+
 	interp->intercept(interp, INTERCEPT_PROCEDURE_CALL, root);
 
 	auto result = interp_eval_root_expression(interp, root->procedure);
 	interp->stack_top = prev_top;
 
 	interp->intercept(interp, INTERCEPT_PROCEDURE_RETURN, root);
+
+	interp->current_procedure = prev_proc;
 	
 	return result;
 }

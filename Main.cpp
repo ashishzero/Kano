@@ -167,8 +167,26 @@ void print_value(Code_Type *type, void *data)
 	}
 }
 
+static int breakpoint = 4;
+
 void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 {
+	int line_number = -1;
+	if (intercept == INTERCEPT_STATEMENT)
+	{
+		line_number = (int)((Code_Node_Statement *)node)->source_row;
+	}
+	else
+	{
+		line_number = (int)((Code_Node_Procedure_Call *)node)->source_row;
+	}
+
+	if (line_number == breakpoint)
+	{
+		printf("Breakpoint:\n");
+		//TriggerBreakpoint();
+	}
+
 	if (intercept == INTERCEPT_PROCEDURE_CALL)
 	{
 		auto proc = (Code_Node_Procedure_Call *)node;
@@ -182,9 +200,10 @@ void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 	else if (intercept == INTERCEPT_STATEMENT)
 	{
 		auto statement = (Code_Node_Statement *)node;
-		printf("Executing statement: %zu\n", statement->source_row);
+		printf("Executing statement: %zu inside: %s\n", statement->source_row, interp->current_procedure->name.data);
 
 		printf("%-15s %s\n", "Name", "Value");
+
 		for (auto symbols = statement->symbol_table; symbols; symbols = symbols->parent)
 		{
 			for (auto symbol : symbols->buffer)
@@ -198,7 +217,7 @@ void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 				if (symbol->address.kind == Symbol_Address::CCALL)
 					continue;
 
-				void *data = interp->stack + symbols->stack_offset + symbol->address.offset;
+				void *data = interp->stack + interp->stack_top - symbols->stack_offset + symbol->address.offset;
 
 				printf("%-15s ", symbol->name.data);
 				//print_type(symbol->type);

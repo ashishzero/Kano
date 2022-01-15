@@ -1392,6 +1392,7 @@ static Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolv
 			resolver->address_kind                           = Symbol_Address::STACK;
 			resolver->virtual_address[Symbol_Address::STACK] = 0;
 			
+			// @@Cleanup: Confirm if we need to set the stack offset for the struct symbols or not?
 			auto block                                       = new Code_Node_Block;
 			auto struct_symbols                              = &block->symbols;
 			struct_symbols->parent                           = symbols;

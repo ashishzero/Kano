@@ -19,6 +19,7 @@ struct Interpreter
 	uint8_t *global = nullptr;
 	uint64_t stack_top = 0;
 	int64_t  return_count = 0;
+	struct Code_Type_Procedure *current_procedure = nullptr;
 	Intercep_Proc intercept = intercept_default;
 };
 
