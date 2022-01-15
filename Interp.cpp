@@ -131,6 +131,10 @@ static Evaluation_Value interp_eval_address(Interpreter *interp, Code_Node_Addre
 				return type_value;
 			}
 		}
+		else
+		{
+			offset += interp->stack_top;
+		}
 
 		Evaluation_Value type_value;
 		type_value.type = node->type;
@@ -928,26 +932,6 @@ static Evaluation_Value interp_eval_procedure_call(Interpreter *interp, Code_Nod
 	}
 	
 	new_top += variadics_args_size;
-
-	uint64_t return_and_parameters_size = 0;
-	{
-		if (root->type)
-		{
-			new_top = AlignPower2Up(new_top, (uint64_t)root->type->alignment);
-			return_and_parameters_size += root->type->runtime_size;
-		}
-		else if (root->parameter_count)
-		{
-			new_top = AlignPower2Up(new_top, (uint64_t)root->parameters[0]->type->alignment);
-		}
-
-		for (int64_t i = 0; i < root->parameter_count; ++i)
-		{
-			auto param = root->parameters[i];
-			return_and_parameters_size = AlignPower2Up(return_and_parameters_size, (uint64_t)param->type->alignment);
-			return_and_parameters_size += param->type->runtime_size;
-		}
-	}
 
 	uint64_t return_type_size = 0;
 	if (root->type)

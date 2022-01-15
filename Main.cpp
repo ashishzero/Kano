@@ -169,8 +169,6 @@ void print_value(Code_Type *type, void *data)
 
 void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 {
-	return;
-
 	if (intercept == INTERCEPT_PROCEDURE_CALL)
 	{
 		auto proc = (Code_Node_Procedure_Call *)node;

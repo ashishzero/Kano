@@ -13,7 +13,7 @@ const fib := proc(var a: int) -> int {
 	var b:= fib(a - 1);
 	var c:= fib(a - 2);
 	var d:= b + c;
-	print("a: %d, b: %d, c: %d, d: %d\n", a, b, c, d);
+	print("=================== a: %d, b: %d, c: %d, d: %d\n", a, b, c, d);
 	return d;
 }
 
@@ -43,6 +43,10 @@ const vec2_add := proc(var a: Vec2, var b: Vec2) -> Vec2 {
 
 const get_two := proc() -> int { return 2; }
 
+const print_numbers := proc(var a: int, var b: int, var c: int, var d: int) {
+	print("a: %d, b: %d, c: %d, d: %d\n", a, b, c, d);
+}
+
 const main := proc() {
 	//var a: Vec2;
 	//a.x = 7;
@@ -57,14 +61,20 @@ const main := proc() {
 	//print("b = { x = %f, y = %f }\n", b.x, b.y);
 	//print("c (a + b) = { x = %f, y = %f }\n", c.x, c.y);
 
-	var numbers: [2]int;
-	numbers[0] = 6;
-	numbers[1] = 9;
+	//var numbers: [2]int;
+	//numbers[0] = 6;
+	//numbers[1] = 9;
 	//var result:= execute(numbers[0], numbers[1], proc(var a: int, var b: int) -> int { return a * b; });
-	var result:= get_two() + execute(numbers[0], numbers[1], adder) + get_two();
-	print("%d op %d is %d\n", numbers[0], numbers[1], result);
+	//var result:= get_two() + execute(numbers[0], numbers[1], adder) + get_two();
+	//print("%d op %d is %d\n", numbers[0], numbers[1], result);
 
-	//var number: int = 6; print("number: %d\n", number);
-	//var result: int = fib(number);
-	//print("Fib of %d is %d\n", number, result);
+	var number: int = 2; 
+	print("number: %d\n", number);
+	var result: int = fib(number);
+	print("Fib of %d is %d\n", number, result);
+
+	//var a: int; var b: int; var c: int; var d: int;
+	//a = 1; b = 2; c = 3; d = 4;
+	//print("previous: %d\n", a);
+	//print_numbers(a, b, c, d);
 }
