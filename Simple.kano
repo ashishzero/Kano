@@ -5,7 +5,25 @@ const factorial := proc(var n: float) -> float {
 	return n * factorial(n - 1);
 }
 
+//const execute(var a: int, var b: int, var op: proc(int, int) -> int) -> int {
+//	return op(a, b);
+//}
+
+// 0, 1, 1, 2, 3, 5, 8
+// 0, 1, 2, 3, 4, 5, 6
+
+//const fib := proc(var a: int) -> int {
+//	if a <= 0 then return 0;
+//	if a == 1 then return 1;
+//	return fib(a - 1) + fib(a - 2);
+//}
+
+const num_one := proc() -> int { return 1; }
+const num_two := proc() -> int { return 2; }
+
 const main := proc() {
-	var n: float = 5;
-	print("Factorial of %f is %f\n", n, factorial(n));
+	//var n: int = 6;
+	//print("%d fib number is %d\n", n, fib(n));
+	var res:= num_one() + num_two();
+	print("res=%d\n", res);
 }

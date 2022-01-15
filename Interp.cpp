@@ -892,11 +892,29 @@ static BinaryOperatorProc BinaryOperators[] = {
 static Evaluation_Value interp_eval_expression(Interpreter *interp, Code_Node *root);
 static Evaluation_Value interp_eval_root_expression(Interpreter *interp, Code_Node_Expression *root);
 
-static Evaluation_Value evaluate_binary_operator(Interpreter *interp, Code_Node_Binary_Operator *node)
+static Evaluation_Value interp_store_temporarily(Interpreter *interp, Evaluation_Value in)
 {
-	auto a = interp_eval_expression(interp, node->left);
+	if (in.address)
+	{
+		if (interp->scratch_size < in.type->runtime_size)
+		{
+			interp->scratch_size = in.type->runtime_size * 2;
+			interp->stack = (uint8_t *)malloc(interp->scratch_size);
+		}
+		memcpy(interp->stack, in.address, in.type->runtime_size);
+		in.address = interp->stack;
+	}
+
+	return in;
+}
+
+static Evaluation_Value interp_eval_binary_operator(Interpreter *interp, Code_Node_Binary_Operator *node)
+{
 	auto b = interp_eval_expression(interp, node->right);
+	//b = interp_store_temporarily(interp, b);
 	
+	auto a = interp_eval_expression(interp, node->left);
+
 	Assert(node->op_kind < ArrayCount(BinaryOperators));
 	
 	return BinaryOperators[node->op_kind](a, b, node->type);
@@ -986,7 +1004,7 @@ static Evaluation_Value interp_eval_expression(Interpreter *interp, Code_Node *r
 	{
 		case CODE_NODE_LITERAL: return interp_eval_literal(interp, (Code_Node_Literal *)root);
 		case CODE_NODE_UNARY_OPERATOR: return interp_eval_unary_operator(interp, (Code_Node_Unary_Operator *)root);
-		case CODE_NODE_BINARY_OPERATOR: return evaluate_binary_operator(interp, (Code_Node_Binary_Operator *)root);
+		case CODE_NODE_BINARY_OPERATOR: return interp_eval_binary_operator(interp, (Code_Node_Binary_Operator *)root);
 		case CODE_NODE_ADDRESS: return interp_eval_address(interp, (Code_Node_Address *)root);
 		case CODE_NODE_ASSIGNMENT: return interp_eval_assignment(interp, (Code_Node_Assignment *)root);
 		case CODE_NODE_TYPE_CAST: return interp_eval_type_cast(interp, (Code_Node_Type_Cast *)root);
