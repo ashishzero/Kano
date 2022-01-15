@@ -1916,7 +1916,6 @@ static Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Symbol_
 	Code_Node_Statement *parent_statement = &statement_stub_head;
 	
 	auto stack_top = resolver->virtual_address[Symbol_Address::STACK];
-	block->symbols.stack_offset = stack_top;
 	
 	uint32_t             statement_count  = 0;
 	for (auto statement = root->statements; statement; statement = statement->next)

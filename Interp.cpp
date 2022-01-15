@@ -46,6 +46,13 @@ static inline uint64_t interp_push_into_stack(Interpreter *interp, Evaluation_Va
 	return offset;
 }
 
+static inline uint64_t interp_push_into_stack_reduced(Interpreter *interp, Evaluation_Value var, uint64_t offset)
+{
+	offset -= var.type->runtime_size;
+	memcpy(interp->stack + interp->stack_top + offset, EvaluationTypePointer(var, void *), var.type->runtime_size);
+	return offset;
+}
+
 //
 //
 //
@@ -840,12 +847,12 @@ static Evaluation_Value interp_eval_root_expression(Interpreter *interp, Code_No
 
 static Evaluation_Value interp_eval_binary_operator(Interpreter *interp, Code_Node_Binary_Operator *node)
 {
-	auto return_stack = interp->return_stack;
-	auto b = interp_eval_expression(interp, node->right);
-	interp->return_stack += b.type->runtime_size;
-
+	//auto return_stack = interp->return_stack;
 	auto a = interp_eval_expression(interp, node->left);
-	interp->return_stack = return_stack;
+	auto b = interp_eval_expression(interp, node->right);
+	//interp->return_stack += b.type->runtime_size;
+
+	//interp->return_stack = return_stack;
 
 	Assert(node->op_kind < ArrayCount(BinaryOperators));
 	
@@ -878,61 +885,78 @@ static Evaluation_Value interp_eval_assignment(Interpreter *interp, Code_Node_As
 
 static void interp_eval_block(Interpreter *interp, Code_Node_Block *root, bool isproc);
 
+static inline void interp_recursive_push_aligned_parameter(Interpreter *interp, Code_Node_Procedure_Call *root, uint64_t prev_top, uint64_t new_top, int64_t index, uint64_t offset)
+{
+	if (index < root->parameter_count)
+	{
+		auto param = root->parameters[index];
+		offset = AlignPower2Up(offset, (uint64_t)param->type->alignment);
+		interp_recursive_push_aligned_parameter(interp, root, prev_top, new_top, index + 1, offset + param->type->runtime_size);
+		
+		interp->stack_top = prev_top;
+		auto var = interp_eval_root_expression(interp, param);
+		interp->stack_top = new_top;
+		interp_push_into_stack(interp, var, offset);
+	}
+}
+
 static Evaluation_Value interp_eval_procedure_call(Interpreter *interp, Code_Node_Procedure_Call *root)
 {
 	auto prev_top = interp->stack_top;
 
-	auto new_top = root->stack_top + prev_top + interp->return_stack;
+	auto new_top = root->stack_top + prev_top;
 
 	// @Note: We do not align variadics to simplify the variadics routine
 
-	uint64_t offset = 0;
-
-	auto return_stack = interp->return_stack;
-
+	uint64_t variadics_args_size = 0;
 	for (int64_t i = 0; i < root->variadic_count; ++i)
+		variadics_args_size += root->variadics[i]->type->runtime_size;
+
 	{
-		auto param = root->variadics[i];
+		uint64_t offset = variadics_args_size;
+		for (int64_t i = root->variadic_count - 1; i >= 0; --i)
+		{
+			interp->stack_top = prev_top;
+			auto var = interp_eval_root_expression(interp, (Code_Node_Expression *)root->variadics[i]);
+			interp->stack_top = new_top;
+			offset = interp_push_into_stack_reduced(interp, var, offset);
+		}
+	}
+	
+	new_top += variadics_args_size;
 
-		interp->stack_top = prev_top;
-		auto var = interp_eval_root_expression(interp, param);
+	uint64_t return_and_parameters_size = 0;
+	{
+		if (root->type)
+		{
+			new_top = AlignPower2Up(new_top, (uint64_t)root->type->alignment);
+			return_and_parameters_size += root->type->runtime_size;
+		}
+		else if (root->parameter_count)
+		{
+			new_top = AlignPower2Up(new_top, (uint64_t)root->parameters[0]->type->alignment);
+		}
 
-		interp->stack_top = new_top;
-		offset = interp_push_into_stack(interp, var, offset);
-		interp->return_stack += param->type->runtime_size;
+		for (int64_t i = 0; i < root->parameter_count; ++i)
+		{
+			auto param = root->parameters[i];
+			return_and_parameters_size = AlignPower2Up(return_and_parameters_size, (uint64_t)param->type->alignment);
+			return_and_parameters_size += param->type->runtime_size;
+		}
 	}
 
-	interp->return_stack = return_stack;
-	
-	new_top += offset;
-
-	offset = 0;
-
+	uint64_t return_type_size = 0;
 	if (root->type)
 	{
-		new_top = AlignPower2Up(new_top, root->type->alignment);
-		offset += root->type->runtime_size;
+		new_top = AlignPower2Up(new_top, (uint64_t)root->type->alignment);
+		return_type_size = root->type->runtime_size;
 	}
 	else if (root->parameter_count)
 	{
-		new_top = AlignPower2Up(new_top, root->parameters[0]->type->alignment);
+		new_top = AlignPower2Up(new_top, (uint64_t)root->parameters[0]->type->alignment);
 	}
 
-	return_stack = interp->return_stack;
-	for (int64_t i = 0; i < root->parameter_count; ++i)
-	{
-		auto param = root->parameters[i];
-
-		interp->stack_top = prev_top;
-		auto var = interp_eval_root_expression(interp, param);
-
-		interp->stack_top = new_top;
-		offset = AlignPower2Up(offset, param->type->alignment);
-		offset = interp_push_into_stack(interp, var, offset);
-		interp->return_stack += param->type->runtime_size;
-	}
-
-	interp->return_stack = return_stack;
+	interp_recursive_push_aligned_parameter(interp, root, prev_top, new_top, 0, return_type_size);
 
 	interp->stack_top = prev_top;
 	auto proc_expr = interp_eval_root_expression(interp, root->procedure);

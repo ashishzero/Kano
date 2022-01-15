@@ -10,7 +10,11 @@ const factorial := proc(var n: float) -> float {
 const fib := proc(var a: int) -> int {
 	if a <= 0 then return 0;
 	if a == 1 then return 1;
-	return fib(a - 1) + fib(a - 2);
+	var b:= fib(a - 1);
+	var c:= fib(a - 2);
+	var d:= b + c;
+	print("a: %d, b: %d, c: %d, d: %d\n", a, b, c, d);
+	return d;
 }
 
 const adder := proc(var x: int, var y: int) -> int {
@@ -25,11 +29,40 @@ const execute := proc(var a: int, var b: int, var op: proc(int, int) -> int) -> 
 	return op(a, b);
 }
 
+const Vec2 := struct {
+	var x: float;
+	var y: float;
+}
+
+const vec2_add := proc(var a: Vec2, var b: Vec2) -> Vec2 {
+	var r: Vec2;
+	r.x = a.x + b.x;
+	r.y = a.y + b.y;
+	return r;
+}
+
 const main := proc() {
+	//var a: Vec2;
+	//a.x = 7;
+	//a.y = 8;
+
+	//var b: Vec2;
+	//b.x = 8;
+	//b.y = 7;
+
+	//var c:= vec2_add(a, b);
+	//print("a = { x = %f, y = %f }\n", a.x, a.y);
+	//print("b = { x = %f, y = %f }\n", b.x, b.y);
+	//print("c (a + b) = { x = %f, y = %f }\n", c.x, c.y);
+
 	var numbers: [2]int;
 	numbers[0] = 6;
 	numbers[1] = 9;
 	var result:= execute(numbers[0], numbers[1], proc(var a: int, var b: int) -> int { return a * b; });
+	//var result:= execute(numbers[0], numbers[1], adder);
 	print("%d op %d is %d\n", numbers[0], numbers[1], result);
-	//print("Fib of %d is %d\n", numbers[0], fib(numbers[0]));
+
+	//var number: int = 6; print("number: %d\n", number);
+	//var result: int = fib(number);
+	//print("Fib of %d is %d\n", number, result);
 }

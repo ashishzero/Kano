@@ -83,7 +83,7 @@ struct Code_Type_Procedure : public Code_Type
 	{
 		kind         = CODE_TYPE_PROCEDURE;
 		runtime_size = sizeof(Code_Value_Procedure);
-		alignment    = sizeof(void *);
+		alignment    = sizeof(Code_Value_Procedure);
 	}
 
 	String name = "anonymous";
@@ -206,7 +206,6 @@ struct Symbol_Table
 {
 	Symbol_Lookup   lookup;
 	Array<Symbol *> buffer;
-	uint64_t        stack_offset = 0;
 	Symbol_Table *  parent = nullptr;
 };
 

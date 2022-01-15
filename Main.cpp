@@ -167,25 +167,9 @@ void print_value(Code_Type *type, void *data)
 	}
 }
 
-static int breakpoint = 4;
-
 void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 {
-	int line_number = -1;
-	if (intercept == INTERCEPT_STATEMENT)
-	{
-		line_number = (int)((Code_Node_Statement *)node)->source_row;
-	}
-	else
-	{
-		line_number = (int)((Code_Node_Procedure_Call *)node)->source_row;
-	}
-
-	if (line_number == breakpoint)
-	{
-		printf("Breakpoint:\n");
-		//TriggerBreakpoint();
-	}
+	return;
 
 	if (intercept == INTERCEPT_PROCEDURE_CALL)
 	{
@@ -217,7 +201,18 @@ void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 				if (symbol->address.kind == Symbol_Address::CCALL)
 					continue;
 
-				void *data = interp->stack + interp->stack_top - symbols->stack_offset + symbol->address.offset;
+				void *data = nullptr;
+
+				if (symbol->address.kind == Symbol_Address::STACK)
+					data = interp->stack + interp->stack_top + symbol->address.offset;
+				else if (symbol->address.kind == Symbol_Address::GLOBAL)
+					data = interp->global + symbol->address.offset;
+				else if (symbol->address.kind == Symbol_Address::CODE)
+					data = symbol->address.code;
+				else if (symbol->address.kind == Symbol_Address::CCALL)
+					data = symbol->address.ccall;
+				else
+					Unreachable();
 
 				printf("%-15s ", symbol->name.data);
 				//print_type(symbol->type);
