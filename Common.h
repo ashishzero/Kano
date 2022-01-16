@@ -303,10 +303,7 @@ template <typename T> struct Array_View
 	}
 };
 
-inline void *operator new(size_t size, void *ptr)
-{
-	return ptr;
-}
+#include <new>
 
 template <typename T> struct Array
 {
