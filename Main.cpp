@@ -172,20 +172,63 @@ void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 	if (intercept == INTERCEPT_PROCEDURE_CALL)
 	{
 		auto proc = (Code_Node_Procedure_Call *)node;
-		printf("Procedure Call: %s: %zu\n", proc->procedure_type->name.data, proc->source_row);
+		printf("{\n\"intercept\": \"procedure_call\",\n\"line_number\" : ");
+		printf("\"");
+		printf("%zu",proc->source_row);
+		printf("\",\n");
+		printf("\"procedure_name\" : \"%s\",\n", proc->procedure_type->name.data);
+
+		printf("\"procedure_type\" : {\n");	
+		printf("\t\t\"arguments\" : [ ");
+		for (int64_t i = 0; i < proc->procedure_type->argument_count; ++i) {
+			if (i != 0)
+				printf(",");
+			printf("\"");
+			print_type(proc->procedure_type->arguments[i]);
+			printf("\"");
+		}
+		printf(" ], \n\t\t\"return\": ");
+		if (proc->procedure_type->return_type == NULL)
+			printf("\"void\" \n\t\t   },\n");
+		else {
+			printf("\"");
+			print_type(proc->procedure_type->return_type);
+			printf("\" \n\t\t   },\n");
+		}
+		printf("},\n\n");
 	}
 	else if (intercept == INTERCEPT_PROCEDURE_RETURN)
 	{
 		auto proc = (Code_Node_Procedure_Call *)node;
-		printf("Procedure Return: %s: %zu\n", proc->procedure_type->name.data, proc->source_row);
+		printf("{\n\"intercept\": \"return\",\n\"line_number\" : ");
+		printf("\"");
+		printf("%zu", proc->source_row);
+		printf("\",\n");
+		printf("\"procedure_name\" : \"%s\",\n", proc->procedure_type->name.data);
+
+		printf("\"return_type\" : ");
+		//printf("\"Procedure Return\" : [ \"%s\" , %zu", proc->procedure_type->name.data, proc->source_row);
+		if (proc->procedure_type->return_type == NULL)
+			printf("\"void\", ");
+		else {
+			printf("\"");
+			print_type(proc->procedure_type);
+			printf("\",");
+		}
+		printf("\n},\n");
 	}
 	else if (intercept == INTERCEPT_STATEMENT)
 	{
 		auto statement = (Code_Node_Statement *)node;
-		printf("Executing statement: %zu inside: %s\n", statement->source_row, interp->current_procedure->name.data);
+		printf("{\n\"intercept\": \"statement\",\n\"line_number\" : ");
+		printf("\"");
+		printf("%zu", statement->source_row);
+		printf("\",\n");
+		printf("\"procedure_name\" : \"%s\",\n", interp->current_procedure->name.data); 
+		//printf("\"Executing statement\" : %zu \n \"inside-function\" : \"%s\"\n", statement->source_row, interp->current_procedure->name.data);
 
-		printf("%-15s %s\n", "Name", "Value");
-
+		//printf("%-15s %s\n", "Name", "Value");
+		printf("\"variables\" : [\n");
 		for (auto symbols = statement->symbol_table; symbols; symbols = symbols->parent)
 		{
 			for (auto symbol : symbols->buffer)
@@ -212,13 +255,16 @@ void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 				else
 					Unreachable();
 
-				printf("%-15s ", symbol->name.data);
-				//print_type(symbol->type);
+				printf("\t\t{ \"name : \"%s\", ", symbol->name.data);
+				printf("\"type\" : \"");
+				print_type(symbol->type);
+				printf("\", \"value\" : \"");
 				print_value(symbol->type, data);
-				printf("\n");
+				printf("\"},\n");
 			}
 		}
-		printf("\n\n");
+		printf("\t      ]\n");
+		printf("},\n\n");
 	}
 }
 
