@@ -39,94 +39,94 @@ bool print_error(Error_List *list)
 	return list->first.next != nullptr;
 }
 
-void print_type(Code_Type *type)
+void print_type(FILE *out, Code_Type *type)
 {
 	switch (type->kind)
 	{
-		case CODE_TYPE_NULL: printf("void"); return;
-		case CODE_TYPE_INTEGER: printf("int"); return;
-		case CODE_TYPE_REAL: printf("float"); return;
-		case CODE_TYPE_BOOL: printf("bool"); return;
+		case CODE_TYPE_NULL: fprintf(out, "void"); return;
+		case CODE_TYPE_INTEGER: fprintf(out, "int"); return;
+		case CODE_TYPE_REAL: fprintf(out, "float"); return;
+		case CODE_TYPE_BOOL: fprintf(out, "bool"); return;
 
 		case CODE_TYPE_POINTER: {
-			printf("*"); 
-			print_type(((Code_Type_Pointer *)type)->base_type);
+			fprintf(out, "*"); 
+			print_type(out, ((Code_Type_Pointer *)type)->base_type);
 			return;
 		}
 
 		case CODE_TYPE_PROCEDURE: {
 			auto proc = (Code_Type_Procedure *)type;
-			printf("proc (");
+			fprintf(out, "proc (");
 			for (int64_t index = 0; index < proc->argument_count; ++index)
 			{
-				print_type(proc->arguments[index]);
-				if (index < proc->argument_count - 1) printf(", ");
+				print_type(out, proc->arguments[index]);
+				if (index < proc->argument_count - 1) fprintf(out, ", ");
 			}
-			printf(")");
+			fprintf(out, ")");
 
 			if (proc->return_type)
 			{
-				printf(" -> ");
-				print_type(proc->return_type);
+				fprintf(out, " -> ");
+				print_type(out, proc->return_type);
 			}
 			return;
 		}
 
 		case CODE_TYPE_STRUCT: {
 			auto strt = (Code_Type_Struct *)type;
-			printf("%s", strt->name.data); 
+			fprintf(out, "%s", strt->name.data); 
 			return;
 		}
 
 		case CODE_TYPE_ARRAY_VIEW: {
 			auto arr = (Code_Type_Array_View *)type;
-			printf("[] ");
-			print_type(arr->element_type);
+			fprintf(out, "[] ");
+			print_type(out, arr->element_type);
 			return;
 		}
 
 		case CODE_TYPE_STATIC_ARRAY: {
 			auto arr = (Code_Type_Static_Array *)type;
-			printf("[%u] ", arr->element_count);
-			print_type(arr->element_type);
+			fprintf(out, "[%u] ", arr->element_count);
+			print_type(out, arr->element_type);
 			return;
 		}
 	}
 }
 
-void print_value(Code_Type *type, void *data)
+void print_value(FILE *out, Code_Type *type, void *data)
 {
 	switch (type->kind)
 	{
-		case CODE_TYPE_NULL: printf("null"); return;
-		case CODE_TYPE_INTEGER: printf("%zd", *(Kano_Int *)data); return;
-		case CODE_TYPE_REAL: printf("%f", *(Kano_Real *)data); return;
-		case CODE_TYPE_BOOL: printf("%s", (*(Kano_Bool *)data) ? "true" : "false"); return;
+		case CODE_TYPE_NULL: fprintf(out, "null"); return;
+		case CODE_TYPE_INTEGER: fprintf(out, "%zd", *(Kano_Int *)data); return;
+		case CODE_TYPE_REAL: fprintf(out, "%f", *(Kano_Real *)data); return;
+		case CODE_TYPE_BOOL: fprintf(out, "%s", (*(Kano_Bool *)data) ? "true" : "false"); return;
 
 		case CODE_TYPE_POINTER: {
 			auto pointer = (Code_Type_Pointer *)type;
-			printf("%p { ", data);
-			print_value(pointer->base_type, *(uint8_t **)data);
-			printf(" }");
+			fprintf(out, "%p { ", data);
+			print_value(out, pointer->base_type, *(uint8_t **)data);
+			fprintf(out, " }");
 			return;
 		}
 
-		case CODE_TYPE_PROCEDURE: printf("%p", data); return;
+		case CODE_TYPE_PROCEDURE: fprintf(out, "%p", data); return;
 
 		case CODE_TYPE_STRUCT: {
 			auto _struct = (Code_Type_Struct *)type;
-			printf("{ ");
+			fprintf(out, "{ ");
 			
 			for (int64_t index = 0; index < _struct->member_count; ++index)
 			{
 				auto member = &_struct->members[index];
-				printf("%s: ", member->name.data);
-				print_value(member->type, (uint8_t *)data + member->offset);
+				fprintf(out, "%s: ", member->name.data);
+				print_value(out, member->type, (uint8_t *)data + member->offset);
 				if (index < _struct->member_count - 1)
-					printf(", ");
+					fprintf(out, ", ");
 			}
 
-			printf(" }");
+			fprintf(out, " }");
 			return;
 		}
 
@@ -136,14 +136,14 @@ void print_value(Code_Type *type, void *data)
 			auto arr_count = *(Kano_Int *)data;
 			auto arr_data = (uint8_t *)data + sizeof(Kano_Int);
 			
-			printf("[ ");
+			fprintf(out, "[ ");
 			for (int64_t index = 0; index < arr_count; ++index)
 			{
-				print_value(arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
+				print_value(out, arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
 				if (index < arr_count - 1)
-					printf(", ");
+					fprintf(out, ", ");
 			}
-			printf(" ]");
+			fprintf(out, " ]");
 
 			return;
 		}
@@ -153,14 +153,14 @@ void print_value(Code_Type *type, void *data)
 
 			auto arr_data = (uint8_t *)data;
 
-			printf("[ ");
+			fprintf(out, "[ ");
 			for (int64_t index = 0; index < arr_type->element_count; ++index)
 			{
-				print_value(arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
+				print_value(out, arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
 				if (index < arr_type->element_count - 1)
-					printf(", ");
+					fprintf(out, ", ");
 			}
-			printf(" ]");
+			fprintf(out, " ]");
 
 			return;
 		}
@@ -169,66 +169,68 @@ void print_value(Code_Type *type, void *data)
 
 void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 {
+	auto out = (FILE *)interp->user_context;
+
 	if (intercept == INTERCEPT_PROCEDURE_CALL)
 	{
 		auto proc = (Code_Node_Procedure_Call *)node;
-		printf("{\n\"intercept\": \"procedure_call\",\n\"line_number\" : ");
-		printf("\"");
-		printf("%zu",proc->source_row);
-		printf("\",\n");
-		printf("\"procedure_name\" : \"%s\",\n", proc->procedure_type->name.data);
+		fprintf(out, "{\n\"intercept\": \"procedure_call\",\n\"line_number\" : ");
+		fprintf(out, "\"");
+		fprintf(out, "%zu",proc->source_row);
+		fprintf(out, "\",\n");
+		fprintf(out, "\"procedure_name\" : \"%s\",\n", proc->procedure_type->name.data);
 
-		printf("\"procedure_type\" : {\n");	
-		printf("\t\t\"arguments\" : [ ");
+		fprintf(out, "\"procedure_type\" : {\n");	
+		fprintf(out, "\t\t\"arguments\" : [ ");
 		for (int64_t i = 0; i < proc->procedure_type->argument_count; ++i) {
 			if (i != 0)
-				printf(",");
-			printf("\"");
-			print_type(proc->procedure_type->arguments[i]);
-			printf("\"");
+				fprintf(out, ",");
+			fprintf(out, "\"");
+			print_type(out, proc->procedure_type->arguments[i]);
+			fprintf(out, "\"");
 		}
-		printf(" ], \n\t\t\"return\": ");
+		fprintf(out, " ], \n\t\t\"return\": ");
 		if (proc->procedure_type->return_type == NULL)
-			printf("\"void\" \n\t\t   },\n");
+			fprintf(out, "\"void\" \n\t\t   },\n");
 		else {
-			printf("\"");
-			print_type(proc->procedure_type->return_type);
-			printf("\" \n\t\t   },\n");
+			fprintf(out, "\"");
+			print_type(out, proc->procedure_type->return_type);
+			fprintf(out, "\" \n\t\t   },\n");
 		}
-		printf("},\n\n");
+		fprintf(out, "},\n\n");
 	}
 	else if (intercept == INTERCEPT_PROCEDURE_RETURN)
 	{
 		auto proc = (Code_Node_Procedure_Call *)node;
-		printf("{\n\"intercept\": \"return\",\n\"line_number\" : ");
-		printf("\"");
-		printf("%zu", proc->source_row);
-		printf("\",\n");
-		printf("\"procedure_name\" : \"%s\",\n", proc->procedure_type->name.data);
+		fprintf(out, "{\n\"intercept\": \"return\",\n\"line_number\" : ");
+		fprintf(out, "\"");
+		fprintf(out, "%zu", proc->source_row);
+		fprintf(out, "\",\n");
+		fprintf(out, "\"procedure_name\" : \"%s\",\n", proc->procedure_type->name.data);
 
-		printf("\"return_type\" : ");
-		//printf("\"Procedure Return\" : [ \"%s\" , %zu", proc->procedure_type->name.data, proc->source_row);
+		fprintf(out, "\"return_type\" : ");
+		//fprintf(out, ("\"Procedure Return\" : [ \"%s\" , %zu", proc->procedure_type->name.data, proc->source_row);
 		if (proc->procedure_type->return_type == NULL)
-			printf("\"void\", ");
+			fprintf(out, "\"void\", ");
 		else {
-			printf("\"");
-			print_type(proc->procedure_type);
-			printf("\",");
+			fprintf(out, "\"");
+			print_type(out, proc->procedure_type);
+			fprintf(out, "\",");
 		}
-		printf("\n},\n");
+		fprintf(out, "\n},\n");
 	}
 	else if (intercept == INTERCEPT_STATEMENT)
 	{
 		auto statement = (Code_Node_Statement *)node;
-		printf("{\n\"intercept\": \"statement\",\n\"line_number\" : ");
-		printf("\"");
-		printf("%zu", statement->source_row);
-		printf("\",\n");
-		printf("\"procedure_name\" : \"%s\",\n", interp->current_procedure->name.data); 
-		//printf("\"Executing statement\" : %zu \n \"inside-function\" : \"%s\"\n", statement->source_row, interp->current_procedure->name.data);
+		fprintf(out, "{\n\"intercept\": \"statement\",\n\"line_number\" : ");
+		fprintf(out, "\"");
+		fprintf(out, "%zu", statement->source_row);
+		fprintf(out, "\",\n");
+		fprintf(out, "\"procedure_name\" : \"%s\",\n", interp->current_procedure->name.data); 
+		//fprintf(out, ("\"Executing statement\" : %zu \n \"inside-function\" : \"%s\"\n", statement->source_row, interp->current_procedure->name.data);
 
-		//printf("%-15s %s\n", "Name", "Value");
-		printf("\"variables\" : [\n");
+		//fprintf(out, ("%-15s %s\n", "Name", "Value");
+		fprintf(out, "\"variables\" : [\n");
 		for (auto symbols = statement->symbol_table; symbols; symbols = symbols->parent)
 		{
 			for (auto symbol : symbols->buffer)
@@ -255,16 +257,16 @@ void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 				else
 					Unreachable();
 
-				printf("\t\t{ \"name : \"%s\", ", symbol->name.data);
-				printf("\"type\" : \"");
-				print_type(symbol->type);
-				printf("\", \"value\" : \"");
-				print_value(symbol->type, data);
-				printf("\"},\n");
+				fprintf(out, "\t\t{ \"name : \"%s\", ", symbol->name.data);
+				fprintf(out, "\"type\" : \"");
+				print_type(out, symbol->type);
+				fprintf(out, "\", \"value\" : \"");
+				print_value(out, symbol->type, data);
+				fprintf(out, "\"},\n");
 			}
 		}
-		printf("\t      ]\n");
-		printf("},\n\n");
+		fprintf(out, "\t      ]\n");
+		fprintf(out, "},\n\n");
 	}
 }
 
@@ -396,12 +398,19 @@ int main()
 
 	auto exprs = code_type_resolve(resolver, node);
 
+	FILE *out = fopen("DebugInfo.json", "wb");
+	fprintf(out, "[\n");
+
 	Interpreter interp;
 	interp.intercept = intercept;
+	interp.user_context = out;
 	interp_init(&interp, 1024 * 1024 * 4, code_type_resolver_bss_allocated(resolver));
 
 	interp_eval_globals(&interp, exprs);
 	int result = interp_eval_main(&interp, resolver);
+
+	fprintf(out, "]\n");
+	fclose(out);
 
 	return result;
 }
