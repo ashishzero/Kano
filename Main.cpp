@@ -10,9 +10,17 @@
 
 using String_Stream = std::stringstream;
 
+struct Call_Stack {
+	String procedure_name;
+	uint64_t stack_top;
+	Symbol_Table *symbols;
+};
+
 struct Interp_User_Context {
 	String_Stream console_out;
 	FILE *debug_json;
+
+	Array<Call_Stack> call_stack;
 };
 
 //
@@ -190,6 +198,49 @@ static void string_replace_all(std::string &s, const String search, const String
 	}
 }
 
+static void print_symbols(Interpreter *interp, FILE *out, Symbol_Table *symbols)
+{
+	for (auto symbol : symbols->buffer)
+	{
+		if ((symbol->flags & SYMBOL_BIT_TYPE))
+			continue;
+		
+		if (symbol->type->kind == CODE_TYPE_PROCEDURE && (symbol->flags & SYMBOL_BIT_CONSTANT))
+			continue;
+		
+		if (symbol->address.kind == Symbol_Address::CCALL)
+			continue;
+		
+		void *data = nullptr;
+		
+		if (symbol->address.kind == Symbol_Address::STACK)
+			data = interp->stack + interp->stack_top + symbol->address.offset;
+		else if (symbol->address.kind == Symbol_Address::GLOBAL)
+			data = interp->global + symbol->address.offset;
+		else if (symbol->address.kind == Symbol_Address::CODE)
+			data = symbol->address.code;
+		else if (symbol->address.kind == Symbol_Address::CCALL)
+			data = symbol->address.ccall;
+		else
+			Unreachable();
+		
+		fprintf(out, "\t\t{ \"name\" : \"%s\", ", symbol->name.data);
+		fprintf(out, "\"type\" : \"");
+		print_type(out, symbol->type);
+		fprintf(out, "\", \"value\" : \"");
+		print_value(out, symbol->type, data);
+		fprintf(out, "\"},\n");
+	}
+}
+
+static void print_all_symbols_until_parent_is_reached(Interpreter *interp, FILE *out, Symbol_Table *symbol_table)
+{
+	for (auto symbols = symbol_table; symbols != interp->global_symbol_table; symbols = symbols->parent)
+	{
+		print_symbols(interp, out, symbols);
+	}
+}
+
 void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 {
 	auto context = (Interp_User_Context *)interp->user_context;
@@ -198,50 +249,64 @@ void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 
 	if (intercept == INTERCEPT_PROCEDURE_CALL)
 	{
-		auto proc = (Code_Node_Procedure_Call *)node;
+		auto proc = (Code_Node_Block *)node;
+		auto procedure_type = interp->current_procedure;
+
 		fprintf(out, "{\n\"intercept\": \"procedure_call\",\n\"line_number\" : ");
 		fprintf(out, "\"");
-		fprintf(out, "%zu",proc->source_row);
+		fprintf(out, "%zu", proc->procedure_source_row);
 		fprintf(out, "\",\n");
-		fprintf(out, "\"procedure_name\" : \"%s\",\n", proc->procedure_type->name.data);
+		fprintf(out, "\"procedure_name\" : \"%s\",\n", procedure_type->name.data);
 
 		fprintf(out, "\"procedure_type\" : {\n");	
 		fprintf(out, "\t\t\"arguments\" : [ ");
-		for (int64_t i = 0; i < proc->procedure_type->argument_count; ++i) {
+		for (int64_t i = 0; i < procedure_type->argument_count; ++i) {
 			if (i != 0)
 				fprintf(out, ",");
 			fprintf(out, "\"");
-			print_type(out, proc->procedure_type->arguments[i]);
+			print_type(out, procedure_type->arguments[i]);
 			fprintf(out, "\"");
 		}
 		fprintf(out, " ], \n\t\t\"return\": ");
-		if (proc->procedure_type->return_type == NULL)
+		if (procedure_type->return_type == NULL)
 			fprintf(out, "\"void\" \n\t\t   },\n");
 		else {
 			fprintf(out, "\"");
-			print_type(out, proc->procedure_type->return_type);
+			print_type(out, procedure_type->return_type);
 			fprintf(out, "\" \n\t\t   },\n");
 		}
+
 		fprintf(out, "},\n\n");
 	}
 	else if (intercept == INTERCEPT_PROCEDURE_RETURN)
 	{
-		auto proc = (Code_Node_Procedure_Call *)node;
+		auto proc = (Code_Node_Block *)node;
+		auto procedure_type = interp->current_procedure;
+
 		fprintf(out, "{\n\"intercept\": \"return\",\n\"line_number\" : ");
 		fprintf(out, "\"");
-		fprintf(out, "%zu", proc->source_row);
+		fprintf(out, "%zu", proc->procedure_source_row);
 		fprintf(out, "\",\n");
-		fprintf(out, "\"procedure_name\" : \"%s\",\n", proc->procedure_type->name.data);
+		fprintf(out, "\"procedure_name\" : \"%s\",\n", procedure_type->name.data);
 
-		fprintf(out, "\"return_type\" : ");
-		//fprintf(out, ("\"Procedure Return\" : [ \"%s\" , %zu", proc->procedure_type->name.data, proc->source_row);
-		if (proc->procedure_type->return_type == NULL)
-			fprintf(out, "\"void\", ");
+		fprintf(out, "\"procedure_type\" : {\n");	
+		fprintf(out, "\t\t\"arguments\" : [ ");
+		for (int64_t i = 0; i < procedure_type->argument_count; ++i) {
+			if (i != 0)
+				fprintf(out, ",");
+			fprintf(out, "\"");
+			print_type(out, procedure_type->arguments[i]);
+			fprintf(out, "\"");
+		}
+		fprintf(out, " ], \n\t\t\"return\": ");
+		if (procedure_type->return_type == NULL)
+			fprintf(out, "\"void\" \n\t\t   },\n");
 		else {
 			fprintf(out, "\"");
-			print_type(out, proc->procedure_type);
-			fprintf(out, "\",");
+			print_type(out, procedure_type->return_type);
+			fprintf(out, "\" \n\t\t   },\n");
 		}
+		
 		fprintf(out, "\n},\n");
 	}
 	else if (intercept == INTERCEPT_STATEMENT)
@@ -252,44 +317,13 @@ void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 		fprintf(out, "%zu", statement->source_row);
 		fprintf(out, "\",\n");
 		fprintf(out, "\"procedure_name\" : \"%s\",\n", interp->current_procedure->name.data); 
-		//fprintf(out, ("\"Executing statement\" : %zu \n \"inside-function\" : \"%s\"\n", statement->source_row, interp->current_procedure->name.data);
 
-		//fprintf(out, ("%-15s %s\n", "Name", "Value");
+		fprintf(out, "\"globals\" : [\n");
+		print_symbols(interp, out, interp->global_symbol_table);
+		fprintf(out, "\t      ], \n");
+
 		fprintf(out, "\"variables\" : [\n");
-		for (auto symbols = statement->symbol_table; symbols; symbols = symbols->parent)
-		{
-			for (auto symbol : symbols->buffer)
-			{
-				if ((symbol->flags & SYMBOL_BIT_TYPE))
-					continue;
-
-				if (symbol->type->kind == CODE_TYPE_PROCEDURE && (symbol->flags & SYMBOL_BIT_CONSTANT))
-					continue;
-
-				if (symbol->address.kind == Symbol_Address::CCALL)
-					continue;
-
-				void *data = nullptr;
-
-				if (symbol->address.kind == Symbol_Address::STACK)
-					data = interp->stack + interp->stack_top + symbol->address.offset;
-				else if (symbol->address.kind == Symbol_Address::GLOBAL)
-					data = interp->global + symbol->address.offset;
-				else if (symbol->address.kind == Symbol_Address::CODE)
-					data = symbol->address.code;
-				else if (symbol->address.kind == Symbol_Address::CCALL)
-					data = symbol->address.ccall;
-				else
-					Unreachable();
-
-				fprintf(out, "\t\t{ \"name\" : \"%s\", ", symbol->name.data);
-				fprintf(out, "\"type\" : \"");
-				print_type(out, symbol->type);
-				fprintf(out, "\", \"value\" : \"");
-				print_value(out, symbol->type, data);
-				fprintf(out, "\"},\n");
-			}
-		}
+		print_all_symbols_until_parent_is_reached(interp, out, statement->symbol_table);
 		fprintf(out, "\t      ], \n");
 
 		{
@@ -506,6 +540,7 @@ int main()
 	Interpreter interp;
 	interp.intercept = intercept;
 	interp.user_context = &context;
+	interp.global_symbol_table = code_type_resolver_global_symbol_table(resolver);
 	interp_init(&interp, 1024 * 1024 * 4, code_type_resolver_bss_allocated(resolver));
 
 	interp_eval_globals(&interp, exprs);

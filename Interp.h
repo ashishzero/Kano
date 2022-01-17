@@ -21,6 +21,7 @@ struct Interpreter
 	int64_t  return_count = 0;
 	struct Code_Type_Procedure *current_procedure = nullptr;
 	Intercep_Proc intercept = intercept_default;
+	Symbol_Table *global_symbol_table = nullptr;
 
 	void *user_context = nullptr;
 };

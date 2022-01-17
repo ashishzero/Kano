@@ -15,6 +15,8 @@ Code_Type *code_type_resolver_find_type(Code_Type_Resolver *resolver, String nam
 
 bool code_type_resolver_register_ccall(Code_Type_Resolver *resolver, String name, CCall proc, Code_Type_Procedure *type);
 
+Symbol_Table *code_type_resolver_global_symbol_table(Code_Type_Resolver *resolver);
+
 //
 //
 //

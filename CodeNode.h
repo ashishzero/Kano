@@ -457,7 +457,6 @@ struct Code_Node_Procedure_Call : public Code_Node
 	Code_Node_Expression **variadics       = nullptr;
 
 	Code_Type_Procedure *procedure_type = nullptr;
-	uint64_t source_row = -1;
 
 	uint64_t               stack_top       = 0;
 };
@@ -536,4 +535,6 @@ struct Code_Node_Block : public Code_Node
 	int64_t             statement_count = 0;
 
 	Symbol_Table         symbols;
+
+	int64_t procedure_source_row = -1;
 };

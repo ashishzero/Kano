@@ -405,7 +405,7 @@ static Code_Node_Assignment *    code_resolve_assignment(Code_Type_Resolver *res
 static Code_Type *               code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Type *root, int depth = 0);
 static Code_Node_Assignment *    code_resolve_declaration(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Declaration *root, Code_Type **out_type = nullptr);
 static Code_Node_Statement *     code_resolve_statement(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Statement *root);
-static Code_Node_Block *         code_resolve_block(Code_Type_Resolver *resolver, Symbol_Table *parent_symbols, Syntax_Node_Block *root);
+static Code_Node_Block *         code_resolve_block(Code_Type_Resolver *resolver, Symbol_Table *parent_symbols, int64_t procedure_source_row, Syntax_Node_Block *root);
 
 //
 //
@@ -541,7 +541,6 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 		{
 			auto node             = new Code_Node_Procedure_Call;
 			node->procedure_type  = proc;
-			node->source_row      = root->procedure->location.start_row;
 			node->procedure       = procedure;
 			node->type            = proc->return_type;
 			
@@ -583,7 +582,6 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 		{
 			auto node             = new Code_Node_Procedure_Call;
 			node->procedure_type  = proc;
-			node->source_row      = root->procedure->location.start_row;
 			node->procedure       = procedure;
 			node->type            = proc->return_type;
 			
@@ -803,7 +801,7 @@ static Code_Node_Block *code_resolve_procedure(Code_Type_Resolver *resolver, Syn
 	}
 
 	resolver->return_stack.add(proc_type->return_type);
-	auto procedure_body = code_resolve_block(resolver, proc_symbols, proc->body);
+	auto procedure_body = code_resolve_block(resolver, proc_symbols, (int64_t)proc->location.start_row, proc->body);
 	resolver->return_stack.count -= 1;
 
 	resolver->virtual_address[Symbol_Address::STACK] = stack_top;
@@ -1446,7 +1444,7 @@ static Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolv
 				symbol->type = proc_type;
 			
 			resolver->return_stack.add(proc_type->return_type);
-			procedure_body = code_resolve_block(resolver, proc_symbols, proc->body);
+			procedure_body = code_resolve_block(resolver, proc_symbols, (int64_t)proc->location.start_row, proc->body);
 			resolver->return_stack.count -= 1;
 			
 			resolver->virtual_address[Symbol_Address::STACK] = stack_top;
@@ -1890,7 +1888,7 @@ static Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver,
 		break;
 		
 		case SYNTAX_NODE_BLOCK: {
-			auto                 block     = code_resolve_block(resolver, symbols, (Syntax_Node_Block *)node);
+			auto                 block     = code_resolve_block(resolver, symbols, -1, (Syntax_Node_Block *)node);
 			Code_Node_Statement *statement = new Code_Node_Statement;
 			statement->source_row          = node->location.start_row;
 			statement->node                = block;
@@ -1905,12 +1903,13 @@ static Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver,
 	return nullptr;
 }
 
-static Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Symbol_Table *parent_symbols, Syntax_Node_Block *root)
+static Code_Node_Block *code_resolve_block(Code_Type_Resolver *resolver, Symbol_Table *parent_symbols, int64_t procedure_source_row, Syntax_Node_Block *root)
 {
 	Code_Node_Block *block = new Code_Node_Block;
 	
 	block->type            = nullptr;
 	block->symbols.parent  = parent_symbols;
+	block->procedure_source_row = procedure_source_row;
 	
 	Code_Node_Statement  statement_stub_head;
 	Code_Node_Statement *parent_statement = &statement_stub_head;
@@ -2229,6 +2228,11 @@ bool code_type_resolver_register_ccall(Code_Type_Resolver *resolver, String name
 		return true;
 	}
 	return false;
+}
+
+Symbol_Table *code_type_resolver_global_symbol_table(Code_Type_Resolver *resolver)
+{
+	return &resolver->symbols;
 }
 
 //

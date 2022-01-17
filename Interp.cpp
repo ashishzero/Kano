@@ -953,7 +953,6 @@ static Evaluation_Value interp_eval_procedure_call(Interpreter *interp, Code_Nod
 	auto prev_proc = interp->current_procedure;
 	interp->stack_top = new_top;
 	interp->current_procedure = root->procedure_type;
-	interp->intercept(interp, INTERCEPT_PROCEDURE_CALL, root);
 
 	if (procedure.block)
 		interp_eval_block(interp, procedure.block, true);
@@ -972,7 +971,6 @@ static Evaluation_Value interp_eval_procedure_call(Interpreter *interp, Code_Nod
 		result.type    = nullptr;
 	}
 
-	interp->intercept(interp, INTERCEPT_PROCEDURE_RETURN, root);
 	interp->current_procedure = prev_proc;
 	interp->stack_top = prev_top;
 	
@@ -1087,7 +1085,7 @@ static bool interp_eval_statement(Interpreter *interp, Code_Node_Statement *root
 			*dst = interp_eval_assignment(interp, (Code_Node_Assignment *)root->node);
 			return true;
 		
-		case CODE_NODE_BLOCK:			
+		case CODE_NODE_BLOCK:
 			interp_eval_block(interp, (Code_Node_Block *)root->node, false);
 			return false;
 		
@@ -1117,6 +1115,11 @@ static bool interp_eval_statement(Interpreter *interp, Code_Node_Statement *root
 
 static void interp_eval_block(Interpreter *interp, Code_Node_Block *root, bool isproc)
 {
+	if (isproc)
+	{
+		interp->intercept(interp, INTERCEPT_PROCEDURE_CALL, root);
+	}
+
 	auto return_index = interp->return_count;
 	for (auto statement = root->statement_head; statement; statement = statement->next)
 	{
@@ -1127,6 +1130,11 @@ static void interp_eval_block(Interpreter *interp, Code_Node_Block *root, bool i
 				interp->return_count -= 1;
 			break;
 		}
+	}
+
+	if (isproc)
+	{
+		interp->intercept(interp, INTERCEPT_PROCEDURE_RETURN, root);
 	}
 }
 
@@ -1192,7 +1200,7 @@ int interp_eval_main(Interpreter *interp, Code_Type_Resolver *resolver)
 	auto proc_call = new Code_Node_Procedure_Call;
 	proc_call->type = proc->return_type;
 	proc_call->procedure_type = proc_type;
-	proc_call->source_row = main_proc->location.start_row;
+	//proc_call->source_row = main_proc->location.start_row;
 	proc_call->flags = main_proc->flags;
 	proc_call->procedure = expr;
 
