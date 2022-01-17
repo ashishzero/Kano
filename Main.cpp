@@ -10,7 +10,7 @@
 
 using String_Stream = std::stringstream;
 
-struct Call_Stack {
+struct Call_Info {
 	String procedure_name;
 	uint64_t stack_top;
 	Symbol_Table *symbols;
@@ -20,7 +20,7 @@ struct Interp_User_Context {
 	String_Stream console_out;
 	FILE *debug_json;
 
-	Array<Call_Stack> call_stack;
+	Array<Call_Info> callstack;
 };
 
 //
@@ -47,6 +47,25 @@ String read_entire_file(const char *file)
 	string[fsize] = 0;
 	return String(string, (int64_t)fsize);
 }
+
+//
+//
+//
+
+static inline Call_Info make_procedure_call(String name, uint64_t stack_top, Symbol_Table *table)
+{
+	Call_Info call;
+	call.procedure_name = name;
+	call.stack_top = stack_top;
+	call.symbols = table;
+	return call;
+}
+
+struct Call_Stack {
+	String procedure_name;
+	uint64_t stack_top;
+	Symbol_Table *symbols;
+};
 
 bool print_error(Error_List *list)
 {
@@ -198,7 +217,7 @@ static void string_replace_all(std::string &s, const String search, const String
 	}
 }
 
-static void print_symbols(Interpreter *interp, FILE *out, Symbol_Table *symbols)
+static void print_symbols(Interpreter *interp, FILE *out, Symbol_Table *symbols, uint64_t stack_top, uint64_t skip_stack_offset)
 {
 	for (auto symbol : symbols->buffer)
 	{
@@ -214,7 +233,11 @@ static void print_symbols(Interpreter *interp, FILE *out, Symbol_Table *symbols)
 		void *data = nullptr;
 		
 		if (symbol->address.kind == Symbol_Address::STACK)
-			data = interp->stack + interp->stack_top + symbol->address.offset;
+		{
+			auto offset = stack_top + symbol->address.offset;
+			if (offset > skip_stack_offset) continue;
+			data = interp->stack + offset;
+		}
 		else if (symbol->address.kind == Symbol_Address::GLOBAL)
 			data = interp->global + symbol->address.offset;
 		else if (symbol->address.kind == Symbol_Address::CODE)
@@ -233,12 +256,24 @@ static void print_symbols(Interpreter *interp, FILE *out, Symbol_Table *symbols)
 	}
 }
 
-static void print_all_symbols_until_parent_is_reached(Interpreter *interp, FILE *out, Symbol_Table *symbol_table)
+static void print_all_symbols_until_parent_is_reached(Interpreter *interp, FILE *out, Symbol_Table *symbol_table, uint64_t stack_top, uint64_t skip_stack_offset)
 {
 	for (auto symbols = symbol_table; symbols != interp->global_symbol_table; symbols = symbols->parent)
 	{
-		print_symbols(interp, out, symbols);
+		print_symbols(interp, out, symbols, stack_top, skip_stack_offset);
 	}
+}
+
+static void print_symbols_from_procedure(Interpreter *interp, FILE *out, String procedure_name, Symbol_Table *symbol_table, uint64_t stack_top, uint64_t skip_stack_offset)
+{
+	fprintf(out, "\t{\n");
+
+	fprintf(out, "\t\"procedure\" : \"%s\",\n", procedure_name.data); 
+	fprintf(out, "\t\"variables\" : [\n");
+	print_all_symbols_until_parent_is_reached(interp, out, symbol_table, stack_top, skip_stack_offset);
+	fprintf(out, "\t      ], \n");
+	
+	fprintf(out, "\t},\n");
 }
 
 void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
@@ -277,6 +312,8 @@ void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 		}
 
 		fprintf(out, "},\n\n");
+
+		context->callstack.add(make_procedure_call(procedure_type->name, interp->stack_top, &proc->symbols));
 	}
 	else if (intercept == INTERCEPT_PROCEDURE_RETURN)
 	{
@@ -308,6 +345,8 @@ void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 		}
 		
 		fprintf(out, "\n},\n");
+
+		context->callstack.remove_last();
 	}
 	else if (intercept == INTERCEPT_STATEMENT)
 	{
@@ -316,14 +355,22 @@ void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 		fprintf(out, "\"");
 		fprintf(out, "%zu", statement->source_row);
 		fprintf(out, "\",\n");
-		fprintf(out, "\"procedure_name\" : \"%s\",\n", interp->current_procedure->name.data); 
 
 		fprintf(out, "\"globals\" : [\n");
-		print_symbols(interp, out, interp->global_symbol_table);
+		print_symbols(interp, out, interp->global_symbol_table, 0, 0);
 		fprintf(out, "\t      ], \n");
 
-		fprintf(out, "\"variables\" : [\n");
-		print_all_symbols_until_parent_is_reached(interp, out, statement->symbol_table);
+
+		fprintf(out, "\"callstack\" : [\n");
+
+		print_symbols_from_procedure(interp, out, interp->current_procedure->name, statement->symbol_table, interp->stack_top, UINT64_MAX);
+
+		// Don't print the last added calstack before we are already printing it
+		for (int64_t index = context->callstack.count - 2; index >= 0; --index) {
+			auto call = &context->callstack[index];
+			print_symbols_from_procedure(interp, out, call->procedure_name, call->symbols, call->stack_top, interp->stack_top);
+		}
+
 		fprintf(out, "\t      ], \n");
 
 		{
