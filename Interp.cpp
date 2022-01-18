@@ -295,11 +295,10 @@ static Evaluation_Value interp_eval_unary_operator(Interpreter *interp, Code_Nod
 			auto address = (Code_Node_Address *)root->child;
 
 			auto pointer = interp_eval_address(interp, address);
-			Assert(pointer.address);
 
 			Evaluation_Value type_value;
 			type_value.type    = root->type;
-			type_value.address = pointer.address;
+			type_value.address = EvaluationTypeValue(pointer, uint8_t *);
 			
 			return type_value;
 		}
