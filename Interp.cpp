@@ -150,6 +150,7 @@ static Evaluation_Value interp_eval_offset(Interpreter *interp, Code_Node_Offset
 	auto dest = interp_eval_root_expression(interp, root->expression);
 	Assert(dest.address);
 	dest.address += root->offset;
+	dest.type = root->type;
 	return dest;
 }
 
