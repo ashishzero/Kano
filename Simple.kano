@@ -1,4 +1,4 @@
-
+/*
 const factorial := proc(var n: float) -> float {
 	if n <= 1 then return 1;
 	return n * factorial(n - 1);
@@ -46,8 +46,35 @@ const get_two := proc() -> int { return 2; }
 const print_numbers := proc(var a: int, var b: int, var c: int, var d: int) {
 	print("a: %d, b: %d, c: %d, d: %d\n", a, b, c, d);
 }
+*/
+
+const Node := struct {
+	var data: int;
+	var next: *Node;
+}
+
+const print_nodes := proc (var head: *Node) {
+	while (head != null) {
+		print("%d -> ", head.data);
+		head = head.next;
+	}
+	print("null\n");
+}
 
 const main := proc() {
+	var a: Node;
+	a.data = 1;
+	a.next = null;
+	//a.next = allocate(size_of(Node));
+	//a.next.data = 2;
+	//a.next.next = allocate(size_of(Node));
+	//a.next.next.data = 3;
+	//a.next.next = null;
+
+	print_nodes(*a);
+
+	//print("a.data: %d, a.next: %d\n", a.data, a.next);
+	
 	//var a: Vec2;
 	//a.x = 7;
 	//a.y = 8;
@@ -68,10 +95,10 @@ const main := proc() {
 	//var result:= get_two() + execute(numbers[0], numbers[1], adder) + get_two();
 	//print("%d op %d is %d\n", numbers[0], numbers[1], result);
 
-	var number: int = 2; 
-	print("number: %d\n", number);
-	var result: int = fib(number);
-	print("Fib of %d is %d\n", number, result);
+	//var number: int = 2; 
+	//print("number: %d\n", number);
+	//var result: int = fib(number);
+	//print("Fib of %d is %d\n", number, result);
 
 	//var a: int; var b: int; var c: int; var d: int;
 	//a = 1; b = 2; c = 3; d = 4;

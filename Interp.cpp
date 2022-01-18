@@ -145,6 +145,14 @@ static Evaluation_Value interp_eval_address(Interpreter *interp, Code_Node_Addre
 
 static Evaluation_Value interp_eval_root_expression(Interpreter *interp, Code_Node_Expression *root);
 
+static Evaluation_Value interp_eval_offset(Interpreter *interp, Code_Node_Offset *root)
+{
+	auto dest = interp_eval_root_expression(interp, root->expression);
+	Assert(dest.address);
+	dest.address += root->offset;
+	return dest;
+}
+
 static Evaluation_Value interp_eval_type_cast(Interpreter *interp, Code_Node_Type_Cast *cast)
 {
 	auto value = interp_eval_root_expression(interp, cast->child);
@@ -625,6 +633,12 @@ static Evaluation_Value binary_cmp(Evaluation_Value a, Evaluation_Value b, Code_
 			return r;
 		}
 		break;
+
+		case CODE_TYPE_POINTER: {
+			r.imm.bool_value = (EvaluationTypeValue(a, uint8_t *) == EvaluationTypeValue(b, uint8_t *));
+			return r;
+		}
+		break;
 	}
 	
 	Unreachable();
@@ -655,6 +669,12 @@ static Evaluation_Value binary_ncmp(Evaluation_Value a, Evaluation_Value b, Code
 		case CODE_TYPE_BOOL: {
 			Assert(b.type->kind == CODE_TYPE_BOOL);
 			r.imm.bool_value = EvaluationTypeValue(a, Kano_Bool) != EvaluationTypeValue(b, Kano_Bool);
+			return r;
+		}
+		break;
+
+		case CODE_TYPE_POINTER: {
+			r.imm.bool_value = (EvaluationTypeValue(a, uint8_t *) != EvaluationTypeValue(b, uint8_t *));
 			return r;
 		}
 		break;
@@ -871,7 +891,7 @@ static Evaluation_Value interp_eval_assignment(Interpreter *interp, Code_Node_As
 {
 	auto value = interp_eval_root_expression(interp, (Code_Node_Expression *)node->value);
 	
-	Assert(node->destination->child->kind == CODE_NODE_ADDRESS);
+	Assert(node->destination->child->kind == CODE_NODE_ADDRESS || node->destination->child->kind == CODE_NODE_OFFSET);
 	
 	auto dst = interp_eval_root_expression(interp, node->destination);
 	
@@ -985,6 +1005,7 @@ static Evaluation_Value interp_eval_expression(Interpreter *interp, Code_Node *r
 		case CODE_NODE_UNARY_OPERATOR: return interp_eval_unary_operator(interp, (Code_Node_Unary_Operator *)root);
 		case CODE_NODE_BINARY_OPERATOR: return interp_eval_binary_operator(interp, (Code_Node_Binary_Operator *)root);
 		case CODE_NODE_ADDRESS: return interp_eval_address(interp, (Code_Node_Address *)root);
+		case CODE_NODE_OFFSET: return interp_eval_offset(interp, (Code_Node_Offset *)root);
 		case CODE_NODE_ASSIGNMENT: return interp_eval_assignment(interp, (Code_Node_Assignment *)root);
 		case CODE_NODE_TYPE_CAST: return interp_eval_type_cast(interp, (Code_Node_Type_Cast *)root);
 		case CODE_NODE_IF: return interp_eval_expression(interp, (Code_Node *)root);
@@ -1019,7 +1040,7 @@ static void interp_eval_do(Interpreter *interp, Code_Node_Do *root)
 	} while (EvaluationTypeValue(cond, bool));
 }
 
-static void interp_eval_if(Interpreter *interp, Code_Node_While *root)
+static void interp_eval_while(Interpreter *interp, Code_Node_While *root)
 {
 	auto while_cond = root->condition;
 	auto while_body = root->body;
@@ -1034,7 +1055,7 @@ static void interp_eval_if(Interpreter *interp, Code_Node_While *root)
 	}
 }
 
-static void interp_eval_if_block(Interpreter *interp, Code_Node_If *root)
+static void interp_eval_if(Interpreter *interp, Code_Node_If *root)
 {
 	auto cond = interp_eval_root_expression(interp, (Code_Node_Expression *)root->condition);
 	if (EvaluationTypeValue(cond, bool))
@@ -1046,7 +1067,7 @@ static void interp_eval_if_block(Interpreter *interp, Code_Node_If *root)
 	}
 }
 
-static void interp_eval_for_block(Interpreter *interp, Code_Node_For *root)
+static void interp_eval_for(Interpreter *interp, Code_Node_For *root)
 {
 	auto for_init = root->initialization;
 	auto for_cond = root->condition;
@@ -1090,15 +1111,15 @@ static bool interp_eval_statement(Interpreter *interp, Code_Node_Statement *root
 			return false;
 		
 		case CODE_NODE_IF:
-			interp_eval_if_block(interp, (Code_Node_If *)root->node);
+			interp_eval_if(interp, (Code_Node_If *)root->node);
 			return false;
 		
 		case CODE_NODE_FOR:
-			interp_eval_for_block(interp, (Code_Node_For *)root->node);
+			interp_eval_for(interp, (Code_Node_For *)root->node);
 			return false;
 		
 		case CODE_NODE_WHILE:
-			interp_eval_if(interp, (Code_Node_While *)root->node);
+			interp_eval_while(interp, (Code_Node_While *)root->node);
 			return false;
 		
 		case CODE_NODE_DO:

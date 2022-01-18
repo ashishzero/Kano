@@ -1049,13 +1049,13 @@ Syntax_Node_Block *parse_block(Parser *parser)
 
 		while (parser_should_continue(parser))
 		{
+			if (parser_accept_token(parser, TOKEN_KIND_CLOSE_CURLY_BRACKET))
+				break;
+
 			auto statement         = parse_statement(parser);
 			parent_statement->next = statement;
 			parent_statement       = statement;
 			statement_count += 1;
-
-			if (parser_accept_token(parser, TOKEN_KIND_CLOSE_CURLY_BRACKET))
-				break;
 		}
 
 		block->statements      = statement_stub_head.next;

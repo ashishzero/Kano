@@ -226,6 +226,7 @@ enum Code_Node_Kind
 	CODE_NODE_RETURN,
 	CODE_NODE_STATEMENT,
 	CODE_NODE_PROCEDURE_CALL,
+	CODE_NODE_OFFSET,
 	CODE_NODE_SUBSCRIPT,
 	CODE_NODE_IF,
 	CODE_NODE_FOR,
@@ -470,6 +471,17 @@ struct Code_Node_Subscript : public Code_Node
 
 	Code_Node_Expression *expression = nullptr;
 	Code_Node_Expression *subscript  = nullptr;
+};
+
+struct Code_Node_Offset : public Code_Node
+{
+	Code_Node_Offset()
+	{
+		kind = CODE_NODE_OFFSET;
+	}
+
+	Code_Node_Expression *expression = nullptr;
+	uint64_t offset = 0;
 };
 
 struct Code_Node_If : public Code_Node

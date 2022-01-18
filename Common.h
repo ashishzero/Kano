@@ -39,7 +39,7 @@
 #elif defined(macintosh) || defined(Macintosh)
 #define PLATFORM_OS_MAC 1
 #elif defined(__APPLE__) && defined(__MACH__)
-#defined PLATFORM_OS_MAC 1
+#define PLATFORM_OS_MAC 1
 #elif defined(__APPLE__)
 #define PLATFORM_OS_IOS 1
 #elif defined(_WIN64) || defined(_WIN32)

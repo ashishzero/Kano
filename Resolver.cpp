@@ -52,6 +52,99 @@ static uint32_t murmur3_32(const uint8_t *key, size_t len, uint32_t seed)
 //
 //
 
+thread_local static char TempBuffer[4096];
+thread_local static int TempBufferIndex;
+
+void tprintf(const char *fmt, ...)
+{
+	va_list arg;
+	va_start(arg, fmt);
+	TempBufferIndex += vsnprintf(TempBuffer + TempBufferIndex, sizeof(TempBuffer) - TempBufferIndex, fmt, arg);
+	va_end(arg);
+}
+
+static void type_to_string_internal(Code_Type *type)
+{
+	switch (type->kind)
+	{
+		case CODE_TYPE_NULL: tprintf("void"); return;
+		case CODE_TYPE_INTEGER: tprintf("int"); return;
+		case CODE_TYPE_REAL: tprintf("float"); return;
+		case CODE_TYPE_BOOL: tprintf("bool"); return;
+
+		case CODE_TYPE_POINTER: {
+			tprintf("*"); 
+			type_to_string_internal(((Code_Type_Pointer *)type)->base_type);
+			return;
+		}
+
+		case CODE_TYPE_PROCEDURE: {
+			auto proc = (Code_Type_Procedure *)type;
+			tprintf("proc (");
+			for (int64_t index = 0; index < proc->argument_count; ++index)
+			{
+				type_to_string_internal(proc->arguments[index]);
+				if (index < proc->argument_count - 1) tprintf(", ");
+			}
+			tprintf(")");
+
+			if (proc->return_type)
+			{
+				tprintf(" -> ");
+				type_to_string_internal(proc->return_type);
+			}
+			return;
+		}
+
+		case CODE_TYPE_STRUCT: {
+			auto strt = (Code_Type_Struct *)type;
+			tprintf("%s", strt->name.data); 
+			return;
+		}
+
+		case CODE_TYPE_ARRAY_VIEW: {
+			auto arr = (Code_Type_Array_View *)type;
+			tprintf("[] ");
+			type_to_string_internal(arr->element_type);
+			return;
+		}
+
+		case CODE_TYPE_STATIC_ARRAY: {
+			auto arr = (Code_Type_Static_Array *)type;
+			tprintf("[%u] ", arr->element_count);
+			type_to_string_internal(arr->element_type);
+			return;
+		}
+	}
+}
+
+static char *type_to_string(Code_Type *type) {
+	TempBufferIndex = 0;
+	type_to_string_internal(type);
+	char *string = (char *)malloc(TempBufferIndex + 1);
+	memcpy(string, TempBuffer, TempBufferIndex);
+	string[TempBufferIndex] = 0;
+	return string;
+}
+
+static void report_error(Syntax_Node *node, const char *fmt, ...) {
+	int line = (int)node->location.start_row;
+	fprintf(stderr, "ERROR: %d: ", line);
+
+	va_list arg;
+	va_start(arg, fmt);
+	vfprintf(stderr, fmt, arg);
+	va_end(arg);
+
+	fprintf(stderr, "\n");
+
+	exit(1);
+}
+
+//
+//
+//
+
 static Unary_Operator_Kind token_to_unary_operator(Token_Kind kind)
 {
 	switch (kind)
@@ -487,8 +580,9 @@ static Code_Node_Address *code_resolve_identifier(Code_Type_Resolver *resolver, 
 		address->type = symbol->type;
 		return address;
 	}
+
+	report_error(root, "Identifier not found: %s", root->name.data);
 	
-	Unimplemented();
 	return nullptr;
 }
 
@@ -567,7 +661,9 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 					}
 					else
 					{
-						Unimplemented();
+						report_error(param, "On procedure: '%s', expected type '%s' but got '%s' on %u parameter", proc->name.data,
+							type_to_string(proc->arguments[param_index]), type_to_string(code_param->type), param_index + 1);
+						//Unimplemented();
 					}
 				}
 				
@@ -961,125 +1057,112 @@ static Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Sym
 	
 	if (root->op == TOKEN_KIND_PERIOD)
 	{
-		if (left->kind != CODE_NODE_ADDRESS)
-		{
-			Unimplemented();
-		}
-		
 		if (root->right->kind != SYNTAX_NODE_IDENTIFIER)
 		{
 			Unimplemented();
 		}
-		
-		bool valid_type = false;
-		auto base_type  = left->type;
-		
-		for (int depth = 0; depth < 2; ++depth)
+
+		if (left->type->kind == CODE_TYPE_POINTER)
 		{
-			if (base_type->kind == CODE_TYPE_STRUCT || base_type->kind == CODE_TYPE_ARRAY_VIEW ||
-				base_type->kind == CODE_TYPE_STATIC_ARRAY)
+			auto ptr_type = (Code_Type_Pointer *)left->type;
+	
+			auto node     = new Code_Node_Unary_Operator;
+			node->type    = ptr_type->base_type;
+			node->child   = left;
+			node->op_kind = UNARY_OPERATOR_DEREFERENCE;
+			node->flags   = left->flags;
+
+			left = node;
+		}
+
+		auto iden = (Syntax_Node_Identifier *)root->right;
+
+		Code_Type *offset_type = nullptr;
+		uint64_t offset_value = 0;
+
+		auto type_kind = left->type->kind;
+		if (type_kind == CODE_TYPE_STRUCT)
+		{
+			auto type = (Code_Type_Struct *)left->type;
+			auto symbol = symbol_table_get(symbols, type->name);
+			Assert(symbol && symbol->type->kind == CODE_TYPE_STRUCT && symbol->address.kind == Symbol_Address::CODE);
+
+			auto block = symbol->address.code;
+
+			auto member = symbol_table_get(&block->symbols, iden->name, false);
+
+			if (member)
 			{
-				valid_type = true;
-				break;
-			}
-			else if (base_type->kind == CODE_TYPE_POINTER)
-			{
-				auto ptr  = (Code_Type_Pointer *)base_type;
-				base_type = ptr->base_type;
+				Assert(member->address.kind == Symbol_Address::STACK);
+
+				offset_type = member->type;
+				offset_value = member->address.offset;
 			}
 			else
 			{
 				Unimplemented();
 			}
 		}
-		
-		if (valid_type)
+		else if (type_kind == CODE_TYPE_ARRAY_VIEW)
 		{
-			auto iden = (Syntax_Node_Identifier *)root->right;
-			
-			switch (base_type->kind)
+			if (iden->name == "count")
 			{
-				case CODE_TYPE_STRUCT: {
-					auto type   = (Code_Type_Struct *)base_type;
-					auto symbol = symbol_table_get(symbols, type->name);
-					Assert(symbol && symbol->type->kind == CODE_TYPE_STRUCT &&
-						symbol->address.kind == Symbol_Address::CODE);
-					
-					auto block  = symbol->address.code;
-					
-					auto member = symbol_table_get(&block->symbols, iden->name, false);
-					
-					if (member)
-					{
-						Assert(member->address.kind == Symbol_Address::STACK);
-						
-						auto code_node  = (Code_Node_Address *)left;
-						code_node->type = member->type;
-						code_node->offset += member->address.offset;
-						
-						return code_node;
-					}
-					else
-					{
-						Unimplemented();
-					}
-				}
-				break;
-				
-				case CODE_TYPE_STATIC_ARRAY: {
-					auto code_node = (Code_Node_Address *)left;
-					
-					if (iden->name == "data")
-					{
-						auto type           = (Code_Type_Static_Array *)base_type;
-						auto ptr_type       = new Code_Type_Pointer;
-						ptr_type->base_type = type->element_type;
-						code_node->type     = ptr_type;
-						return code_node;
-					}
-					else if (iden->name == "count")
-					{
-						auto type                = (Code_Type_Static_Array *)base_type;
-						auto node                = new Code_Node_Literal;
-						node->type               = symbol_table_get(&resolver->symbols, "int")->type;
-						node->data.integer.value = type->element_count;
-						return node;
-					}
-					else
-					{
-						Unimplemented();
-					}
-				}
-				break;
-				
-				case CODE_TYPE_ARRAY_VIEW: {
-					auto code_node = (Code_Node_Address *)left;
-					
-					if (iden->name == "count")
-					{
-						code_node->type = symbol_table_get(&resolver->symbols, "int")->type;
-						code_node->offset += 0;
-					}
-					else if (iden->name == "data")
-					{
-						auto type       = (Code_Type_Array_View *)base_type;
-						code_node->type = type->element_type;
-						code_node->offset += sizeof(int64_t);
-					}
-					else
-					{
-						Unimplemented();
-					}
-					
-					return code_node;
-				}
-				break;
+				offset_type = symbol_table_get(&resolver->symbols, "int")->type;
+				offset_value = 0;
+			}
+			else if (iden->name == "data")
+			{
+				auto type = (Code_Type_Array_View *)left->type;
+				offset_type = type->element_type;
+				offset_value = sizeof(int64_t);
+			}
+			else
+			{
+				Unimplemented();
+			}
+		}
+		else if (type_kind == CODE_TYPE_STATIC_ARRAY)
+		{
+			if (iden->name == "data")
+			{
+				auto type = (Code_Type_Static_Array *)left->type;
+				auto ptr_type = new Code_Type_Pointer;
+				ptr_type->base_type = type->element_type;
+				offset_type = ptr_type;
+				offset_value = 0;
+			}
+			else if (iden->name == "count")
+			{
+				auto type = (Code_Type_Static_Array *)left->type;
+				auto node = new Code_Node_Literal;
+				node->type = symbol_table_get(&resolver->symbols, "int")->type;
+				node->data.integer.value = type->element_count;
+				return node;
+			}
+			else
+			{
+				Unimplemented();
 			}
 		}
 		else
 		{
 			Unimplemented();
 		}
+
+		Assert(offset_type);
+
+		Code_Node_Expression *expression = new Code_Node_Expression;
+		expression->child = left;
+		expression->flags = left->flags;
+		expression->type = left->type;
+
+		Code_Node_Offset *node = new Code_Node_Offset;
+		node->expression = expression;
+		node->type = offset_type;
+		node->offset = offset_value;
+		node->flags = left->flags;
+
+		return node;
 	}
 	
 	else
@@ -1130,8 +1213,13 @@ static Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Sym
 				if (left_match && right_match && (!op->compound || (op->compound && (left->flags & SYMBOL_BIT_LVALUE))))
 				{
 					auto node     = new Code_Node_Binary_Operator;
-					
-					node->type    = op->parameters[0]->kind == CODE_TYPE_POINTER ? left->type : op->output;
+
+					auto type = op->output;
+
+					if (op->output->kind == CODE_TYPE_POINTER && op->parameters[0]->kind == CODE_TYPE_POINTER)
+						type = left->type;
+
+					node->type    = type;
 					node->left    = left;
 					node->right   = right;
 					node->flags   = left->flags & right->flags;
@@ -1142,8 +1230,10 @@ static Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Sym
 			}
 		}
 	}
+
+	report_error(root, "Mismatch binary operator and operands");
 	
-	Unimplemented();
+	//Unimplemented();
 	
 	return nullptr;
 }
@@ -1197,8 +1287,10 @@ static Code_Node_Assignment *code_resolve_assignment(Code_Type_Resolver *resolve
 			}
 		}
 	}
+
+	report_error(root, "Assignment on invalid types: %s, %s", type_to_string(destination->type), type_to_string(value->type));
 	
-	Unimplemented();
+	//Unimplemented();
 	return nullptr;
 }
 
@@ -1798,7 +1890,8 @@ static Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver,
 				}
 				else
 				{
-					Unimplemented();
+					report_error(while_node->condition, "Expected boolean expression, but got %s", type_to_string(condition->child->type));
+					//Unimplemented();
 				}
 			}
 			
@@ -2130,6 +2223,20 @@ Code_Type_Resolver *code_type_resolver_create()
 		binary_operator_pointer.compound = true;
 		resolver->binary_operators[BINARY_OPERATOR_COMPOUND_ADDITION].add(binary_operator_pointer);
 		resolver->binary_operators[BINARY_OPERATOR_COMPOUND_SUBTRACTION].add(binary_operator_pointer);
+	}
+
+	{
+		Binary_Operator binary_operator_pointer;
+		binary_operator_pointer.parameters[0] = CompilerTypes[CODE_TYPE_POINTER];
+		binary_operator_pointer.parameters[1] = CompilerTypes[CODE_TYPE_POINTER];
+		binary_operator_pointer.output = CompilerTypes[CODE_TYPE_BOOL];
+		binary_operator_pointer.compound = false;
+		resolver->binary_operators[BINARY_OPERATOR_COMPARE_EQUAL].add(binary_operator_pointer);
+		resolver->binary_operators[BINARY_OPERATOR_COMPARE_NOT_EQUAL].add(binary_operator_pointer);
+		resolver->binary_operators[BINARY_OPERATOR_RELATIONAL_LESS].add(binary_operator_pointer);
+		resolver->binary_operators[BINARY_OPERATOR_RELATIONAL_LESS_EQUAL].add(binary_operator_pointer);
+		resolver->binary_operators[BINARY_OPERATOR_RELATIONAL_GREATER].add(binary_operator_pointer);
+		resolver->binary_operators[BINARY_OPERATOR_RELATIONAL_GREATER_EQUAL].add(binary_operator_pointer);
 	}
 	
 	{

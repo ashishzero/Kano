@@ -137,6 +137,12 @@ void print_type(FILE *out, Code_Type *type)
 
 void print_value(FILE *out, Code_Type *type, void *data)
 {
+	if (!data)
+	{
+		fprintf(out, "null");
+		return;
+	}
+
 	switch (type->kind)
 	{
 		case CODE_TYPE_NULL: fprintf(out, "null"); return;
@@ -243,7 +249,7 @@ static void print_symbols(Interpreter *interp, FILE *out, Symbol_Table *symbols,
 		else if (symbol->address.kind == Symbol_Address::CODE)
 			data = symbol->address.code;
 		else if (symbol->address.kind == Symbol_Address::CCALL)
-			data = symbol->address.ccall;
+			data = (void *)symbol->address.ccall;
 		else
 			Unreachable();
 		
