@@ -65,11 +65,11 @@ const main := proc() {
 	var a: Node;
 	a.data = 1;
 	a.next = null;
-	//a.next = allocate(size_of(Node));
-	//a.next.data = 2;
-	//a.next.next = allocate(size_of(Node));
-	//a.next.next.data = 3;
-	//a.next.next = null;
+	a.next = allocate(size_of(Node));
+	a.next.data = 2;
+	a.next.next = allocate(size_of(Node));
+	a.next.next.data = 3;
+	a.next.next = null;
 
 	print_nodes(*a);
 

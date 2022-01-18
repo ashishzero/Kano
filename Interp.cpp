@@ -291,12 +291,14 @@ static Evaluation_Value interp_eval_unary_operator(Interpreter *interp, Code_Nod
 		break;
 		
 		case UNARY_OPERATOR_DEREFERENCE:  {
-			Assert(root->child->kind == CODE_NODE_ADDRESS);
+			Evaluation_Value pointer;
+			if (root->child->kind == CODE_NODE_ADDRESS)
+				pointer = interp_eval_address(interp, (Code_Node_Address *)root->child);
+			else if (root->child->kind == CODE_NODE_OFFSET)
+				pointer = interp_eval_offset(interp, (Code_Node_Offset *)root->child);
+			else
+				Unreachable();
 			
-			auto address = (Code_Node_Address *)root->child;
-
-			auto pointer = interp_eval_address(interp, address);
-
 			Evaluation_Value type_value;
 			type_value.type    = root->type;
 			type_value.address = EvaluationTypeValue(pointer, uint8_t *);
