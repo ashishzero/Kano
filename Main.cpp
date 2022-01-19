@@ -220,7 +220,7 @@ void handle_assertion(const char *reason, const char *file, int line, const char
 	DebugTriggerbreakpoint();
 }
 
-String read_entire_file(const char *file)
+static String read_entire_file(const char *file)
 {
 	FILE *f = fopen(file, "rb");
 	fseek(f, 0, SEEK_END);
@@ -254,7 +254,7 @@ struct Call_Stack {
 	Symbol_Table *symbols;
 };
 
-bool print_error(Error_List *list)
+static bool print_error(Error_List *list)
 {
 	for (auto error = list->first.next; error; error = error->next)
 	{
@@ -267,7 +267,9 @@ bool print_error(Error_List *list)
 	return list->first.next != nullptr;
 }
 
-void json_write_type(Json_Writer *json, Code_Type *type)
+static void json_write_symbol(Json_Writer *json, String name, Code_Type *type, void *data);
+
+static void json_write_type(Json_Writer *json, Code_Type *type)
 {
 	if (!type)
 	{
@@ -328,43 +330,36 @@ void json_write_type(Json_Writer *json, Code_Type *type)
 	}
 }
 
-void print_value(FILE *out, Code_Type *type, void *data)
+static void json_write_value(Json_Writer *json, Code_Type *type, void *data)
 {
 	if (!data)
 	{
-		fprintf(out, "null");
+		json->write_single_value("null");
 		return;
 	}
 
 	switch (type->kind)
 	{
-		case CODE_TYPE_NULL: fprintf(out, "null"); return;
-		case CODE_TYPE_INTEGER: fprintf(out, "%zd", *(Kano_Int *)data); return;
-		case CODE_TYPE_REAL: fprintf(out, "%f", *(Kano_Real *)data); return;
-		case CODE_TYPE_BOOL: fprintf(out, "%s", (*(Kano_Bool *)data) ? "true" : "false"); return;
-
-		case CODE_TYPE_POINTER: {
-			auto pointer = (Code_Type_Pointer *)type;
-			fprintf(out, "%p", *(void **)data);
-			return;
-		}
-
-		case CODE_TYPE_PROCEDURE: fprintf(out, "%p", data); return;
+		case CODE_TYPE_NULL: json->write_single_value("null"); return;
+		case CODE_TYPE_INTEGER: json->write_single_value("%zd", *(Kano_Int *)data); return;
+		case CODE_TYPE_REAL: json->write_single_value("%f", *(Kano_Real *)data); return;
+		case CODE_TYPE_BOOL: json->write_single_value("%s", (*(Kano_Bool *)data) ? "true" : "false"); return;
+		case CODE_TYPE_POINTER: json->write_single_value("%p", *(void **)data); return;
+		case CODE_TYPE_PROCEDURE: json->write_single_value("%p", data); return;
 
 		case CODE_TYPE_STRUCT: {
 			auto _struct = (Code_Type_Struct *)type;
-			fprintf(out, "{ ");
-			
+
+			json->begin_array(true);
+
 			for (int64_t index = 0; index < _struct->member_count; ++index)
 			{
 				auto member = &_struct->members[index];
-				fprintf(out, "%s: ", member->name.data);
-				print_value(out, member->type, (uint8_t *)data + member->offset);
-				if (index < _struct->member_count - 1)
-					fprintf(out, ", ");
+
+				json_write_symbol(json, member->name, member->type, (uint8_t *)data + member->offset);
 			}
 
-			fprintf(out, " }");
+			json->end_array();
 			return;
 		}
 
@@ -373,15 +368,13 @@ void print_value(FILE *out, Code_Type *type, void *data)
 			
 			auto arr_count = *(Kano_Int *)data;
 			auto arr_data = (uint8_t *)data + sizeof(Kano_Int);
-			
-			fprintf(out, "[ ");
+
+			json->begin_array(true);			
 			for (int64_t index = 0; index < arr_count; ++index)
 			{
-				print_value(out, arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
-				if (index < arr_count - 1)
-					fprintf(out, ", ");
+				json_write_value(json, arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
 			}
-			fprintf(out, " ]");
+			json->end_array();
 
 			return;
 		}
@@ -391,18 +384,34 @@ void print_value(FILE *out, Code_Type *type, void *data)
 
 			auto arr_data = (uint8_t *)data;
 
-			fprintf(out, "[ ");
+			json->begin_array(true);
 			for (int64_t index = 0; index < arr_type->element_count; ++index)
 			{
-				print_value(out, arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
-				if (index < arr_type->element_count - 1)
-					fprintf(out, ", ");
+				json_write_value(json, arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
 			}
-			fprintf(out, " ]");
+			json->end_array();
 
 			return;
 		}
 	}
+}
+
+static void json_write_symbol(Json_Writer *json, String name, Code_Type *type, void *data)
+{
+	json->begin_object();
+	json->write_key_value("name", "%s", name.data);
+	
+	json->write_key("type");
+	json->begin_string_value();
+	json_write_type(json, type);
+	json->end_string_value();
+	
+	json->write_key_value("address", "%p", data);
+	
+	json->write_key("value");
+	json_write_value(json, type, data);
+	
+	json->end_object();
 }
 
 static void json_write_symbols(Interpreter *interp, Json_Writer *json, Symbol_Table *symbols, uint64_t stack_top, uint64_t skip_stack_offset)
@@ -435,22 +444,7 @@ static void json_write_symbols(Interpreter *interp, Json_Writer *json, Symbol_Ta
 		else
 			Unreachable();
 
-		json->begin_object();
-		json->write_key_value("name", "%s", symbol->name.data);
-
-		json->write_key("type");
-		json->begin_string_value();
-		json_write_type(json, symbol->type);
-		json->end_string_value();
-
-		json->write_key_value("address", "%p", data);
-		
-		json->write_key("value");
-		json->begin_string_value();
-		print_value(json->out, symbol->type, data);
-		json->end_string_value();
-
-		json->end_object();
+		json_write_symbol(json, symbol->name, symbol->type, data);
 	}
 }
 
@@ -475,7 +469,7 @@ static void json_write_procedure_symbols(Interpreter *interp, Json_Writer *json,
 	json->end_object();
 }
 
-void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
+static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 {
 	auto context = (Interp_User_Context *)interp->user_context;
 
