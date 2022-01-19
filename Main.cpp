@@ -225,6 +225,7 @@ static void string_replace_all(std::string &s, const String search, const String
 
 static void print_symbols(Interpreter *interp, FILE *out, Symbol_Table *symbols, uint64_t stack_top, uint64_t skip_stack_offset)
 {
+	bool first = true;
 	for (auto symbol : symbols->buffer)
 	{
 		if ((symbol->flags & SYMBOL_BIT_TYPE))
@@ -252,13 +253,19 @@ static void print_symbols(Interpreter *interp, FILE *out, Symbol_Table *symbols,
 			data = (void *)symbol->address.ccall;
 		else
 			Unreachable();
+
+		if (!first)
+		{
+			fprintf(out, ",\n");
+		}
+		first = false;
 		
 		fprintf(out, "\t\t{ \"name\" : \"%s\", ", symbol->name.data);
 		fprintf(out, "\"type\" : \"");
 		print_type(out, symbol->type);
 		fprintf(out, "\", \"value\" : \"");
 		print_value(out, symbol->type, data);
-		fprintf(out, "\"},\n");
+		fprintf(out, "\"}");
 	}
 }
 
@@ -277,16 +284,23 @@ static void print_symbols_from_procedure(Interpreter *interp, FILE *out, String 
 	fprintf(out, "\t\"procedure\" : \"%s\",\n", procedure_name.data); 
 	fprintf(out, "\t\"variables\" : [\n");
 	print_all_symbols_until_parent_is_reached(interp, out, symbol_table, stack_top, skip_stack_offset);
-	fprintf(out, "\t      ], \n");
+	fprintf(out, "\t      ]\n");
 	
-	fprintf(out, "\t},\n");
+	fprintf(out, "\t}");
 }
 
 void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 {
+	static bool first_time = true;
+
 	auto context = (Interp_User_Context *)interp->user_context;
 
 	auto out = context->debug_json;
+
+	if (!first_time) {
+		fprintf(out, ",\n\n");
+	}
+	first_time = false;
 
 	if (intercept == INTERCEPT_PROCEDURE_CALL)
 	{
@@ -301,23 +315,25 @@ void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 
 		fprintf(out, "\"procedure_type\" : {\n");	
 		fprintf(out, "\t\t\"arguments\" : [ ");
+
 		for (int64_t i = 0; i < procedure_type->argument_count; ++i) {
-			if (i != 0)
-				fprintf(out, ",");
 			fprintf(out, "\"");
 			print_type(out, procedure_type->arguments[i]);
 			fprintf(out, "\"");
+			if (i != procedure_type->argument_count - 1)
+				fprintf(out, ", ");
 		}
+
 		fprintf(out, " ], \n\t\t\"return\": ");
 		if (procedure_type->return_type == NULL)
-			fprintf(out, "\"void\" \n\t\t   },\n");
+			fprintf(out, "\"void\" \n\t\t   }\n");
 		else {
 			fprintf(out, "\"");
 			print_type(out, procedure_type->return_type);
-			fprintf(out, "\" \n\t\t   },\n");
+			fprintf(out, "\" \n\t\t   }\n");
 		}
 
-		fprintf(out, "},\n\n");
+		fprintf(out, "}");
 
 		context->callstack.add(make_procedure_call(procedure_type->name, interp->stack_top, &proc->symbols));
 	}
@@ -334,23 +350,25 @@ void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 
 		fprintf(out, "\"procedure_type\" : {\n");	
 		fprintf(out, "\t\t\"arguments\" : [ ");
+
 		for (int64_t i = 0; i < procedure_type->argument_count; ++i) {
-			if (i != 0)
-				fprintf(out, ",");
 			fprintf(out, "\"");
 			print_type(out, procedure_type->arguments[i]);
 			fprintf(out, "\"");
+			if (i != procedure_type->argument_count - 1)
+				fprintf(out, ", ");
 		}
+
 		fprintf(out, " ], \n\t\t\"return\": ");
 		if (procedure_type->return_type == NULL)
-			fprintf(out, "\"void\" \n\t\t   },\n");
+			fprintf(out, "\"void\" \n\t\t   }\n");
 		else {
 			fprintf(out, "\"");
 			print_type(out, procedure_type->return_type);
-			fprintf(out, "\" \n\t\t   },\n");
+			fprintf(out, "\" \n\t\t   }\n");
 		}
 		
-		fprintf(out, "\n},\n");
+		fprintf(out, "\n}");
 
 		context->callstack.remove_last();
 	}
@@ -372,8 +390,10 @@ void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 		print_symbols_from_procedure(interp, out, interp->current_procedure->name, statement->symbol_table, interp->stack_top, UINT64_MAX);
 
 		// Don't print the last added calstack before we are already printing it
-		for (int64_t index = context->callstack.count - 2; index >= 0; --index) {
+		for (int64_t index = context->callstack.count - 2; index >= 0; --index)
+		{
 			auto call = &context->callstack[index];
+			fprintf(out, ",\n");
 			print_symbols_from_procedure(interp, out, call->procedure_name, call->symbols, call->stack_top, interp->stack_top);
 		}
 
@@ -388,7 +408,7 @@ void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 			fprintf(out, "\"console_out\": \"%s\"\n", string.data());
 		}
 
-		fprintf(out, "},\n\n");
+		fprintf(out, "}");
 	}
 }
 
