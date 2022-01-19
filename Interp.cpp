@@ -1137,12 +1137,22 @@ static bool interp_eval_statement(Interpreter *interp, Code_Node_Statement *root
 	return false;
 }
 
+
+struct Nocheckin {
+	int64_t data;
+	Nocheckin *next;
+};
+
+static volatile Nocheckin nocheckin;
+
 static void interp_eval_block(Interpreter *interp, Code_Node_Block *root, bool isproc)
 {
 	if (isproc)
 	{
 		interp->intercept(interp, INTERCEPT_PROCEDURE_CALL, root);
 	}
+
+	nocheckin.next = (Nocheckin *)&nocheckin;
 
 	auto return_index = interp->return_count;
 	for (auto statement = root->statement_head; statement; statement = statement->next)

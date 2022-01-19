@@ -173,9 +173,7 @@ void print_value(FILE *out, Code_Type *type, void *data)
 
 		case CODE_TYPE_POINTER: {
 			auto pointer = (Code_Type_Pointer *)type;
-			fprintf(out, "%p { ", data);
-			print_value(out, pointer->base_type, *(uint8_t **)data);
-			fprintf(out, " }");
+			fprintf(out, "%p", *(void **)data);
 			return;
 		}
 
@@ -275,7 +273,8 @@ static void print_symbols(Interpreter *interp, FILE *out, Symbol_Table *symbols,
 		fprintf(out, "\t\t{ \"name\" : \"%s\", ", symbol->name.data);
 		fprintf(out, "\"type\" : \"");
 		print_type(out, symbol->type);
-		fprintf(out, "\", \"value\" : \"");
+		fprintf(out, "\", \"address\" : \"%p\"", data);
+		fprintf(out, ", \"value\" : \"");
 		print_value(out, symbol->type, data);
 		fprintf(out, "\"}");
 	}
