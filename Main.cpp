@@ -8,7 +8,7 @@
 struct String_Stream {
 	Array<char> buffer;
 
-	void fmt_print(const char *fmt, ...)
+	void write_fmt(const char *fmt, ...)
 	{
 		va_list args0, args1;
 		va_start(args0, fmt);
@@ -31,6 +31,171 @@ struct String_Stream {
 	}
 };
 
+struct Json_Writer {
+	Array<int> depth;
+
+	FILE *out = nullptr;
+	int indent = 0;
+	bool same_line = false;
+
+	void init(FILE *fp)
+	{
+		out = fp;
+		depth.add(0);
+	}
+
+	void write_newline(int count = 1)
+	{
+		for (int i = 0; i < count; ++i)
+			fprintf(out, "\n");
+	}
+
+	void next_element(int newline_count = 1)
+	{
+		auto value = depth.last();
+		if (*value)
+		{
+			fprintf(out, ",");
+			if (!same_line)
+				write_newline(newline_count);
+		}
+
+		*value += 1;
+	}
+
+	void push_scope(int newline_count = 1)
+	{
+		next_element(newline_count);
+		depth.add(0);
+	}
+
+	void pop_scope()
+	{
+		depth.remove_last();
+	}
+
+	void write_indent()
+	{
+		if (indent == 0) return;
+		fprintf(out, "%*s", indent, "\t");
+	}
+
+	void begin_object(bool imm = false, int newline_count = 1)
+	{
+		push_scope(newline_count);
+
+		if (!imm)
+			write_indent();
+
+		fprintf(out, "{");
+
+		if (!same_line)
+		{
+			fprintf(out, "\n");
+			indent += 1;
+		}
+
+		indent += 1;
+	}
+
+	void end_object()
+	{
+		indent -= 1;
+
+		if (!same_line)
+		{
+			indent -= 1;
+			fprintf(out, "\n");
+			write_indent();
+		}
+
+		fprintf(out, "}");
+		pop_scope();
+	}
+
+	void begin_array(bool imm = false, int newline_count = 1)
+	{
+		push_scope(newline_count);
+		
+		if (!imm)
+			write_indent();
+
+		fprintf(out, "[");
+
+		if (!same_line)
+		{
+			fprintf(out, "\n");
+			indent += 1;
+		}
+
+		indent += 1;
+	}
+
+	void end_array()
+	{
+		indent -= 1;
+
+		if (!same_line)
+		{
+			indent -= 1;
+			write_newline();
+			write_indent();
+		}
+		fprintf(out, "]");
+		pop_scope();
+	}
+
+	void write_key(const char *key)
+	{
+		push_scope();
+		write_indent();
+		fprintf(out, "\"%s\": ", key);
+	}
+
+	void write_single_value(const char *fmt, ...)
+	{
+		fprintf(out, "\"");
+		va_list args;
+		va_start(args, fmt);
+		vfprintf(out, fmt, args);
+		va_end(args);
+		fprintf(out, "\"");
+		pop_scope();
+	}
+
+	void begin_string_value()
+	{
+		fprintf(out, "\"");
+	}
+
+	void append_string_value(const char *fmt, ...)
+	{
+		va_list args;
+		va_start(args, fmt);
+		vfprintf(out, fmt, args);
+		va_end(args);
+	}
+
+	void end_string_value()
+	{
+		fprintf(out, "\"");
+		pop_scope();
+	}
+
+	void write_key_value(const char *key, const char *fmt, ...)
+	{
+		next_element();
+		write_indent();
+		fprintf(out, "\"%s\": ", key);
+		fprintf(out, "\"");
+		va_list args;
+		va_start(args, fmt);
+		vfprintf(out, fmt, args);
+		va_end(args);
+		fprintf(out, "\"");
+	}
+};
+
 struct Call_Info {
 	String procedure_name;
 	uint64_t stack_top;
@@ -39,7 +204,8 @@ struct Call_Info {
 
 struct Interp_User_Context {
 	String_Stream console_out;
-	FILE *debug_json;
+
+	Json_Writer json;
 
 	Array<Call_Info> callstack;
 };
@@ -101,56 +267,62 @@ bool print_error(Error_List *list)
 	return list->first.next != nullptr;
 }
 
-void print_type(FILE *out, Code_Type *type)
+void json_write_type(Json_Writer *json, Code_Type *type)
 {
+	if (!type)
+	{
+		json->append_string_value("void");
+		return;
+	}
+
 	switch (type->kind)
 	{
-		case CODE_TYPE_NULL: fprintf(out, "void"); return;
-		case CODE_TYPE_INTEGER: fprintf(out, "int"); return;
-		case CODE_TYPE_REAL: fprintf(out, "float"); return;
-		case CODE_TYPE_BOOL: fprintf(out, "bool"); return;
+		case CODE_TYPE_NULL: json->append_string_value("void"); return;
+		case CODE_TYPE_INTEGER: json->append_string_value("int"); return;
+		case CODE_TYPE_REAL: json->append_string_value("float"); return;
+		case CODE_TYPE_BOOL: json->append_string_value("bool"); return;
 
 		case CODE_TYPE_POINTER: {
-			fprintf(out, "*"); 
-			print_type(out, ((Code_Type_Pointer *)type)->base_type);
+			json->append_string_value("*"); 
+			json_write_type(json, ((Code_Type_Pointer *)type)->base_type);
 			return;
 		}
 
 		case CODE_TYPE_PROCEDURE: {
 			auto proc = (Code_Type_Procedure *)type;
-			fprintf(out, "proc (");
+			json->append_string_value("proc (");
 			for (int64_t index = 0; index < proc->argument_count; ++index)
 			{
-				print_type(out, proc->arguments[index]);
-				if (index < proc->argument_count - 1) fprintf(out, ", ");
+				json_write_type(json, proc->arguments[index]);
+				if (index < proc->argument_count - 1) json->append_string_value(", ");
 			}
-			fprintf(out, ")");
+			json->append_string_value(")");
 
 			if (proc->return_type)
 			{
-				fprintf(out, " -> ");
-				print_type(out, proc->return_type);
+				json->append_string_value(" -> ");
+				json_write_type(json, proc->return_type);
 			}
 			return;
 		}
 
 		case CODE_TYPE_STRUCT: {
 			auto strt = (Code_Type_Struct *)type;
-			fprintf(out, "%s", strt->name.data); 
+			json->append_string_value("%s", strt->name.data); 
 			return;
 		}
 
 		case CODE_TYPE_ARRAY_VIEW: {
 			auto arr = (Code_Type_Array_View *)type;
-			fprintf(out, "[] ");
-			print_type(out, arr->element_type);
+			json->append_string_value("[] ");
+			json_write_type(json, arr->element_type);
 			return;
 		}
 
 		case CODE_TYPE_STATIC_ARRAY: {
 			auto arr = (Code_Type_Static_Array *)type;
-			fprintf(out, "[%u] ", arr->element_count);
-			print_type(out, arr->element_type);
+			json->append_string_value("[%u] ", arr->element_count);
+			json_write_type(json, arr->element_type);
 			return;
 		}
 	}
@@ -233,9 +405,8 @@ void print_value(FILE *out, Code_Type *type, void *data)
 	}
 }
 
-static void print_symbols(Interpreter *interp, FILE *out, Symbol_Table *symbols, uint64_t stack_top, uint64_t skip_stack_offset)
+static void json_write_symbols(Interpreter *interp, Json_Writer *json, Symbol_Table *symbols, uint64_t stack_top, uint64_t skip_stack_offset)
 {
-	bool first = true;
 	for (auto symbol : symbols->buffer)
 	{
 		if ((symbol->flags & SYMBOL_BIT_TYPE))
@@ -264,153 +435,120 @@ static void print_symbols(Interpreter *interp, FILE *out, Symbol_Table *symbols,
 		else
 			Unreachable();
 
-		if (!first)
-		{
-			fprintf(out, ",\n");
-		}
-		first = false;
+		json->begin_object();
+		json->write_key_value("name", "%s", symbol->name.data);
+
+		json->write_key("type");
+		json->begin_string_value();
+		json_write_type(json, symbol->type);
+		json->end_string_value();
+
+		json->write_key_value("address", "%p", data);
 		
-		fprintf(out, "\t\t{ \"name\" : \"%s\", ", symbol->name.data);
-		fprintf(out, "\"type\" : \"");
-		print_type(out, symbol->type);
-		fprintf(out, "\", \"address\" : \"%p\"", data);
-		fprintf(out, ", \"value\" : \"");
-		print_value(out, symbol->type, data);
-		fprintf(out, "\"}");
+		json->write_key("value");
+		json->begin_string_value();
+		print_value(json->out, symbol->type, data);
+		json->end_string_value();
+
+		json->end_object();
 	}
 }
 
-static void print_all_symbols_until_parent_is_reached(Interpreter *interp, FILE *out, Symbol_Table *symbol_table, uint64_t stack_top, uint64_t skip_stack_offset)
+static void json_write_table_symbols(Interpreter *interp, Json_Writer *json, Symbol_Table *symbol_table, uint64_t stack_top, uint64_t skip_stack_offset)
 {
 	for (auto symbols = symbol_table; symbols != interp->global_symbol_table; symbols = symbols->parent)
 	{
-		print_symbols(interp, out, symbols, stack_top, skip_stack_offset);
+		json_write_symbols(interp, json, symbols, stack_top, skip_stack_offset);
 	}
 }
 
-static void print_symbols_from_procedure(Interpreter *interp, FILE *out, String procedure_name, Symbol_Table *symbol_table, uint64_t stack_top, uint64_t skip_stack_offset)
+static void json_write_procedure_symbols(Interpreter *interp, Json_Writer *json, String procedure_name, Symbol_Table *symbol_table, uint64_t stack_top, uint64_t skip_stack_offset)
 {
-	fprintf(out, "\t{\n");
+	json->begin_object();
 
-	fprintf(out, "\t\"procedure\" : \"%s\",\n", procedure_name.data); 
-	fprintf(out, "\t\"variables\" : [\n");
-	print_all_symbols_until_parent_is_reached(interp, out, symbol_table, stack_top, skip_stack_offset);
-	fprintf(out, "\t      ]\n");
+	json->write_key_value("procedure", "%s", procedure_name.data);
+	json->write_key("variables");
+	json->begin_array(true);
+	json_write_table_symbols(interp, json, symbol_table, stack_top, skip_stack_offset);
+	json->end_array();
 	
-	fprintf(out, "\t}");
+	json->end_object();
 }
 
 void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 {
-	static bool first_time = true;
-
 	auto context = (Interp_User_Context *)interp->user_context;
 
-	auto out = context->debug_json;
+	auto json = &context->json;
 
-	if (!first_time) {
-		fprintf(out, ",\n\n");
-	}
-	first_time = false;
-
-	if (intercept == INTERCEPT_PROCEDURE_CALL)
+	if (intercept == INTERCEPT_PROCEDURE_CALL || intercept == INTERCEPT_PROCEDURE_RETURN)
 	{
 		auto proc = (Code_Node_Block *)node;
 		auto procedure_type = interp->current_procedure;
 
-		fprintf(out, "{\n\"intercept\": \"procedure_call\",\n\"line_number\" : ");
-		fprintf(out, "\"");
-		fprintf(out, "%zu", proc->procedure_source_row);
-		fprintf(out, "\",\n");
-		fprintf(out, "\"procedure_name\" : \"%s\",\n", procedure_type->name.data);
+		const char *intercept_type = (intercept == INTERCEPT_PROCEDURE_CALL) ? "call" : "return";
 
-		fprintf(out, "\"procedure_type\" : {\n");	
-		fprintf(out, "\t\t\"arguments\" : [ ");
+		json->begin_object(false, 2);
 
-		for (int64_t i = 0; i < procedure_type->argument_count; ++i) {
-			fprintf(out, "\"");
-			print_type(out, procedure_type->arguments[i]);
-			fprintf(out, "\"");
-			if (i != procedure_type->argument_count - 1)
-				fprintf(out, ", ");
+		json->write_key_value("intercept", "procedure_%s", intercept_type);
+		json->write_key_value("line_number", "%d", (int)proc->procedure_source_row);
+		json->write_key_value("procedure_name", "%s", procedure_type->name.data);
+
+		json->write_key("procedure_arguments");
+
+		{
+			json->same_line = true;
+			Defer { json->same_line = false; };
+
+			json->begin_array(true);
+			for (int64_t i = 0; i < procedure_type->argument_count; ++i)
+			{
+				json->begin_string_value();
+				json_write_type(json, procedure_type->arguments[i]);
+				json->end_string_value();
+			}
+			json->end_array();
 		}
 
-		fprintf(out, " ], \n\t\t\"return\": ");
-		if (procedure_type->return_type == NULL)
-			fprintf(out, "\"void\" \n\t\t   }\n");
-		else {
-			fprintf(out, "\"");
-			print_type(out, procedure_type->return_type);
-			fprintf(out, "\" \n\t\t   }\n");
-		}
+		json->write_key("procedure_return");
+		json->begin_string_value();
+		json_write_type(json, procedure_type->return_type);
+		json->end_string_value();
 
-		fprintf(out, "}");
+		json->end_object();
 
 		context->callstack.add(make_procedure_call(procedure_type->name, interp->stack_top, &proc->symbols));
-	}
-	else if (intercept == INTERCEPT_PROCEDURE_RETURN)
-	{
-		auto proc = (Code_Node_Block *)node;
-		auto procedure_type = interp->current_procedure;
-
-		fprintf(out, "{\n\"intercept\": \"return\",\n\"line_number\" : ");
-		fprintf(out, "\"");
-		fprintf(out, "%zu", proc->procedure_source_row);
-		fprintf(out, "\",\n");
-		fprintf(out, "\"procedure_name\" : \"%s\",\n", procedure_type->name.data);
-
-		fprintf(out, "\"procedure_type\" : {\n");	
-		fprintf(out, "\t\t\"arguments\" : [ ");
-
-		for (int64_t i = 0; i < procedure_type->argument_count; ++i) {
-			fprintf(out, "\"");
-			print_type(out, procedure_type->arguments[i]);
-			fprintf(out, "\"");
-			if (i != procedure_type->argument_count - 1)
-				fprintf(out, ", ");
-		}
-
-		fprintf(out, " ], \n\t\t\"return\": ");
-		if (procedure_type->return_type == NULL)
-			fprintf(out, "\"void\" \n\t\t   }\n");
-		else {
-			fprintf(out, "\"");
-			print_type(out, procedure_type->return_type);
-			fprintf(out, "\" \n\t\t   }\n");
-		}
-		
-		fprintf(out, "\n}");
-
-		context->callstack.remove_last();
 	}
 	else if (intercept == INTERCEPT_STATEMENT)
 	{
 		auto statement = (Code_Node_Statement *)node;
-		fprintf(out, "{\n\"intercept\": \"statement\",\n\"line_number\" : ");
-		fprintf(out, "\"");
-		fprintf(out, "%zu", statement->source_row);
-		fprintf(out, "\",\n");
 
-		fprintf(out, "\"globals\" : [\n");
-		print_symbols(interp, out, interp->global_symbol_table, 0, 0);
-		fprintf(out, "\t      ], \n");
+		json->begin_object(false, 2);
+		
+		json->write_key_value("intercept", "statement");
+		json->write_key_value("line_number", "%d", (int)statement->source_row);
 
+		json->write_key("globals");
+		json->begin_array(true);
+		json_write_symbols(interp, json, interp->global_symbol_table, 0, 0);
+		json->end_array();
 
-		fprintf(out, "\"callstack\" : [\n");
-
-		print_symbols_from_procedure(interp, out, interp->current_procedure->name, statement->symbol_table, interp->stack_top, UINT64_MAX);
+		json->write_key("callstack");
+		json->begin_array(true);
+		json_write_procedure_symbols(interp, json, interp->current_procedure->name, statement->symbol_table, interp->stack_top, UINT64_MAX);
 
 		// Don't print the last added calstack before we are already printing it
 		for (int64_t index = context->callstack.count - 2; index >= 0; --index)
 		{
 			auto call = &context->callstack[index];
-			fprintf(out, ",\n");
-			print_symbols_from_procedure(interp, out, call->procedure_name, call->symbols, call->stack_top, interp->stack_top);
+			json_write_procedure_symbols(interp, json, call->procedure_name, call->symbols, call->stack_top, interp->stack_top);
 		}
 
-		fprintf(out, "\t      ], \n");
-		fprintf(out, "\"console_out\": \"%s\"\n", context->console_out.get_cstring());
-		fprintf(out, "}");
+		json->end_array();
+
+		json->write_key_value("console_out", "%s", context->console_out.get_cstring());
+
+		json->end_object();
 	}
 }
 
@@ -457,7 +595,7 @@ static void basic_print(Interpreter *interp) {
 				{
 					index += 1;
 					auto value = (Kano_Int *)(args);
-					con_out.fmt_print("%zd", *value);
+					con_out.write_fmt("%zd", *value);
 					printf("%zd", *value);
 					args += sizeof(Kano_Int);
 				}
@@ -465,7 +603,7 @@ static void basic_print(Interpreter *interp) {
 				{
 					index += 1;
 					auto value = (Kano_Real *)(args);
-					con_out.fmt_print("%f", *value);
+					con_out.write_fmt("%f", *value);
 					printf("%f", *value);
 					args += sizeof(Kano_Real);
 				}
@@ -473,20 +611,20 @@ static void basic_print(Interpreter *interp) {
 				{
 					index += 1;
 					auto value = (Kano_Bool *)(args);
-					con_out.fmt_print("%s", (*value ? "true" : "false"));
+					con_out.write_fmt("%s", (*value ? "true" : "false"));
 					printf("%s", (*value ? "true" : "false"));
 					args += sizeof(Kano_Bool);
 				}
 				else if (fmt[index] == '%')
 				{
-					con_out.fmt_print("%");
+					con_out.write_fmt("%");
 					printf("%%");
 					index += 1;
 				}
 			}
 			else
 			{
-				con_out.fmt_print("%");
+				con_out.write_fmt("%");
 				printf("%%");
 			}
 		}
@@ -498,25 +636,25 @@ static void basic_print(Interpreter *interp) {
 				if (fmt[index] == 'n')
 				{
 					index += 1;
-					con_out.fmt_print("\\n");
+					con_out.write_fmt("\\n");
 					printf("\n");
 				}
 				else if (fmt[index] == '\\')
 				{
-					con_out.fmt_print("\\\\");
+					con_out.write_fmt("\\\\");
 					printf("\\");
 					index += 1;
 				}
 			}
 			else
 			{
-				con_out.fmt_print("\\\\");
+				con_out.write_fmt("\\\\");
 				printf("\\");
 			}
 		}
 		else
 		{
-			con_out.fmt_print("%c", fmt[index]);
+			con_out.write_fmt("%c", fmt[index]);
 			printf("%c", fmt[index]);
 			index += 1;
 		}
@@ -612,10 +750,11 @@ int main()
 	auto exprs = code_type_resolve(resolver, node);
 
 	FILE *out = fopen("DebugInfo.json", "wb");
-	fprintf(out, "[\n");
 
 	Interp_User_Context context;
-	context.debug_json = out;
+	context.json.init(out);
+
+	context.json.begin_array();
 
 	Interpreter interp;
 	interp.intercept = intercept;
@@ -626,7 +765,7 @@ int main()
 	interp_eval_globals(&interp, exprs);
 	int result = interp_eval_main(&interp, resolver);
 
-	fprintf(out, "]\n");
+	context.json.end_array();
 	fclose(out);
 
 	return result;
