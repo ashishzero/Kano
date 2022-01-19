@@ -5,10 +5,31 @@
 #include "Interp.h"
 #include "Printer.h"
 
-// Let's be lazy one in a while
-#include <sstream>
+struct String_Stream {
+	Array<char> buffer;
 
-using String_Stream = std::stringstream;
+	void fmt_print(const char *fmt, ...)
+	{
+		va_list args0, args1;
+		va_start(args0, fmt);
+		va_copy(args1, args0);
+		
+		int   len = 1 + vsnprintf(NULL, 0, fmt, args1);
+		buffer.reserve(buffer.count + len);
+		char *buf = buffer.data + buffer.count;
+		vsnprintf(buf, len, fmt, args0);
+		buffer.count += (len - 1);
+		
+		va_end(args1);
+		va_end(args0);
+	}
+
+	const char *get_cstring() {
+		buffer.reserve(buffer.count + 1);
+		buffer.data[buffer.count] = 0;
+		return buffer.data;
+	}
+};
 
 struct Call_Info {
 	String procedure_name;
@@ -214,15 +235,6 @@ void print_value(FILE *out, Code_Type *type, void *data)
 	}
 }
 
-static void string_replace_all(std::string &s, const String search, const String replace) {
-	for (size_t pos = 0; ; pos += replace.length) {
-		pos = s.find((char *)search.data, pos);
-		if (pos == std::string::npos) break;
-		s.erase(pos, search.length);
-		s.insert(pos, (char *)replace.data);
-	}
-}
-
 static void print_symbols(Interpreter *interp, FILE *out, Symbol_Table *symbols, uint64_t stack_top, uint64_t skip_stack_offset)
 {
 	bool first = true;
@@ -398,16 +410,7 @@ void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *node)
 		}
 
 		fprintf(out, "\t      ], \n");
-
-		{
-			auto &con_out = context->console_out;
-			auto buffer = con_out.rdbuf();
-			auto string = buffer->str();
-
-			string_replace_all(string, "\n", "\\n");
-			fprintf(out, "\"console_out\": \"%s\"\n", string.data());
-		}
-
+		fprintf(out, "\"console_out\": \"%s\"\n", context->console_out.get_cstring());
 		fprintf(out, "}");
 	}
 }
@@ -455,32 +458,37 @@ static void basic_print(Interpreter *interp) {
 				{
 					index += 1;
 					auto value = (Kano_Int *)(args);
-					con_out << *value;
+					con_out.fmt_print("%zd", *value);
+					printf("%zd", *value);
 					args += sizeof(Kano_Int);
 				}
 				else if (fmt[index] == 'f')
 				{
 					index += 1;
 					auto value = (Kano_Real *)(args);
-					con_out << *value;
+					con_out.fmt_print("%f", *value);
+					printf("%f", *value);
 					args += sizeof(Kano_Real);
 				}
 				else if (fmt[index] == 'b')
 				{
 					index += 1;
 					auto value = (Kano_Bool *)(args);
-					con_out << (*value ? "true" : "false");
+					con_out.fmt_print("%s", (*value ? "true" : "false"));
+					printf("%s", (*value ? "true" : "false"));
 					args += sizeof(Kano_Bool);
 				}
 				else if (fmt[index] == '%')
 				{
-					con_out << "%";
+					con_out.fmt_print("%");
+					printf("%%");
 					index += 1;
 				}
 			}
 			else
 			{
-				con_out << "%";
+				con_out.fmt_print("%");
+				printf("%%");
 			}
 		}
 		else if (fmt[index] == '\\')
@@ -491,29 +499,29 @@ static void basic_print(Interpreter *interp) {
 				if (fmt[index] == 'n')
 				{
 					index += 1;
-					con_out << "\n";
+					con_out.fmt_print("\\n");
+					printf("\n");
 				}
 				else if (fmt[index] == '\\')
 				{
-					con_out << "\\";
+					con_out.fmt_print("\\\\");
+					printf("\\");
 					index += 1;
 				}
 			}
 			else
 			{
-				con_out << "\\";
+				con_out.fmt_print("\\\\");
+				printf("\\");
 			}
 		}
 		else
 		{
-			con_out << (char)fmt[index];
+			con_out.fmt_print("%c", fmt[index]);
+			printf("%c", fmt[index]);
 			index += 1;
 		}
 	}
-
-	auto buffer = con_out.rdbuf();
-	auto string = buffer->str();
-	printf("%s", string.data());
 }
 
 static void basic_allocate(Interpreter *interp) {

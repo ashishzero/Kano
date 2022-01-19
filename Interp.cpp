@@ -899,7 +899,8 @@ static Evaluation_Value interp_eval_assignment(Interpreter *interp, Code_Node_As
 	
 	if (dst.address)
 	{
-		memcpy(dst.address, EvaluationTypePointer(value, void *), value.type->runtime_size);
+		uint64_t *source = (uint64_t *)EvaluationTypePointer(value, void *);
+		memcpy(dst.address, source, value.type->runtime_size);
 	}
 	else if (dst.type->kind == CODE_TYPE_POINTER)
 	{
