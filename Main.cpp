@@ -523,6 +523,8 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 
 		json->write_key_value("intercept", "procedure_%s", intercept_type);
 		json->write_key_value("line_number", "%d", (int)proc->procedure_source_row);
+
+#if 0
 		json->write_key_value("procedure_name", "%s", procedure_type->name.data);
 
 		json->write_key("procedure_arguments");
@@ -530,7 +532,7 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 		{
 			json->same_line = true;
 			Defer { json->same_line = false; };
-
+		
 			json->begin_array(true);
 			for (int64_t i = 0; i < procedure_type->argument_count; ++i)
 			{
@@ -545,6 +547,24 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 		json->begin_string_value();
 		json_write_type(json, procedure_type->return_type);
 		json->end_string_value();
+#endif
+
+		json->write_key("globals");
+		json->begin_array(true);
+		json_write_symbols(interp, json, interp->global_symbol_table, 0, 0);
+		json->end_array();
+
+		json->write_key("callstack");
+		json->begin_array(true);
+		
+		// Don't print the last added calstack before we are already printing it
+		for (int64_t index = 0; index < context->callstack.count; ++index)
+		{
+			auto call = &context->callstack[index];
+			json_write_procedure_symbols(interp, json, call->procedure_name, call->symbols, call->stack_top, interp->stack_top);
+		}
+
+		json->end_array();
 
 		json->write_key_value("console_out", "%s", context->console_out.get_cstring());
 
@@ -568,14 +588,15 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 
 		json->write_key("callstack");
 		json->begin_array(true);
-		json_write_procedure_symbols(interp, json, interp->current_procedure->name, statement->symbol_table, interp->stack_top, UINT64_MAX);
 
 		// Don't print the last added calstack before we are already printing it
-		for (int64_t index = context->callstack.count - 2; index >= 0; --index)
+		for (int64_t index = 0; index < context->callstack.count - 1; ++index)
 		{
 			auto call = &context->callstack[index];
 			json_write_procedure_symbols(interp, json, call->procedure_name, call->symbols, call->stack_top, interp->stack_top);
 		}
+
+		json_write_procedure_symbols(interp, json, interp->current_procedure->name, statement->symbol_table, interp->stack_top, UINT64_MAX);
 
 		json->end_array();
 
