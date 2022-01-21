@@ -570,7 +570,15 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 
 		json->end_object();
 
-		context->callstack.add(make_procedure_call(procedure_type->name, interp->stack_top, &proc->symbols));
+		if (intercept == INTERCEPT_PROCEDURE_CALL)
+		{
+			context->callstack.add(make_procedure_call(procedure_type->name, interp->stack_top, &proc->symbols));
+		}
+		else
+		{
+			Assert(intercept == INTERCEPT_PROCEDURE_RETURN);
+			context->callstack.remove_last();
+		}
 	}
 	else if (intercept == INTERCEPT_STATEMENT)
 	{
