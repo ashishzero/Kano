@@ -4,6 +4,7 @@
 #include "Resolver.h"
 #include "Interp.h"
 #include "Printer.h"
+#include "HeapAllocator.h"
 
 struct String_Stream {
 	Array<char> buffer;
@@ -267,7 +268,7 @@ static bool print_error(Error_List *list)
 	return list->first.next != nullptr;
 }
 
-static void json_write_symbol(Json_Writer *json, String name, Code_Type *type, void *data);
+static void json_write_symbol(Json_Writer *json, Interpreter *interp, String name, Code_Type *type, void *data);
 
 static void json_write_type(Json_Writer *json, Code_Type *type)
 {
@@ -330,22 +331,58 @@ static void json_write_type(Json_Writer *json, Code_Type *type)
 	}
 }
 
-static void json_write_value(Json_Writer *json, Code_Type *type, void *data)
+static inline bool interp_is_valid_memory(Interpreter *interp, void *ptr)
+{
+	if (ptr >= interp->stack && ptr < interp->stack + interp->stack_size)
+		return true;
+	return heap_contains_memory(interp->heap, ptr);
+}
+
+static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *type, void *data)
 {
 	if (!data)
 	{
-		json->write_single_value("null");
+		json->write_single_value("(null)");
 		return;
 	}
 
 	switch (type->kind)
 	{
-		case CODE_TYPE_NULL: json->write_single_value("null"); return;
+		case CODE_TYPE_NULL: json->write_single_value("(null)"); return;
 		case CODE_TYPE_INTEGER: json->write_single_value("%zd", *(Kano_Int *)data); return;
 		case CODE_TYPE_REAL: json->write_single_value("%f", *(Kano_Real *)data); return;
 		case CODE_TYPE_BOOL: json->write_single_value("%s", (*(Kano_Bool *)data) ? "true" : "false"); return;
-		case CODE_TYPE_POINTER: json->write_single_value("%p", *(void **)data); return;
-		case CODE_TYPE_PROCEDURE: json->write_single_value("%p", data); return;
+		case CODE_TYPE_PROCEDURE: json->write_single_value("0x%8zx", data); return;
+
+		case CODE_TYPE_POINTER: {
+			auto pointer_type = (Code_Type_Pointer *)type;
+			void *raw_ptr = *(void **)data;
+
+			json->begin_object(true);
+
+			if (raw_ptr)
+				json->write_key_value("raw", "0x%8zx", raw_ptr);
+			else
+				json->write_key_value("raw", "(null)");
+
+			json->write_key("base_type");
+			json->begin_string_value();
+			json_write_type(json, pointer_type->base_type);
+			json->end_string_value();
+
+			json->write_key("value");
+			if (interp_is_valid_memory(interp, raw_ptr))
+			{
+				json_write_value(json, interp, pointer_type->base_type, raw_ptr);
+			}
+			else
+			{
+				json->write_single_value("%s", raw_ptr ? "(garbage)" : "(invalid)");
+			}
+
+			json->end_object();
+			return;
+		}
 
 		case CODE_TYPE_STRUCT: {
 			auto _struct = (Code_Type_Struct *)type;
@@ -356,7 +393,7 @@ static void json_write_value(Json_Writer *json, Code_Type *type, void *data)
 			{
 				auto member = &_struct->members[index];
 
-				json_write_symbol(json, member->name, member->type, (uint8_t *)data + member->offset);
+				json_write_symbol(json, interp, member->name, member->type, (uint8_t *)data + member->offset);
 			}
 
 			json->end_array();
@@ -372,7 +409,7 @@ static void json_write_value(Json_Writer *json, Code_Type *type, void *data)
 			json->begin_array(true);			
 			for (int64_t index = 0; index < arr_count; ++index)
 			{
-				json_write_value(json, arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
+				json_write_value(json, interp, arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
 			}
 			json->end_array();
 
@@ -387,7 +424,7 @@ static void json_write_value(Json_Writer *json, Code_Type *type, void *data)
 			json->begin_array(true);
 			for (int64_t index = 0; index < arr_type->element_count; ++index)
 			{
-				json_write_value(json, arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
+				json_write_value(json, interp, arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
 			}
 			json->end_array();
 
@@ -396,7 +433,7 @@ static void json_write_value(Json_Writer *json, Code_Type *type, void *data)
 	}
 }
 
-static void json_write_symbol(Json_Writer *json, String name, Code_Type *type, void *data)
+static void json_write_symbol(Json_Writer *json, Interpreter *interp, String name, Code_Type *type, void *data)
 {
 	json->begin_object();
 	json->write_key_value("name", "%s", name.data);
@@ -406,10 +443,10 @@ static void json_write_symbol(Json_Writer *json, String name, Code_Type *type, v
 	json_write_type(json, type);
 	json->end_string_value();
 	
-	json->write_key_value("address", "%p", data);
+	json->write_key_value("address", "0x%8zx", data);
 	
 	json->write_key("value");
-	json_write_value(json, type, data);
+	json_write_value(json, interp, type, data);
 	
 	json->end_object();
 }
@@ -444,7 +481,7 @@ static void json_write_symbols(Interpreter *interp, Json_Writer *json, Symbol_Ta
 		else
 			Unreachable();
 
-		json_write_symbol(json, symbol->name, symbol->type, data);
+		json_write_symbol(json, interp, symbol->name, symbol->type, data);
 	}
 }
 
@@ -508,6 +545,8 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 		json->begin_string_value();
 		json_write_type(json, procedure_type->return_type);
 		json->end_string_value();
+
+		json->write_key_value("console_out", "%s", context->console_out.get_cstring());
 
 		json->end_object();
 
@@ -659,14 +698,14 @@ static void basic_allocate(Interpreter *interp) {
 	Interp_Morph morph(interp);
 	morph.OffsetReturn<void *>();
 	auto size = morph.Arg<Kano_Int>();
-	auto result = malloc(size);
+	auto result = heap_alloc(interp->heap, size);
 	morph.Return(result);
 }
 
 static void basic_free(Interpreter *interp) {
 	Interp_Morph morph(interp);
 	auto ptr = morph.Arg<void *>();
-	free(ptr);
+	heap_free(interp->heap, ptr);
 }
 
 static void basic_sin(Interpreter *interp) {
@@ -754,6 +793,7 @@ int main()
 	interp.intercept = intercept;
 	interp.user_context = &context;
 	interp.global_symbol_table = code_type_resolver_global_symbol_table(resolver);
+	interp.heap = new Heap_Allocator;
 	interp_init(&interp, 1024 * 1024 * 4, code_type_resolver_bss_allocated(resolver));
 
 	interp_eval_globals(&interp, exprs);

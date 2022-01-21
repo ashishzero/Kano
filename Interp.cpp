@@ -1182,6 +1182,8 @@ void interp_init(Interpreter *interp, size_t stack_size, size_t bss_size)
 {
 	interp->stack  = new uint8_t[stack_size];
 	interp->global = new uint8_t[bss_size];
+	interp->stack_size = stack_size;
+	interp->global_size = bss_size;
 	memset(interp->stack, 0, stack_size);
 	memset(interp->global, 0, bss_size);
 }

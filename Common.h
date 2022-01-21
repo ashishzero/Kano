@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
+#include <stdlib.h>
 
 #if defined(__clang__) || defined(__ibmxl__)
 #define COMPILER_CLANG 1

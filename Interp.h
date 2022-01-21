@@ -16,13 +16,16 @@ inline void intercept_default(struct Interpreter *interp, Intercept_Kind interce
 struct Interpreter
 {
 	uint8_t *stack = nullptr;
+	uint64_t stack_size = 0;
 	uint8_t *global = nullptr;
+	uint64_t global_size = 0;
 	uint64_t stack_top = 0;
 	int64_t  return_count = 0;
 	struct Code_Type_Procedure *current_procedure = nullptr;
-	Intercep_Proc intercept = intercept_default;
 	Symbol_Table *global_symbol_table = nullptr;
+	struct Heap_Allocator *heap = nullptr;
 
+	Intercep_Proc intercept = intercept_default;
 	void *user_context = nullptr;
 };
 
