@@ -55,7 +55,7 @@ const Node := struct {
 
 const print_nodes := proc (var head: *Node) {
 	while (head != null) {
-		print("%d -> ", head.data);
+		print("% -> ", head.data);
 		head = head.next;
 	}
 	print("null.\n");
@@ -72,7 +72,9 @@ const main := proc() {
 
 	print_nodes(*a);
 
-	//print("a.data: %d, a.next: %d\n", a.data, a.next);
+	print("\n%\n", a);
+
+	//print("a.data: %, a.next: %\n", a.data, a.next);
 	
 	//var a: Vec2;
 	//a.x = 7;

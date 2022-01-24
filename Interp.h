@@ -25,11 +25,13 @@ struct Interpreter
 	Symbol_Table *global_symbol_table = nullptr;
 	struct Heap_Allocator *heap = nullptr;
 
+	struct Code_Type_Resolver *resolver = nullptr;
+
 	Intercep_Proc intercept = intercept_default;
 	void *user_context = nullptr;
 };
 
-void            interp_init(Interpreter *interp, size_t stack_size, size_t bss_size);
+void            interp_init(Interpreter *interp, struct Code_Type_Resolver *resolver, size_t stack_size, size_t bss_size);
 
 void interp_eval_globals(Interpreter *interp, Array_View<Code_Node_Assignment *> exprs);
-int interp_eval_main(Interpreter *interp, struct Code_Type_Resolver *resolver);
+int interp_eval_main(Interpreter *interp);

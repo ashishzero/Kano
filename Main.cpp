@@ -637,6 +637,134 @@ struct Interp_Morph {
 	}
 };
 
+static void stdout_value(Interpreter *interp, String_Stream &out, Code_Type *type, void *data)
+{
+	if (!data)
+	{
+		out.write_fmt("(null)");
+		printf("(null)");
+		return;
+	}
+
+	switch (type->kind)
+	{
+		case CODE_TYPE_NULL: 
+			out.write_fmt("(null)");
+			printf("(null)");
+			return;
+		case CODE_TYPE_INTEGER: 
+			out.write_fmt("%zd", *(Kano_Int *)data);
+			printf("%zd", *(Kano_Int *)data);
+			return;
+		case CODE_TYPE_REAL: 
+			out.write_fmt("%f", *(Kano_Real *)data);
+			printf("%f", *(Kano_Real *)data);
+			return;
+		case CODE_TYPE_BOOL: 
+			out.write_fmt("%s", (*(Kano_Bool *)data) ? "true" : "false");
+			printf("%s", (*(Kano_Bool *)data) ? "true" : "false");
+			return;
+		case CODE_TYPE_PROCEDURE: 
+			out.write_fmt("0x%8zx", data);
+			printf("0x%8zx", data);
+			return;
+
+		case CODE_TYPE_POINTER: {
+			auto pointer_type = (Code_Type_Pointer *)type;
+			void *raw_ptr = *(void **)data;
+
+			out.write_fmt("{ ");
+			printf("{ ");
+
+			if (raw_ptr)
+			{
+				out.write_fmt("raw: 0x%8zx ", raw_ptr);
+				printf("raw: 0x%8zx ", raw_ptr);
+			}
+			else
+			{
+				out.write_fmt("raw: (null) ");
+				printf("raw: (null) ");
+			}
+
+			out.write_fmt("value: ");
+			printf("value: ");
+			if (interp_is_valid_memory(interp, raw_ptr))
+			{
+				stdout_value(interp, out, pointer_type->base_type, raw_ptr);
+				out.write_fmt(" ");
+				printf(" ");
+			}
+			else
+			{
+				out.write_fmt("%s ", raw_ptr ? "(garbage)" : "(invalid)");
+				printf("%s ", raw_ptr ? "(garbage)" : "(invalid)");
+			}
+
+			out.write_fmt("}");
+			printf("}");
+			return;
+		}
+
+		case CODE_TYPE_STRUCT: {
+			auto _struct = (Code_Type_Struct *)type;
+
+			out.write_fmt("{ ");
+			printf("{ ");
+
+			for (int64_t index = 0; index < _struct->member_count; ++index)
+			{
+				auto member = &_struct->members[index];
+				stdout_value(interp, out, member->type, (uint8_t *)data + member->offset);
+				out.write_fmt(" ");
+				printf(" ");
+			}
+
+			out.write_fmt("}");
+			printf("}");
+			return;
+		}
+
+		case CODE_TYPE_ARRAY_VIEW: {
+			auto arr_type = (Code_Type_Array_View *)type;
+			
+			auto arr_count = *(Kano_Int *)data;
+			auto arr_data = (uint8_t *)data + sizeof(Kano_Int);
+
+			out.write_fmt("[ ");
+			printf("[ ");
+			for (int64_t index = 0; index < arr_count; ++index)
+			{
+				stdout_value(interp, out, arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
+				out.write_fmt(" ");
+			}
+			out.write_fmt("]");
+			printf("]");
+
+			return;
+		}
+
+		case CODE_TYPE_STATIC_ARRAY: {
+			auto arr_type = (Code_Type_Static_Array *)type;
+
+			auto arr_data = (uint8_t *)data;
+
+			out.write_fmt("[ ");
+			printf("[ ");
+			for (int64_t index = 0; index < arr_type->element_count; ++index)
+			{
+				stdout_value(interp, out, arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
+				out.write_fmt(" ");
+				printf(" ");
+			}
+			out.write_fmt("]");
+			printf("]");
+
+			return;
+		}
+	}
+}
+
 static void basic_print(Interpreter *interp) {
 	Interp_Morph morph(interp);
 
@@ -651,44 +779,13 @@ static void basic_print(Interpreter *interp) {
 		if (fmt[index] == '%')
 		{
 			index += 1;
-			if (index < fmt.length)
-			{
-				if (fmt[index] == 'd')
-				{
-					index += 1;
-					auto value = (Kano_Int *)(args);
-					con_out.write_fmt("%zd", *value);
-					printf("%zd", *value);
-					args += sizeof(Kano_Int);
-				}
-				else if (fmt[index] == 'f')
-				{
-					index += 1;
-					auto value = (Kano_Real *)(args);
-					con_out.write_fmt("%f", *value);
-					printf("%f", *value);
-					args += sizeof(Kano_Real);
-				}
-				else if (fmt[index] == 'b')
-				{
-					index += 1;
-					auto value = (Kano_Bool *)(args);
-					con_out.write_fmt("%s", (*value ? "true" : "false"));
-					printf("%s", (*value ? "true" : "false"));
-					args += sizeof(Kano_Bool);
-				}
-				else if (fmt[index] == '%')
-				{
-					con_out.write_fmt("%");
-					printf("%%");
-					index += 1;
-				}
-			}
-			else
-			{
-				con_out.write_fmt("%");
-				printf("%%");
-			}
+
+			auto type = *(Code_Type **)args;
+			args += sizeof(Code_Type *);
+			auto ptr = args;
+			args += type->runtime_size;
+
+			stdout_value(interp, con_out, type, ptr);
 		}
 		else if (fmt[index] == '\\')
 		{
@@ -823,10 +920,10 @@ int main()
 	interp.user_context = &context;
 	interp.global_symbol_table = code_type_resolver_global_symbol_table(resolver);
 	interp.heap = new Heap_Allocator;
-	interp_init(&interp, 1024 * 1024 * 4, code_type_resolver_bss_allocated(resolver));
+	interp_init(&interp, resolver, 1024 * 1024 * 4, code_type_resolver_bss_allocated(resolver));
 
 	interp_eval_globals(&interp, exprs);
-	int result = interp_eval_main(&interp, resolver);
+	int result = interp_eval_main(&interp);
 
 	context.json.end_array();
 	fclose(out);

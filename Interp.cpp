@@ -1,5 +1,8 @@
 #include "Interp.h"
 #include "CodeNode.h"
+
+#include "Resolver.h"
+
 #include <stdlib.h>
 
 struct Evaluation_Value
@@ -931,6 +934,13 @@ static inline void interp_recursive_push_aligned_parameter(Interpreter *interp, 
 	}
 }
 
+static Evaluation_Value interp_make_type_value(Interpreter *interp, Code_Type *type) {
+	Evaluation_Value value;
+	value.imm.pointer_value = (uint8_t *)type;
+	value.type = code_type_resolver_find_type(interp->resolver, "*void");
+	return value;
+}
+
 static Evaluation_Value interp_eval_procedure_call(Interpreter *interp, Code_Node_Procedure_Call *root)
 {
 	auto prev_top = interp->stack_top;
@@ -941,16 +951,21 @@ static Evaluation_Value interp_eval_procedure_call(Interpreter *interp, Code_Nod
 
 	uint64_t variadics_args_size = 0;
 	for (int64_t i = 0; i < root->variadic_count; ++i)
+	{
 		variadics_args_size += root->variadics[i]->type->runtime_size;
+		variadics_args_size += sizeof(Code_Type *);
+	}
 
 	{
 		uint64_t offset = variadics_args_size;
 		for (int64_t i = root->variadic_count - 1; i >= 0; --i)
 		{
 			interp->stack_top = prev_top;
-			auto var = interp_eval_root_expression(interp, (Code_Node_Expression *)root->variadics[i]);
+			auto param = root->variadics[i];
+			auto var = interp_eval_root_expression(interp, param);
 			interp->stack_top = new_top;
 			offset = interp_push_into_stack_reduced(interp, var, offset);
+			offset = interp_push_into_stack_reduced(interp, interp_make_type_value(interp, param->type), offset);
 		}
 	}
 	
@@ -1176,14 +1191,13 @@ static void interp_eval_block(Interpreter *interp, Code_Node_Block *root, bool i
 //
 //
 
-#include "Resolver.h"
-
-void interp_init(Interpreter *interp, size_t stack_size, size_t bss_size)
+void interp_init(Interpreter *interp, Code_Type_Resolver *resolver, size_t stack_size, size_t bss_size)
 {
 	interp->stack  = new uint8_t[stack_size];
 	interp->global = new uint8_t[bss_size];
 	interp->stack_size = stack_size;
 	interp->global_size = bss_size;
+	interp->resolver = resolver;
 	memset(interp->stack, 0, stack_size);
 	memset(interp->global, 0, bss_size);
 }
@@ -1194,8 +1208,9 @@ void interp_eval_globals(Interpreter *interp, Array_View<Code_Node_Assignment *>
 		interp_eval_assignment(interp, expr);
 }
 
-int interp_eval_main(Interpreter *interp, Code_Type_Resolver *resolver)
+int interp_eval_main(Interpreter *interp)
 {
+	auto resolver = interp->resolver;
 	auto main_proc = code_type_resolver_find(resolver, "main");
 	
 	if (!main_proc)
