@@ -665,8 +665,8 @@ static void stdout_value(Interpreter *interp, String_Stream &out, Code_Type *typ
 			printf("%s", (*(Kano_Bool *)data) ? "true" : "false");
 			return;
 		case CODE_TYPE_PROCEDURE: 
-			out.write_fmt("0x%8zx", data);
-			printf("0x%8zx", data);
+			out.write_fmt("0x%8zx", (uint64_t)data);
+			printf("0x%8zx", (uint64_t)data);
 			return;
 
 		case CODE_TYPE_POINTER: {
@@ -678,13 +678,13 @@ static void stdout_value(Interpreter *interp, String_Stream &out, Code_Type *typ
 
 			if (raw_ptr)
 			{
-				out.write_fmt("raw: 0x%8zx ", raw_ptr);
-				printf("raw: 0x%8zx ", raw_ptr);
+				out.write_fmt("raw: 0x%8zx, ", (uint64_t)raw_ptr);
+				printf("raw: 0x%8zx, ", (uint64_t)raw_ptr);
 			}
 			else
 			{
-				out.write_fmt("raw: (null) ");
-				printf("raw: (null) ");
+				out.write_fmt("raw: (null), ");
+				printf("raw: (null), ");
 			}
 
 			out.write_fmt("value: ");
@@ -715,7 +715,16 @@ static void stdout_value(Interpreter *interp, String_Stream &out, Code_Type *typ
 			for (int64_t index = 0; index < _struct->member_count; ++index)
 			{
 				auto member = &_struct->members[index];
+				out.write_fmt("%s: ", member->name.data);
+				printf("%s: ", member->name.data);
 				stdout_value(interp, out, member->type, (uint8_t *)data + member->offset);
+
+				if (index < _struct->member_count - 1)
+				{
+					out.write_fmt(",");
+					printf(",");
+				}
+
 				out.write_fmt(" ");
 				printf(" ");
 			}
