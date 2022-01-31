@@ -331,11 +331,30 @@ static void json_write_type(Json_Writer *json, Code_Type *type)
 	}
 }
 
-static inline bool interp_is_valid_memory(Interpreter *interp, void *ptr)
+enum Memory_Type {
+	Memory_Type_INVALID,
+	Memory_Type_STACK,
+	Memory_Type_GLOBAL,
+	Memory_Type_HEAP,
+};
+
+static const char *memory_type_string(Memory_Type type) {
+	if (type == Memory_Type_INVALID) return "(invalid)";
+	if (type == Memory_Type_STACK) return "stack";
+	if (type == Memory_Type_GLOBAL) return "global";
+	if (type == Memory_Type_HEAP) return "heap";
+	return "(null)";
+}
+
+static Memory_Type interp_get_memory_type(Interpreter *interp, void *ptr)
 {
 	if (ptr >= interp->stack && ptr < interp->stack + interp->stack_size)
-		return true;
-	return heap_contains_memory(interp->heap, ptr);
+		return Memory_Type_STACK;
+	if (ptr >= interp->global && ptr < interp->global + interp->global_size)
+		return Memory_Type_GLOBAL;
+	if (heap_contains_memory(interp->heap, ptr))
+		return Memory_Type_HEAP;
+	return Memory_Type_INVALID;
 }
 
 static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *type, void *data)
@@ -370,8 +389,12 @@ static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *
 			json_write_type(json, pointer_type->base_type);
 			json->end_string_value();
 
+			auto mem_type = interp_get_memory_type(interp, raw_ptr);
+
+			json->write_key_value("memory", "%s", memory_type_string(mem_type));
+
 			json->write_key("value");
-			if (interp_is_valid_memory(interp, raw_ptr))
+			if (mem_type != Memory_Type_INVALID)
 			{
 				json_write_value(json, interp, pointer_type->base_type, raw_ptr);
 			}
@@ -443,7 +466,9 @@ static void json_write_symbol(Json_Writer *json, Interpreter *interp, String nam
 	json_write_type(json, type);
 	json->end_string_value();
 	
+	auto mem_type = interp_get_memory_type(interp, data);
 	json->write_key_value("address", "0x%8zx", data);
+	json->write_key_value("memory", "%s", memory_type_string(mem_type));
 	
 	json->write_key("value");
 	json_write_value(json, interp, type, data);
@@ -687,9 +712,11 @@ static void stdout_value(Interpreter *interp, String_Stream &out, Code_Type *typ
 				printf("raw: (null), ");
 			}
 
+			auto mem_type = interp_get_memory_type(interp, raw_ptr);
+
 			out.write_fmt("value: ");
 			printf("value: ");
-			if (interp_is_valid_memory(interp, raw_ptr))
+			if (mem_type != Memory_Type_INVALID)
 			{
 				stdout_value(interp, out, pointer_type->base_type, raw_ptr);
 				out.write_fmt(" ");
