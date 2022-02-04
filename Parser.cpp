@@ -197,8 +197,16 @@ Syntax_Node *parse_subexpression(Parser *parser, uint32_t prec)
 	if (parser_accept_token(parser, TOKEN_KIND_INTEGER))
 	{
 		auto node                = parser_new_syntax_node<Syntax_Node_Literal>(parser);
-		node->value.kind         = Literal::INTEGER;
-		node->value.data.integer = (int32_t)parser->value.integer;
+		if (parser->value.integer >= 0 && parser->value.integer < 255)
+		{
+			node->value.kind = Literal::BYTE;
+			node->value.data.integer = (int32_t)parser->value.integer;
+		}
+		else
+		{
+			node->value.kind = Literal::INTEGER;
+			node->value.data.integer = (int32_t)parser->value.integer;
+		}
 		parser_finish_syntax_node(parser, node);
 		return node;
 	}
@@ -709,7 +717,12 @@ Syntax_Node_Type *parse_type(Parser *parser)
 {
 	auto type = parser_new_syntax_node<Syntax_Node_Type>(parser);
 
-	if (parser_accept_token(parser, TOKEN_KIND_INT))
+	if (parser_accept_token(parser, TOKEN_KIND_BYTE))
+	{
+		type->id       = Syntax_Node_Type::BYTE;
+		type->location = parser->location;
+	}
+	else if (parser_accept_token(parser, TOKEN_KIND_INT))
 	{
 		type->id       = Syntax_Node_Type::INT;
 		type->location = parser->location;

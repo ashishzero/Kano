@@ -68,6 +68,7 @@ static inline void *heap_alloc(Heap_Allocator *allocator, uint64_t size)
 					allocator->free_list = next;
 
 				buk->size = size;
+				memset(buk->ptr, 0, size);
 				return (void *)buk->ptr;
 			}
 			else
@@ -76,6 +77,7 @@ static inline void *heap_alloc(Heap_Allocator *allocator, uint64_t size)
 					parent->next[0] = buk->next[0];
 				else
 					allocator->free_list = buk->next[0];
+				memset(buk->ptr, 0, size);
 				return (void *)buk->ptr;
 			}
 		}

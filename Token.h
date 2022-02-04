@@ -66,6 +66,7 @@ enum Token_Kind
 	TOKEN_KIND_TRUE,
 	TOKEN_KIND_FALSE,
 
+	TOKEN_KIND_BYTE,
 	TOKEN_KIND_INT,
 	TOKEN_KIND_FLOAT,
 	TOKEN_KIND_BOOL,
@@ -165,7 +166,7 @@ static inline String token_kind_string(Token_Kind kind)
 
 	                           "true",        "false",
 
-	                           "int",         "float",
+	                           "byte", "int",         "float",
 	                           "bool",        "..",
 
 	                           "if",          "then",

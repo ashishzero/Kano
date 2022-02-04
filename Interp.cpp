@@ -187,6 +187,10 @@ static Evaluation_Value interp_eval_type_cast(Interpreter *interp, Code_Node_Typ
 			{
 				type_value.imm.int_value = (Kano_Int)EvaluationTypeValue(value, Kano_Real);
 			}
+			else if (value.type->kind == CODE_TYPE_CHARACTER) 
+			{
+				type_value.imm.int_value = (Kano_Int)EvaluationTypeValue(value, Kano_Char);
+			}
 			else
 			{
 				Unreachable();
@@ -202,6 +206,10 @@ static Evaluation_Value interp_eval_type_cast(Interpreter *interp, Code_Node_Typ
 			else if (value.type->kind == CODE_TYPE_REAL)
 			{
 				type_value.imm.bool_value = EvaluationTypeValue(value, Kano_Real) != 0.0;
+			}
+			else if (value.type->kind == CODE_TYPE_CHARACTER) 
+			{
+				type_value.imm.bool_value = EvaluationTypeValue(value, Kano_Char) != 0;
 			}
 			else
 			{

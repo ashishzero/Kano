@@ -369,7 +369,7 @@ static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *
 	switch (type->kind)
 	{
 		case CODE_TYPE_NULL: json->write_single_value("(null)"); return;
-		case CODE_TYPE_CHARACTER: json->write_single_value("%c", *(Kano_Char *)data); return;
+		case CODE_TYPE_CHARACTER: json->write_single_value("%d", (int) *(Kano_Char *)data); return;
 		case CODE_TYPE_INTEGER: json->write_single_value("%zd", *(Kano_Int *)data); return;
 		case CODE_TYPE_REAL: json->write_single_value("%f", *(Kano_Real *)data); return;
 		case CODE_TYPE_BOOL: json->write_single_value("%s", (*(Kano_Bool *)data) ? "true" : "false"); return;

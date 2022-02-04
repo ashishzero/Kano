@@ -92,6 +92,7 @@ struct Literal
 {
 	enum Kind
 	{
+		BYTE,
 		INTEGER,
 		REAL,
 		BOOL,
@@ -189,6 +190,7 @@ struct Syntax_Node_Type : public Syntax_Node
 	{
 		ERROR,
 		VOID,
+		BYTE,
 		INT,
 		FLOAT,
 		BOOL,

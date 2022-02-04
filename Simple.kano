@@ -61,8 +61,66 @@ const print_nodes := proc (var head: *Node) {
 	print("null.\n");
 }
 
+const TreeNode := struct {
+	var op: byte;
+	var number: int;
+
+	var left: *TreeNode;
+	var right: *TreeNode;
+}
+
+const OP_ADD : byte = 1;
+const OP_SUB : byte = 2;
+const OP_MUL : byte = 3;
+const OP_DIV : byte = 4;
+
+const evaluate_tree := proc(var root: *TreeNode) -> int {
+	if (root.op) {
+		var op := root.op;
+		var a  := evaluate_tree(root.left);
+		var b  := evaluate_tree(root.right);
+		
+		var c :int = 0;
+
+		if (op == OP_ADD) {
+			c = a + b;
+		} else if (op == OP_SUB) {
+			c = a - b;
+		} else if (op == OP_MUL) {
+			c = a * b;
+		} else {
+			c = a / b;
+		}
+
+		return c;
+	}
+
+	return root.number;
+}
+
+const make_expr_tree := proc() -> *TreeNode {
+	var a: *TreeNode = allocate(size_of(TreeNode));
+	a.op = OP_ADD;
+	a.left = allocate(size_of(TreeNode));
+	a.right = allocate(size_of(TreeNode));
+	a.left.op = 0;
+	a.right.op = 0;
+	a.left.number = 5;
+	a.right.number = 6;
+	a.left.left = null;
+	a.left.right = null;
+	a.right.left = null;
+	a.right.right = null;
+	return a;
+}
+
 const main := proc() {
-	print("%\n", "thing"[0]);
+	//print("%\n", "thing"[0]);
+
+	var tree := make_expr_tree();
+	var result := evaluate_tree(tree);
+
+	print("Result: %\n", result);
 
 	//var a: Node;
 	//a.data = 1;

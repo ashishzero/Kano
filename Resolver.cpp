@@ -68,6 +68,7 @@ static void type_to_string_internal(Code_Type *type)
 	switch (type->kind)
 	{
 		case CODE_TYPE_NULL: tprintf("void"); return;
+		case CODE_TYPE_CHARACTER: tprintf("byte"); return;
 		case CODE_TYPE_INTEGER: tprintf("int"); return;
 		case CODE_TYPE_REAL: tprintf("float"); return;
 		case CODE_TYPE_BOOL: tprintf("bool"); return;
@@ -337,18 +338,18 @@ static Code_Node_Type_Cast *code_type_cast(Code_Node *node, Code_Type *to_type, 
 	{
 		case CODE_TYPE_CHARACTER: {
 			auto from_type = node->type->kind;
-			cast_success = (from_type == CODE_TYPE_BOOL || from_type == CODE_TYPE_INTEGER);
+			cast_success = (from_type == CODE_TYPE_BOOL);
 
 			if (!cast_success && explicit_cast)
 			{
-				cast_success = (from_type == CODE_TYPE_REAL);
+				cast_success = (from_type == CODE_TYPE_REAL || from_type == CODE_TYPE_INTEGER);
 			}
 		}
 		break;
 
 		case CODE_TYPE_INTEGER: {
 			auto from_type = node->type->kind;
-			cast_success   = (from_type == CODE_TYPE_BOOL);
+			cast_success   = (from_type == CODE_TYPE_BOOL || from_type == CODE_TYPE_CHARACTER);
 			
 			if (!cast_success && explicit_cast)
 			{
@@ -370,7 +371,7 @@ static Code_Node_Type_Cast *code_type_cast(Code_Node *node, Code_Type *to_type, 
 		
 		case CODE_TYPE_BOOL: {
 			auto from_type = node->type->kind;
-			cast_success   = (from_type == CODE_TYPE_INTEGER || from_type == CODE_TYPE_REAL || from_type == CODE_TYPE_REAL);
+			cast_success   = (from_type == CODE_TYPE_CHARACTER || from_type == CODE_TYPE_INTEGER || from_type == CODE_TYPE_REAL);
 		}
 		break;
 		
@@ -523,6 +524,15 @@ static Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Sym
 	
 	switch (root->value.kind)
 	{
+		case Literal::BYTE: {
+			auto symbol = symbol_table_get(&resolver->symbols, "byte");
+			Assert(symbol->flags & SYMBOL_BIT_TYPE);
+			
+			node->type               = symbol->type;
+			node->data.integer.value = root->value.data.integer;
+		}
+		break;
+
 		case Literal::INTEGER: {
 			auto symbol = symbol_table_get(&resolver->symbols, "int");
 			Assert(symbol->flags & SYMBOL_BIT_TYPE);
@@ -1326,6 +1336,12 @@ static Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *
 	
 	switch (root->id)
 	{
+		case Syntax_Node_Type::BYTE: {
+			auto symbol = symbol_table_get(&resolver->symbols, "byte");
+			return symbol->type;
+		}
+		break;
+
 		case Syntax_Node_Type::INT: {
 			auto symbol = symbol_table_get(&resolver->symbols, "int");
 			return symbol->type;
@@ -1644,6 +1660,10 @@ static Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolv
 				expression =
 					code_resolve_root_expression(resolver, symbols, (Syntax_Node_Expression *)root->initializer);
 				type = expression->type;
+				if (type->kind == CODE_TYPE_CHARACTER)
+				{
+					type = symbol_table_get(&resolver->symbols, "int", false)->type;
+				}
 			}
 		}
 		else if (root->initializer)
