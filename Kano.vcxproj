@@ -155,6 +155,7 @@
     <ClInclude Include="Common.h" />
     <ClInclude Include="Error.h" />
     <ClInclude Include="Flags.h" />
+    <ClInclude Include="HeapAllocator.h" />
     <ClInclude Include="Interp.h" />
     <ClInclude Include="Lexer.h" />
     <ClInclude Include="Parser.h" />

@@ -281,6 +281,7 @@ static void json_write_type(Json_Writer *json, Code_Type *type)
 	switch (type->kind)
 	{
 		case CODE_TYPE_NULL: json->append_string_value("void"); return;
+		case CODE_TYPE_CHARACTER: json->append_string_value("byte"); return;
 		case CODE_TYPE_INTEGER: json->append_string_value("int"); return;
 		case CODE_TYPE_REAL: json->append_string_value("float"); return;
 		case CODE_TYPE_BOOL: json->append_string_value("bool"); return;
@@ -368,6 +369,7 @@ static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *
 	switch (type->kind)
 	{
 		case CODE_TYPE_NULL: json->write_single_value("(null)"); return;
+		case CODE_TYPE_CHARACTER: json->write_single_value("%c", *(Kano_Char *)data); return;
 		case CODE_TYPE_INTEGER: json->write_single_value("%zd", *(Kano_Int *)data); return;
 		case CODE_TYPE_REAL: json->write_single_value("%f", *(Kano_Real *)data); return;
 		case CODE_TYPE_BOOL: json->write_single_value("%s", (*(Kano_Bool *)data) ? "true" : "false"); return;
@@ -676,6 +678,10 @@ static void stdout_value(Interpreter *interp, String_Stream &out, Code_Type *typ
 		case CODE_TYPE_NULL: 
 			out.write_fmt("(null)");
 			printf("(null)");
+			return;
+		case CODE_TYPE_CHARACTER: 
+			out.write_fmt("%c", *(Kano_Char *)data);
+			printf("%c", *(Kano_Char *)data);
 			return;
 		case CODE_TYPE_INTEGER: 
 			out.write_fmt("%zd", *(Kano_Int *)data);

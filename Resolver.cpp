@@ -335,6 +335,17 @@ static Code_Node_Type_Cast *code_type_cast(Code_Node *node, Code_Type *to_type, 
 	
 	switch (to_type->kind)
 	{
+		case CODE_TYPE_CHARACTER: {
+			auto from_type = node->type->kind;
+			cast_success = (from_type == CODE_TYPE_BOOL || from_type == CODE_TYPE_INTEGER);
+
+			if (!cast_success && explicit_cast)
+			{
+				cast_success = (from_type == CODE_TYPE_REAL);
+			}
+		}
+		break;
+
 		case CODE_TYPE_INTEGER: {
 			auto from_type = node->type->kind;
 			cast_success   = (from_type == CODE_TYPE_BOOL);
@@ -782,8 +793,18 @@ static Code_Node_Address *code_resolve_subscript(Code_Type_Resolver *resolver, S
 {
 	auto expression = code_resolve_root_expression(resolver, symbols, root->expression);
 	auto subscript  = code_resolve_root_expression(resolver, symbols, root->subscript);
+
+	bool expr_type_is_string = false;
+
+	if (expression->type->kind == CODE_TYPE_STRUCT)
+	{
+		auto strt = (Code_Type_Struct *)expression->type;
+		expr_type_is_string = (strt->name == "string");
+	}
 	
-	if (expression->type->kind == CODE_TYPE_ARRAY_VIEW || expression->type->kind == CODE_TYPE_STATIC_ARRAY)
+	if (expression->type->kind == CODE_TYPE_ARRAY_VIEW || 
+		expression->type->kind == CODE_TYPE_STATIC_ARRAY ||
+		expr_type_is_string)
 	{
 		if (subscript->type->kind == CODE_TYPE_INTEGER)
 		{
@@ -802,6 +823,11 @@ static Code_Node_Address *code_resolve_subscript(Code_Type_Resolver *resolver, S
 			{
 				auto type  = (Code_Type_Static_Array *)expression->type;
 				node->type = type->element_type;
+			}
+			else if (expression->type->kind == CODE_TYPE_STRUCT)
+			{
+				Assert(expr_type_is_string);
+				node->type = symbol_table_get(&resolver->symbols, "byte", false)->type;
 			}
 			
 			auto address   = new Code_Node_Address;
@@ -2065,10 +2091,11 @@ Code_Type_Resolver *code_type_resolver_create()
 	Code_Type *        CompilerTypes[_CODE_TYPE_COUNT];
 	
 	{
-		CompilerTypes[CODE_TYPE_NULL]    = new Code_Type;
-		CompilerTypes[CODE_TYPE_INTEGER] = new Code_Type_Integer;
-		CompilerTypes[CODE_TYPE_REAL]    = new Code_Type_Real;
-		CompilerTypes[CODE_TYPE_BOOL]    = new Code_Type_Bool;
+		CompilerTypes[CODE_TYPE_NULL]      = new Code_Type;
+		CompilerTypes[CODE_TYPE_CHARACTER] = new Code_Type_Character;
+		CompilerTypes[CODE_TYPE_INTEGER]   = new Code_Type_Integer;
+		CompilerTypes[CODE_TYPE_REAL]      = new Code_Type_Real;
+		CompilerTypes[CODE_TYPE_BOOL]      = new Code_Type_Bool;
 	}
 	
 	{
@@ -2083,7 +2110,15 @@ Code_Type_Resolver *code_type_resolver_create()
 		
 		CompilerTypes[CODE_TYPE_POINTER] = pointer_type;
 	}
-	
+
+	{
+		auto sym = resolver->symbols_allocator.add();
+		sym->name = "byte";
+		sym->type = CompilerTypes[CODE_TYPE_CHARACTER];
+		sym->flags = SYMBOL_BIT_CONSTANT | SYMBOL_BIT_TYPE;
+		symbol_table_put(&resolver->symbols, sym);
+	}
+
 	{
 		auto sym   = resolver->symbols_allocator.add();
 		sym->name  = "int";
@@ -2159,6 +2194,15 @@ Code_Type_Resolver *code_type_resolver_create()
 		resolver->unary_operators[UNARY_OPERATOR_MINUS].add(unary_operator_int);
 		resolver->unary_operators[UNARY_OPERATOR_BITWISE_NOT].add(unary_operator_int);
 	}
+
+	{
+		Unary_Operator unary_operator_char;
+		unary_operator_char.parameter = CompilerTypes[CODE_TYPE_CHARACTER];
+		unary_operator_char.output    = CompilerTypes[CODE_TYPE_CHARACTER];
+		resolver->unary_operators[UNARY_OPERATOR_PLUS].add(unary_operator_char);
+		resolver->unary_operators[UNARY_OPERATOR_MINUS].add(unary_operator_char);
+		resolver->unary_operators[UNARY_OPERATOR_BITWISE_NOT].add(unary_operator_char);
+	}
 	
 	{
 		Unary_Operator unary_operator_real;
@@ -2176,6 +2220,23 @@ Code_Type_Resolver *code_type_resolver_create()
 	}
 	
 	{
+		Binary_Operator binary_operator_char;
+		binary_operator_char.parameters[0] = CompilerTypes[CODE_TYPE_CHARACTER];
+		binary_operator_char.parameters[1] = CompilerTypes[CODE_TYPE_CHARACTER];
+		binary_operator_char.output        = CompilerTypes[CODE_TYPE_CHARACTER];
+		resolver->binary_operators[BINARY_OPERATOR_ADDITION].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_SUBTRACTION].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_MULTIPLICATION].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_DIVISION].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_REMAINDER].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_BITWISE_SHIFT_RIGHT].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_BITWISE_SHIFT_LEFT].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_BITWISE_AND].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_BITWISE_XOR].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_BITWISE_OR].add(binary_operator_char);
+	}
+
+	{
 		Binary_Operator binary_operator_int;
 		binary_operator_int.parameters[0] = CompilerTypes[CODE_TYPE_INTEGER];
 		binary_operator_int.parameters[1] = CompilerTypes[CODE_TYPE_INTEGER];
@@ -2192,6 +2253,25 @@ Code_Type_Resolver *code_type_resolver_create()
 		resolver->binary_operators[BINARY_OPERATOR_BITWISE_OR].add(binary_operator_int);
 	}
 	
+	{
+		Binary_Operator binary_operator_char;
+		binary_operator_char.parameters[0] = CompilerTypes[CODE_TYPE_CHARACTER];
+		binary_operator_char.parameters[1] = CompilerTypes[CODE_TYPE_CHARACTER];
+		binary_operator_char.output        = CompilerTypes[CODE_TYPE_CHARACTER];
+		binary_operator_char.compound      = true;
+		resolver->binary_operators[BINARY_OPERATOR_COMPOUND_ADDITION].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_COMPOUND_SUBTRACTION].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_COMPOUND_MULTIPLICATION].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_COMPOUND_DIVISION].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_COMPOUND_REMAINDER].add(binary_operator_char);
+		
+		resolver->binary_operators[BINARY_OPERATOR_COMPOUND_BITWISE_SHIFT_RIGHT].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_COMPOUND_BITWISE_SHIFT_LEFT].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_COMPOUND_BITWISE_AND].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_COMPOUND_BITWISE_XOR].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_COMPOUND_BITWISE_OR].add(binary_operator_char);
+	}
+
 	{
 		Binary_Operator binary_operator_int;
 		binary_operator_int.parameters[0] = CompilerTypes[CODE_TYPE_INTEGER];
@@ -2239,6 +2319,19 @@ Code_Type_Resolver *code_type_resolver_create()
 		resolver->binary_operators[BINARY_OPERATOR_RELATIONAL_GREATER_EQUAL].add(binary_operator_pointer);
 	}
 	
+	{
+		Binary_Operator binary_operator_char;
+		binary_operator_char.parameters[0] = CompilerTypes[CODE_TYPE_CHARACTER];
+		binary_operator_char.parameters[1] = CompilerTypes[CODE_TYPE_CHARACTER];
+		binary_operator_char.output        = CompilerTypes[CODE_TYPE_BOOL];
+		resolver->binary_operators[BINARY_OPERATOR_RELATIONAL_GREATER].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_RELATIONAL_LESS].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_RELATIONAL_GREATER_EQUAL].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_RELATIONAL_LESS_EQUAL].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_COMPARE_EQUAL].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_COMPARE_NOT_EQUAL].add(binary_operator_char);
+	}
+
 	{
 		Binary_Operator binary_operator_int;
 		binary_operator_int.parameters[0] = CompilerTypes[CODE_TYPE_INTEGER];

@@ -14,6 +14,7 @@ struct Evaluation_Value
 	};
 	
 	union {
+		Kano_Char  char_value;
 		Kano_Int   int_value;
 		Kano_Real  real_value;
 		Kano_Bool  bool_value;
@@ -80,10 +81,15 @@ static Evaluation_Value interp_eval_address(Interpreter *interp, Code_Node_Addre
 		{
 			address = EvaluationTypePointer(expression, uint8_t);
 		}
+		else if (expr_type == CODE_TYPE_ARRAY_VIEW)
+		{
+			auto arr = EvaluationTypeValue(expression, Array_View<uint8_t>);
+			address = arr.data;
+		}
 		else
 		{
-			Assert(expr_type == CODE_TYPE_ARRAY_VIEW);
-			auto arr = EvaluationTypeValue(expression, Array_View<uint8_t>);
+			Assert(expr_type == CODE_TYPE_STRUCT);
+			auto arr = EvaluationTypeValue(expression, String);
 			address = arr.data;
 		}
 
@@ -344,6 +350,13 @@ static Evaluation_Value binary_add(Evaluation_Value a, Evaluation_Value b, Code_
 	
 	switch (type->kind)
 	{
+		case CODE_TYPE_CHARACTER: {
+			Assert(a.type->kind == CODE_TYPE_CHARACTER && b.type->kind == CODE_TYPE_CHARACTER);
+			r.imm.char_value = EvaluationTypeValue(a, Kano_Char) + EvaluationTypeValue(b, Kano_Char);
+			return r;
+		}
+		break;
+
 		case CODE_TYPE_INTEGER: {
 			Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
 			r.imm.int_value = EvaluationTypeValue(a, Kano_Int) + EvaluationTypeValue(b, Kano_Int);
@@ -376,6 +389,12 @@ static Evaluation_Value binary_sub(Evaluation_Value a, Evaluation_Value b, Code_
 	
 	switch (type->kind)
 	{
+		case CODE_TYPE_CHARACTER: {
+			Assert(a.type->kind == CODE_TYPE_CHARACTER && b.type->kind == CODE_TYPE_CHARACTER);
+			r.imm.char_value = EvaluationTypeValue(a, Kano_Char) - EvaluationTypeValue(b, Kano_Char);
+			return r;
+		}
+							break;
 		case CODE_TYPE_INTEGER: {
 			Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
 			r.imm.int_value = EvaluationTypeValue(a, Kano_Int) - EvaluationTypeValue(b, Kano_Int);
@@ -408,6 +427,13 @@ static Evaluation_Value binary_mul(Evaluation_Value a, Evaluation_Value b, Code_
 	
 	switch (type->kind)
 	{
+		case CODE_TYPE_CHARACTER: {
+			Assert(a.type->kind == CODE_TYPE_CHARACTER && b.type->kind == CODE_TYPE_CHARACTER);
+			r.imm.char_value = EvaluationTypeValue(a, Kano_Char) * EvaluationTypeValue(b, Kano_Char);
+			return r;
+		}
+		break;
+
 		case CODE_TYPE_INTEGER: {
 			Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
 			r.imm.int_value = EvaluationTypeValue(a, Kano_Int) * EvaluationTypeValue(b, Kano_Int);
@@ -434,6 +460,13 @@ static Evaluation_Value binary_div(Evaluation_Value a, Evaluation_Value b, Code_
 	
 	switch (type->kind)
 	{
+		case CODE_TYPE_CHARACTER: {
+			Assert(a.type->kind == CODE_TYPE_CHARACTER && b.type->kind == CODE_TYPE_CHARACTER);
+			r.imm.char_value = EvaluationTypeValue(a, Kano_Char) / EvaluationTypeValue(b, Kano_Char);
+			return r;
+		}
+		break;
+
 		case CODE_TYPE_INTEGER: {
 			Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
 			r.imm.int_value = EvaluationTypeValue(a, Kano_Int) / EvaluationTypeValue(b, Kano_Int);
@@ -457,8 +490,13 @@ static Evaluation_Value binary_mod(Evaluation_Value a, Evaluation_Value b, Code_
 {
 	Evaluation_Value r;
 	r.type = type;
-	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
-	r.imm.int_value = EvaluationTypeValue(a, Kano_Int) % EvaluationTypeValue(b, Kano_Int);
+	Assert((a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER) ||
+		(a.type->kind == CODE_TYPE_CHARACTER && b.type->kind == CODE_TYPE_CHARACTER));
+
+	if (a.type->kind == CODE_TYPE_CHARACTER)
+		r.imm.char_value = EvaluationTypeValue(a, Kano_Char) % EvaluationTypeValue(b, Kano_Char);
+	else
+		r.imm.int_value = EvaluationTypeValue(a, Kano_Int) % EvaluationTypeValue(b, Kano_Int);
 	return r;
 }
 
@@ -466,8 +504,13 @@ static Evaluation_Value binary_rs(Evaluation_Value a, Evaluation_Value b, Code_T
 {
 	Evaluation_Value r;
 	r.type = type;
-	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
-	r.imm.int_value = EvaluationTypeValue(a, Kano_Int) >> EvaluationTypeValue(b, Kano_Int);
+	Assert((a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER) ||
+		(a.type->kind == CODE_TYPE_CHARACTER && b.type->kind == CODE_TYPE_CHARACTER));
+
+	if (a.type->kind == CODE_TYPE_CHARACTER)
+		r.imm.char_value = EvaluationTypeValue(a, Kano_Char) >> EvaluationTypeValue(b, Kano_Char);
+	else
+		r.imm.int_value = EvaluationTypeValue(a, Kano_Int) >> EvaluationTypeValue(b, Kano_Int);
 	return r;
 }
 
@@ -475,8 +518,13 @@ static Evaluation_Value binary_ls(Evaluation_Value a, Evaluation_Value b, Code_T
 {
 	Evaluation_Value r;
 	r.type = type;
-	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
-	r.imm.int_value = EvaluationTypeValue(a, Kano_Int) << EvaluationTypeValue(b, Kano_Int);
+	Assert((a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER) ||
+		(a.type->kind == CODE_TYPE_CHARACTER && b.type->kind == CODE_TYPE_CHARACTER));
+
+	if (a.type->kind == CODE_TYPE_CHARACTER)
+		r.imm.char_value = EvaluationTypeValue(a, Kano_Char) << EvaluationTypeValue(b, Kano_Char);
+	else
+		r.imm.int_value = EvaluationTypeValue(a, Kano_Int) << EvaluationTypeValue(b, Kano_Int);
 	return r;
 }
 
@@ -484,8 +532,13 @@ static Evaluation_Value binary_and(Evaluation_Value a, Evaluation_Value b, Code_
 {
 	Evaluation_Value r;
 	r.type = type;
-	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
-	r.imm.int_value = EvaluationTypeValue(a, Kano_Int) & EvaluationTypeValue(b, Kano_Int);
+	Assert((a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER) ||
+		(a.type->kind == CODE_TYPE_CHARACTER && b.type->kind == CODE_TYPE_CHARACTER));
+
+	if (a.type->kind == CODE_TYPE_CHARACTER)
+		r.imm.char_value = EvaluationTypeValue(a, Kano_Char) & EvaluationTypeValue(b, Kano_Char);
+	else
+		r.imm.int_value = EvaluationTypeValue(a, Kano_Int) & EvaluationTypeValue(b, Kano_Int);
 	return r;
 }
 
@@ -493,8 +546,13 @@ static Evaluation_Value binary_xor(Evaluation_Value a, Evaluation_Value b, Code_
 {
 	Evaluation_Value r;
 	r.type = type;
-	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
-	r.imm.int_value = EvaluationTypeValue(a, Kano_Int) ^ EvaluationTypeValue(b, Kano_Int);
+	Assert((a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER) ||
+		(a.type->kind == CODE_TYPE_CHARACTER && b.type->kind == CODE_TYPE_CHARACTER));
+
+	if (a.type->kind == CODE_TYPE_CHARACTER)
+		r.imm.char_value = EvaluationTypeValue(a, Kano_Char) ^ EvaluationTypeValue(b, Kano_Char);
+	else
+		r.imm.int_value = EvaluationTypeValue(a, Kano_Int) ^ EvaluationTypeValue(b, Kano_Int);
 	return r;
 }
 
@@ -502,8 +560,13 @@ static Evaluation_Value binary_or(Evaluation_Value a, Evaluation_Value b, Code_T
 {
 	Evaluation_Value r;
 	r.type = type;
-	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
-	r.imm.int_value = EvaluationTypeValue(a, Kano_Int) | EvaluationTypeValue(b, Kano_Int);
+	Assert((a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER) ||
+		(a.type->kind == CODE_TYPE_CHARACTER && b.type->kind == CODE_TYPE_CHARACTER));
+
+	if (a.type->kind == CODE_TYPE_CHARACTER)
+		r.imm.char_value = EvaluationTypeValue(a, Kano_Char) | EvaluationTypeValue(b, Kano_Char);
+	else
+		r.imm.int_value = EvaluationTypeValue(a, Kano_Int) | EvaluationTypeValue(b, Kano_Int);
 	return r;
 }
 
@@ -514,6 +577,13 @@ static Evaluation_Value binary_gt(Evaluation_Value a, Evaluation_Value b, Code_T
 	
 	switch (a.type->kind)
 	{
+		case CODE_TYPE_CHARACTER: {
+			Assert(b.type->kind == CODE_TYPE_CHARACTER);
+			r.imm.bool_value = EvaluationTypeValue(a, Kano_Char) > EvaluationTypeValue(b, Kano_Char);
+			return r;
+		}
+		break;
+
 		case CODE_TYPE_INTEGER: {
 			Assert(b.type->kind == CODE_TYPE_INTEGER);
 			r.imm.bool_value = EvaluationTypeValue(a, Kano_Int) > EvaluationTypeValue(b, Kano_Int);
@@ -540,6 +610,13 @@ static Evaluation_Value binary_lt(Evaluation_Value a, Evaluation_Value b, Code_T
 	
 	switch (a.type->kind)
 	{
+		case CODE_TYPE_CHARACTER: {
+			Assert(b.type->kind == CODE_TYPE_CHARACTER);
+			r.imm.bool_value = EvaluationTypeValue(a, Kano_Char) < EvaluationTypeValue(b, Kano_Char);
+			return r;
+		}
+		break;
+
 		case CODE_TYPE_INTEGER: {
 			Assert(b.type->kind == CODE_TYPE_INTEGER);
 			r.imm.bool_value = EvaluationTypeValue(a, Kano_Int) < EvaluationTypeValue(b, Kano_Int);
@@ -566,6 +643,13 @@ static Evaluation_Value binary_ge(Evaluation_Value a, Evaluation_Value b, Code_T
 	
 	switch (a.type->kind)
 	{
+		case CODE_TYPE_CHARACTER: {
+			Assert(b.type->kind == CODE_TYPE_CHARACTER);
+			r.imm.bool_value = EvaluationTypeValue(a, Kano_Char) >= EvaluationTypeValue(b, Kano_Char);
+			return r;
+		}
+		break;
+
 		case CODE_TYPE_INTEGER: {
 			Assert(b.type->kind == CODE_TYPE_INTEGER);
 			r.imm.bool_value = EvaluationTypeValue(a, Kano_Int) >= EvaluationTypeValue(b, Kano_Int);
@@ -592,6 +676,13 @@ static Evaluation_Value binary_le(Evaluation_Value a, Evaluation_Value b, Code_T
 	
 	switch (a.type->kind)
 	{
+		case CODE_TYPE_CHARACTER: {
+			Assert(b.type->kind == CODE_TYPE_CHARACTER);
+			r.imm.bool_value = EvaluationTypeValue(a, Kano_Char) <= EvaluationTypeValue(b, Kano_Char);
+			return r;
+		}
+		break;
+
 		case CODE_TYPE_INTEGER: {
 			Assert(b.type->kind == CODE_TYPE_INTEGER);
 			r.imm.bool_value = EvaluationTypeValue(a, Kano_Int) <= EvaluationTypeValue(b, Kano_Int);
@@ -618,6 +709,13 @@ static Evaluation_Value binary_cmp(Evaluation_Value a, Evaluation_Value b, Code_
 	
 	switch (a.type->kind)
 	{
+		case CODE_TYPE_CHARACTER: {
+			Assert(b.type->kind == CODE_TYPE_CHARACTER);
+			r.imm.bool_value = EvaluationTypeValue(a, Kano_Char) == EvaluationTypeValue(b, Kano_Char);
+			return r;
+		}
+		break;
+
 		case CODE_TYPE_INTEGER: {
 			Assert(b.type->kind == CODE_TYPE_INTEGER);
 			r.imm.bool_value = EvaluationTypeValue(a, Kano_Int) == EvaluationTypeValue(b, Kano_Int);
@@ -657,6 +755,13 @@ static Evaluation_Value binary_ncmp(Evaluation_Value a, Evaluation_Value b, Code
 	
 	switch (a.type->kind)
 	{
+		case CODE_TYPE_CHARACTER: {
+			Assert(b.type->kind == CODE_TYPE_CHARACTER);
+			r.imm.bool_value = EvaluationTypeValue(a, Kano_Char) != EvaluationTypeValue(b, Kano_Char);
+			return r;
+		}
+		break;
+
 		case CODE_TYPE_INTEGER: {
 			Assert(b.type->kind == CODE_TYPE_INTEGER);
 			r.imm.bool_value = EvaluationTypeValue(a, Kano_Int) != EvaluationTypeValue(b, Kano_Int);
@@ -695,6 +800,14 @@ static Evaluation_Value binary_cadd(Evaluation_Value a, Evaluation_Value b, Code
 	
 	switch (type->kind)
 	{
+		case CODE_TYPE_CHARACTER: {
+			Assert(b.type->kind == CODE_TYPE_CHARACTER && b.type->kind == CODE_TYPE_CHARACTER);
+			auto ref = EvaluationTypePointer(a, Kano_Char);
+			*ref += EvaluationTypeValue(b, Kano_Char);
+			return a;
+		}
+		break;
+
 		case CODE_TYPE_INTEGER: {
 			Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
 			auto ref = EvaluationTypePointer(a, Kano_Int);
@@ -730,6 +843,14 @@ static Evaluation_Value binary_csub(Evaluation_Value a, Evaluation_Value b, Code
 	
 	switch (type->kind)
 	{
+		case CODE_TYPE_CHARACTER: {
+			Assert(b.type->kind == CODE_TYPE_CHARACTER && b.type->kind == CODE_TYPE_CHARACTER);
+			auto ref = EvaluationTypePointer(a, Kano_Char);
+			*ref -= EvaluationTypeValue(b, Kano_Char);
+			return a;
+		}
+		break;
+
 		case CODE_TYPE_INTEGER: {
 			Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
 			auto ref = EvaluationTypePointer(a, Kano_Int);
@@ -764,6 +885,14 @@ static Evaluation_Value binary_cmul(Evaluation_Value a, Evaluation_Value b, Code
 	
 	switch (type->kind)
 	{
+		case CODE_TYPE_CHARACTER: {
+			Assert(b.type->kind == CODE_TYPE_CHARACTER && b.type->kind == CODE_TYPE_CHARACTER);
+			auto ref = EvaluationTypePointer(a, Kano_Char);
+			*ref *= EvaluationTypeValue(b, Kano_Char);
+			return a;
+		}
+		break;
+
 		case CODE_TYPE_INTEGER: {
 			Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
 			auto ref = EvaluationTypePointer(a, Kano_Int);
@@ -791,6 +920,14 @@ static Evaluation_Value binary_cdiv(Evaluation_Value a, Evaluation_Value b, Code
 	
 	switch (type->kind)
 	{
+		case CODE_TYPE_CHARACTER: {
+			Assert(b.type->kind == CODE_TYPE_CHARACTER && b.type->kind == CODE_TYPE_CHARACTER);
+			auto ref = EvaluationTypePointer(a, Kano_Char);
+			*ref /= EvaluationTypeValue(b, Kano_Char);
+			return a;
+		}
+		break;
+
 		case CODE_TYPE_INTEGER: {
 			Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
 			auto ref = EvaluationTypePointer(a, Kano_Int);
@@ -815,54 +952,93 @@ static Evaluation_Value binary_cdiv(Evaluation_Value a, Evaluation_Value b, Code
 static Evaluation_Value binary_cmod(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
 	a.type = type;
-	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
-	auto ref = EvaluationTypePointer(a, Kano_Int);
-	*ref %= EvaluationTypeValue(b, Kano_Int);
+	Assert((a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER) ||
+		(a.type->kind == CODE_TYPE_CHARACTER && b.type->kind == CODE_TYPE_CHARACTER));
+	if (a.type->kind == CODE_TYPE_CHARACTER) {
+		auto ref = EvaluationTypePointer(a, Kano_Char);
+		*ref %= EvaluationTypeValue(b, Kano_Char);
+	} else {
+		auto ref = EvaluationTypePointer(a, Kano_Int);
+		*ref %= EvaluationTypeValue(b, Kano_Int);
+	}
+
 	return a;
 }
 
 static Evaluation_Value binary_crs(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
 	a.type = type;
-	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
-	auto ref = EvaluationTypePointer(a, Kano_Int);
-	*ref >>= EvaluationTypeValue(b, Kano_Int);
+	Assert((a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER) ||
+		(a.type->kind == CODE_TYPE_CHARACTER && b.type->kind == CODE_TYPE_CHARACTER));
+	if (a.type->kind == CODE_TYPE_CHARACTER) {
+		auto ref = EvaluationTypePointer(a, Kano_Char);
+		*ref >>= EvaluationTypeValue(b, Kano_Char);
+	}
+	else {
+		auto ref = EvaluationTypePointer(a, Kano_Int);
+		*ref >>= EvaluationTypeValue(b, Kano_Int);
+	}
 	return a;
 }
 
 static Evaluation_Value binary_cls(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
 	a.type = type;
-	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
-	auto ref = EvaluationTypePointer(a, Kano_Int);
-	*ref <<= EvaluationTypeValue(b, Kano_Int);
-	return a;
+	Assert((a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER) ||
+		(a.type->kind == CODE_TYPE_CHARACTER && b.type->kind == CODE_TYPE_CHARACTER));
+	if (a.type->kind == CODE_TYPE_CHARACTER) {
+		auto ref = EvaluationTypePointer(a, Kano_Char);
+		*ref <<= EvaluationTypeValue(b, Kano_Char);
+	}
+	else {
+		auto ref = EvaluationTypePointer(a, Kano_Int);
+		*ref <<= EvaluationTypeValue(b, Kano_Int);
+	}	return a;
 }
 
 static Evaluation_Value binary_cand(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
 	a.type = type;
-	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
-	auto ref = EvaluationTypePointer(a, Kano_Int);
-	*ref &= EvaluationTypeValue(b, Kano_Int);
-	return a;
+	Assert((a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER) ||
+		(a.type->kind == CODE_TYPE_CHARACTER && b.type->kind == CODE_TYPE_CHARACTER));
+	if (a.type->kind == CODE_TYPE_CHARACTER) {
+		auto ref = EvaluationTypePointer(a, Kano_Char);
+		*ref &= EvaluationTypeValue(b, Kano_Char);
+	}
+	else {
+		auto ref = EvaluationTypePointer(a, Kano_Int);
+		*ref &= EvaluationTypeValue(b, Kano_Int);
+	}	return a;
 }
 
 static Evaluation_Value binary_cxor(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
 	a.type = type;
-	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
-	auto ref = EvaluationTypePointer(a, Kano_Int);
-	*ref ^= EvaluationTypeValue(b, Kano_Int);
-	return a;
+	Assert((a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER) ||
+		(a.type->kind == CODE_TYPE_CHARACTER && b.type->kind == CODE_TYPE_CHARACTER));
+	if (a.type->kind == CODE_TYPE_CHARACTER) {
+		auto ref = EvaluationTypePointer(a, Kano_Char);
+		*ref ^= EvaluationTypeValue(b, Kano_Char);
+	}
+	else {
+		auto ref = EvaluationTypePointer(a, Kano_Int);
+		*ref ^= EvaluationTypeValue(b, Kano_Int);
+	}	return a;
 }
 
 static Evaluation_Value binary_cor(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
 {
 	a.type = type;
-	Assert(a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER);
-	auto ref = EvaluationTypePointer(a, Kano_Int);
-	*ref |= EvaluationTypeValue(b, Kano_Int);
+	Assert((a.type->kind == CODE_TYPE_INTEGER && b.type->kind == CODE_TYPE_INTEGER) ||
+		(a.type->kind == CODE_TYPE_CHARACTER && b.type->kind == CODE_TYPE_CHARACTER));
+	if (a.type->kind == CODE_TYPE_CHARACTER) {
+		auto ref = EvaluationTypePointer(a, Kano_Char);
+		*ref |= EvaluationTypeValue(b, Kano_Char);
+	}
+	else {
+		auto ref = EvaluationTypePointer(a, Kano_Int);
+		*ref |= EvaluationTypeValue(b, Kano_Int);
+	}
 	return a;
 }
 
@@ -1152,22 +1328,12 @@ static bool interp_eval_statement(Interpreter *interp, Code_Node_Statement *root
 	return false;
 }
 
-
-struct Nocheckin {
-	int64_t data;
-	Nocheckin *next;
-};
-
-static volatile Nocheckin nocheckin;
-
 static void interp_eval_block(Interpreter *interp, Code_Node_Block *root, bool isproc)
 {
 	if (isproc)
 	{
 		interp->intercept(interp, INTERCEPT_PROCEDURE_CALL, root);
 	}
-
-	nocheckin.next = (Nocheckin *)&nocheckin;
 
 	auto return_index = interp->return_count;
 	for (auto statement = root->statement_head; statement; statement = statement->next)

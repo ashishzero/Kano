@@ -22,6 +22,7 @@
     <ClInclude Include="Flags.h" />
     <ClInclude Include="Error.h" />
     <ClInclude Include="Resolver.h" />
+    <ClInclude Include="HeapAllocator.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Simple.kano" />

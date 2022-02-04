@@ -62,17 +62,19 @@ const print_nodes := proc (var head: *Node) {
 }
 
 const main := proc() {
-	var a: Node;
-	a.data = 1;
-	a.next = allocate(size_of(Node));
-	a.next.data = 2;
-	a.next.next = allocate(size_of(Node));
-	a.next.next.data = 3;
-	a.next.next.next = null;
+	print("%\n", "thing"[0]);
 
-	print_nodes(*a);
-
-	print("\n%\n", a);
+	//var a: Node;
+	//a.data = 1;
+	//a.next = allocate(size_of(Node));
+	//a.next.data = 2;
+	//a.next.next = allocate(size_of(Node));
+	//a.next.next.data = 3;
+	//a.next.next.next = null;
+	//
+	//print_nodes(*a);
+	//
+	//print("\n%\n", a);
 
 	//print("a.data: %, a.next: %\n", a.data, a.next);
 	

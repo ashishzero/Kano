@@ -1,6 +1,7 @@
 #pragma once
 #include "SyntaxNode.h"
 
+using Kano_Char = uint8_t;
 using Kano_Int  = int64_t;
 using Kano_Real = double;
 using Kano_Bool = bool;
@@ -8,6 +9,7 @@ using Kano_Bool = bool;
 enum Code_Type_Kind
 {
 	CODE_TYPE_NULL,
+	CODE_TYPE_CHARACTER,
 	CODE_TYPE_INTEGER,
 	CODE_TYPE_REAL,
 	CODE_TYPE_BOOL,
@@ -25,6 +27,16 @@ struct Code_Type
 	Code_Type_Kind kind         = CODE_TYPE_NULL;
 	uint32_t       runtime_size = 0;
 	uint32_t       alignment    = 0;
+};
+
+struct Code_Type_Character : public Code_Type
+{
+	Code_Type_Character()
+	{
+		kind         = CODE_TYPE_CHARACTER;
+		runtime_size = sizeof(Kano_Char);
+		alignment    = sizeof(Kano_Char);
+	}
 };
 
 struct Code_Type_Integer : public Code_Type
