@@ -360,7 +360,7 @@ static Code_Node_Type_Cast *code_type_cast(Code_Node *node, Code_Type *to_type, 
 		
 		case CODE_TYPE_REAL: {
 			auto from_type = node->type->kind;
-			cast_success   = (from_type == CODE_TYPE_INTEGER);
+			cast_success   = (from_type == CODE_TYPE_INTEGER || from_type == CODE_TYPE_CHARACTER);
 			
 			if (!cast_success && explicit_cast)
 			{

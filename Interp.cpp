@@ -173,7 +173,7 @@ static Evaluation_Value interp_eval_type_cast(Interpreter *interp, Code_Node_Typ
 	switch (cast->type->kind)
 	{
 		case CODE_TYPE_REAL: {
-			Assert(value.type->kind == CODE_TYPE_INTEGER);
+			Assert(value.type->kind == CODE_TYPE_INTEGER || value.type->kind == CODE_TYPE_CHARACTER);
 			type_value.imm.real_value = (Kano_Real)EvaluationTypeValue(value, Kano_Int);
 		}
 		break;

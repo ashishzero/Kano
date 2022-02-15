@@ -950,6 +950,10 @@ int main()
 
 	auto exprs = code_type_resolve(resolver, node);
 
+	auto expr = code_type_resolver_find(resolver, "factorial");
+	print_code(expr->address.code);
+
+
 	FILE *out = fopen("DebugInfo.json", "wb");
 
 	Interp_User_Context context;

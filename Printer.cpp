@@ -47,6 +47,9 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
 
 		switch (node->value.kind)
 		{
+		case Literal::BYTE:
+			fprintf(fp, "Literal(int:%d)\n", node->value.data.integer);
+			break;
 		case Literal::INTEGER:
 			fprintf(fp, "Literal(int:%d)\n", node->value.data.integer);
 			break;
@@ -343,6 +346,74 @@ void print_syntax(Syntax_Node *root, FILE *fp, int child_indent, const char *tit
 //
 //
 
+static void print_type(FILE *fp, Code_Type *type) {
+	if (!type) {
+		fprintf(fp, "void");
+		return;
+	}
+
+	switch (type->kind) {
+	case CODE_TYPE_NULL: fprintf(fp, "void"); return;
+	case CODE_TYPE_CHARACTER: fprintf(fp, "byte"); return;
+	case CODE_TYPE_INTEGER: fprintf(fp, "int"); return;
+	case CODE_TYPE_REAL: fprintf(fp, "float"); return;
+	case CODE_TYPE_BOOL: fprintf(fp, "bool"); return;
+
+	case CODE_TYPE_POINTER: {
+		fprintf(fp, "*");
+		print_type(fp, ((Code_Type_Pointer *)type)->base_type);
+		return;
+	}
+
+	case CODE_TYPE_PROCEDURE: {
+		auto proc = (Code_Type_Procedure *)type;
+		fprintf(fp, "proc (");
+		for (int64_t index = 0; index < proc->argument_count; ++index) {
+			print_type(fp, proc->arguments[index]);
+			if (index < proc->argument_count - 1) fprintf(fp, ", ");
+		}
+		fprintf(fp, ")");
+
+		if (proc->return_type) {
+			fprintf(fp, " -> ");
+			print_type(fp, proc->return_type);
+		}
+		return;
+	}
+
+	case CODE_TYPE_STRUCT: {
+		auto strt = (Code_Type_Struct *)type;
+		fprintf(fp, "%s", strt->name.data);
+		return;
+	}
+
+	case CODE_TYPE_ARRAY_VIEW: {
+		auto arr = (Code_Type_Array_View *)type;
+		fprintf(fp, "[] ");
+		print_type(fp, arr->element_type);
+		return;
+	}
+
+	case CODE_TYPE_STATIC_ARRAY: {
+		auto arr = (Code_Type_Static_Array *)type;
+		fprintf(fp, "[%u] ", arr->element_count);
+		print_type(fp, arr->element_type);
+		return;
+	}
+	}
+}
+
+static inline void print_code_type(Code_Node *node, int child_indent, FILE *fp) {
+	fprintf(fp, " <> BoundType: ");
+	if (node->type) {
+		print_type(fp, node->type);
+	}
+	else {
+		fprintf(fp, "nil");
+	}
+	fprintf(fp, "\n");
+}
+
 void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
 {
 	indent(fp, child_indent);
@@ -356,7 +427,8 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
 	switch (root->kind)
 	{
 	case CODE_NODE_NULL: {
-		fprintf(fp, "Null()\n");
+		fprintf(fp, "Null()");
+		print_code_type(root, child_indent, fp);
 	}
 	break;
 
@@ -366,22 +438,26 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
 		switch (node->type->kind)
 		{
 		case CODE_TYPE_REAL:
-			fprintf(fp, "Literal(float:%f)\n", node->data.real.value);
+			fprintf(fp, "Literal(float:%f)", node->data.real.value);
 			break;
 		case CODE_TYPE_INTEGER:
-			fprintf(fp, "Literal(int:%zd)\n", node->data.integer.value);
+			fprintf(fp, "Literal(int:%zd)", node->data.integer.value);
+			break;
+		case CODE_TYPE_CHARACTER:
+			fprintf(fp, "Literal(byte:%d)", (int)node->data.integer.value);
 			break;
 		case CODE_TYPE_BOOL:
-			fprintf(fp, "Literal(bool:%s)\n", node->data.boolean.value ? "true" : "false");
+			fprintf(fp, "Literal(bool:%s)", node->data.boolean.value ? "true" : "false");
 			break;
 		case CODE_TYPE_POINTER:
-			fprintf(fp, "Literal(*void:null)\n");
+			fprintf(fp, "Literal(*void:null)");
 			break;
 		case CODE_TYPE_STRUCT:
-			fprintf(fp, "Literal(struct:%s)\n", ((Code_Type_Struct *)node->type)->name.data);
+			fprintf(fp, "Literal(struct:%s)", ((Code_Type_Struct *)node->type)->name.data);
 			break;
 			NoDefaultCase();
 		}
+		print_code_type(root, child_indent, fp);
 	}
 	break;
 
@@ -395,38 +471,43 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
 
 		if (node->subscript)
 		{
-			fprintf(fp, "Address(+0x%zx)\n", node->offset);
+			fprintf(fp, "Address(+0x%zx)", node->offset);
+			print_code_type(root, child_indent, fp);
 			print_code(node->subscript, fp, child_indent, "Subscript");
 		}
 		else if (node->address)
 		{
-			fprintf(fp, "Address(%s:0x%zx + 0x%zx)\n", SymbolAddressNames[node->address->kind], node->address->offset,
-			        node->offset);
+			fprintf(fp, "Address(%s:0x%zx + 0x%zx)", SymbolAddressNames[node->address->kind], node->address->offset, node->offset);
+			print_code_type(root, child_indent, fp);
 		}
 		else
 		{
-			fprintf(fp, "Address(stack:+0x%zx)\n", node->offset);
+			fprintf(fp, "Address(stack:+0x%zx)", node->offset);
+			print_code_type(root, child_indent, fp);
 		}
 	}
 	break;
 
 	case CODE_NODE_TYPE_CAST: {
 		auto node = (Code_Node_Type_Cast *)root;
-		fprintf(fp, "TypeCast()\n");
+		fprintf(fp, "TypeCast()");
+		print_code_type(root, child_indent, fp);
 		print_code(node->child, fp, child_indent);
 	}
 	break;
 
 	case CODE_NODE_UNARY_OPERATOR: {
 		auto node = (Code_Node_Unary_Operator *)root;
-		fprintf(fp, "Unary Operator(%s)\n", unary_operator_kind_string(node->op_kind).data);
+		fprintf(fp, "Unary Operator(%s)", unary_operator_kind_string(node->op_kind).data);
+		print_code_type(root, child_indent, fp);
 		print_code(node->child, fp, child_indent);
 	}
 	break;
 
 	case CODE_NODE_BINARY_OPERATOR: {
 		auto node = (Code_Node_Binary_Operator *)root;
-		fprintf(fp, "Binary Operator(%s)\n", binary_operator_kind_string(node->op_kind).data);
+		fprintf(fp, "Binary Operator(%s)", binary_operator_kind_string(node->op_kind).data);
+		print_code_type(root, child_indent, fp);
 		print_code(node->left, fp, child_indent);
 		print_code(node->right, fp, child_indent);
 	}
@@ -434,7 +515,8 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
 
 	case CODE_NODE_EXPRESSION: {
 		auto node = (Code_Node_Expression *)root;
-		fprintf(fp, "Expression()\n");
+		fprintf(fp, "Expression()");
+		print_code_type(root, child_indent, fp);
 		if (node->child)
 			print_code(node->child, fp, child_indent);
 	}
@@ -442,7 +524,8 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
 
 	case CODE_NODE_ASSIGNMENT: {
 		auto node = (Code_Node_Assignment *)root;
-		fprintf(fp, "Assignment()\n");
+		fprintf(fp, "Assignment()");
+		print_code_type(root, child_indent, fp);
 		print_code(node->destination, fp, child_indent);
 		print_code(node->value, fp, child_indent);
 	}
@@ -450,14 +533,16 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
 
 	case CODE_NODE_STATEMENT: {
 		auto node = (Code_Node_Statement *)root;
-		fprintf(fp, "Statement(%zu)\n", node->source_row);
+		fprintf(fp, "Statement(%zu)", node->source_row);
+		print_code_type(root, child_indent, fp);
 		print_code(node->node, fp, child_indent);
 	}
 	break;
 
 	case CODE_NODE_PROCEDURE_CALL: {
 		auto node = (Code_Node_Procedure_Call *)root;
-		fprintf(fp, "Procedure-Call()\n");
+		fprintf(fp, "Procedure-Call()");
+		print_code_type(root, child_indent, fp);
 		print_code(node->procedure, fp, child_indent, "Procedure-Id");
 
 		for (int64_t index = 0; index < node->parameter_count; ++index)
@@ -469,7 +554,8 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
 
 	case CODE_NODE_SUBSCRIPT: {
 		auto node = (Code_Node_Subscript *)root;
-		fprintf(fp, "Subscript()\n");
+		fprintf(fp, "Subscript()");
+		print_code_type(root, child_indent, fp);
 		print_code(node->expression, fp, child_indent, "Expression");
 		print_code(node->subscript, fp, child_indent, "Subscript");
 	}
@@ -477,7 +563,8 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
 
 	case CODE_NODE_IF: {
 		auto node = (Code_Node_If *)root;
-		fprintf(fp, "If()\n");
+		fprintf(fp, "If()");
+		print_code_type(root, child_indent, fp);
 		print_code(node->condition, fp, child_indent, "Condition");
 		print_code(node->true_statement, fp, child_indent, "True-Statement");
 
@@ -490,7 +577,8 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
 
 	case CODE_NODE_FOR: {
 		auto node = (Code_Node_For *)root;
-		fprintf(fp, "For()\n");
+		fprintf(fp, "For()");
+		print_code_type(root, child_indent, fp);
 		print_code(node->initialization, fp, child_indent, "Initialization");
 		print_code(node->condition, fp, child_indent, "Condition");
 		print_code(node->increment, fp, child_indent, "Increment");
@@ -500,7 +588,8 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
 
 	case CODE_NODE_WHILE: {
 		auto node = (Code_Node_While *)root;
-		fprintf(fp, "While()\n");
+		fprintf(fp, "While()");
+		print_code_type(root, child_indent, fp);
 		print_code(node->condition, fp, child_indent, "Condition");
 		print_code(node->body, fp, child_indent, "Body");
 	}
@@ -508,7 +597,8 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
 
 	case CODE_NODE_DO: {
 		auto node = (Code_Node_Do *)root;
-		fprintf(fp, "Do()\n");
+		fprintf(fp, "Do()");
+		print_code_type(root, child_indent, fp);
 		print_code(node->body, fp, child_indent, "Body");
 		print_code(node->condition, fp, child_indent, "Condition");
 	}
@@ -516,11 +606,20 @@ void print_code(Code_Node *root, FILE *fp, int child_indent, const char *title)
 
 	case CODE_NODE_BLOCK: {
 		auto node = (Code_Node_Block *)root;
-		fprintf(fp, "Block()\n");
+		fprintf(fp, "Block()");
+		print_code_type(root, child_indent, fp);
 		for (auto statement = node->statement_head; statement; statement = statement->next)
 		{
 			print_code(statement, fp, child_indent);
 		}
+	}
+	break;
+
+	case CODE_NODE_RETURN: {
+		auto node = (Code_Node_Return *)root;
+		fprintf(fp, "Return()");
+		print_code_type(root, child_indent, fp);
+		print_code(node->expression, fp, child_indent);
 	}
 	break;
 

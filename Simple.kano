@@ -1,12 +1,13 @@
-/*
+
 const factorial := proc(var n: float) -> float {
 	if n <= 1 then return 1;
 	return n * factorial(n - 1);
 }
 
+
 // 0, 1, 1, 2, 3, 5, 8
 // 0, 1, 2, 3, 4, 5, 6
-
+/*
 const fib := proc(var a: int) -> int {
 	if a <= 0 then return 0;
 	if a == 1 then return 1;
@@ -16,7 +17,9 @@ const fib := proc(var a: int) -> int {
 	print("=================== a: %d, b: %d, c: %d, d: %d\n", a, b, c, d);
 	return d;
 }
+*/
 
+/*
 const adder := proc(var x: int, var y: int) -> int {
 	return x + y;
 }
