@@ -7,32 +7,6 @@
 
 #include <stdlib.h>
 
-struct String_Stream {
-	Array<char> buffer;
-
-	void write_fmt(const char *fmt, ...)
-	{
-		va_list args0, args1;
-		va_start(args0, fmt);
-		va_copy(args1, args0);
-		
-		int   len = 1 + vsnprintf(NULL, 0, fmt, args1);
-		buffer.Reserve(buffer.count + len);
-		char *buf = buffer.data + buffer.count;
-		vsnprintf(buf, len, fmt, args0);
-		buffer.count += (len - 1);
-		
-		va_end(args1);
-		va_end(args0);
-	}
-
-	const char *get_cstring() {
-		buffer.Reserve(buffer.count + 1);
-		buffer.data[buffer.count] = 0;
-		return buffer.data;
-	}
-};
-
 struct Json_Writer {
 	Array<int> depth;
 
@@ -110,6 +84,14 @@ struct Json_Writer {
 		Write(builder, "\"");
 	}
 
+	void append_builder(String_Builder *src)
+	{
+		for (auto buk = &src->head; buk; buk = buk->next)
+		{
+			WriteBuffer(builder, buk->data, buk->written);
+		}
+	}
+
 	template <typename ...Args>
 	void append_string_value(const char *fmt, Args... args)
 	{
@@ -140,10 +122,8 @@ struct Call_Info {
 };
 
 struct Interp_User_Context {
-	String_Stream console_out;
-
+	String_Builder console_out;
 	Json_Writer json;
-
 	Array<Call_Info> callstack;
 };
 
@@ -493,7 +473,10 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 
 		json->end_array();
 
-		json->write_key_value("console_out", "%", context->console_out.get_cstring());
+		json->write_key("console_out");
+		json->begin_string_value();
+		json->append_builder(&context->console_out);
+		json->end_string_value();
 
 		json->end_object();
 
@@ -535,7 +518,10 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 
 		json->end_array();
 
-		json->write_key_value("console_out", "%", context->console_out.get_cstring());
+		json->write_key("console_out");
+		json->begin_string_value();
+		json->append_builder(&context->console_out);
+		json->end_string_value();
 
 		json->end_object();
 	}
@@ -564,106 +550,88 @@ struct Interp_Morph {
 	}
 };
 
-static void stdout_value(Interpreter *interp, String_Stream &out, Code_Type *type, void *data)
+static void stdout_value(Interpreter *interp, String_Builder *out, Code_Type *type, void *data)
 {
 	if (!data)
 	{
-		out.write_fmt("(null)");
-		printf("(null)");
+		Write(out, "(null)"); printf("(null)");
 		return;
 	}
 
 	switch (type->kind)
 	{
 		case CODE_TYPE_NULL: 
-			out.write_fmt("(null)");
-			printf("(null)");
+			Write(out, "(null)"); printf("(null)");
 			return;
 		case CODE_TYPE_CHARACTER: 
-			out.write_fmt("%c", *(Kano_Char *)data);
-			printf("%c", *(Kano_Char *)data);
+			Write(out, *(Kano_Char *)data); printf("%c", *(Kano_Char *)data);
 			return;
 		case CODE_TYPE_INTEGER: 
-			out.write_fmt("%zd", *(Kano_Int *)data);
-			printf("%zd", *(Kano_Int *)data);
+			Write(out, *(Kano_Int *)data); printf("%zd", *(Kano_Int *)data);
 			return;
 		case CODE_TYPE_REAL: 
-			out.write_fmt("%f", *(Kano_Real *)data);
-			printf("%f", *(Kano_Real *)data);
+			Write(out, *(Kano_Real *)data); printf("%f", *(Kano_Real *)data);
 			return;
 		case CODE_TYPE_BOOL: 
-			out.write_fmt("%s", (*(Kano_Bool *)data) ? "true" : "false");
-			printf("%s", (*(Kano_Bool *)data) ? "true" : "false");
+			Write(out, (*(Kano_Bool *)data)); printf("%s", (*(Kano_Bool *)data) ? "true" : "false");
 			return;
 		case CODE_TYPE_PROCEDURE: 
-			out.write_fmt("0x%8zx", (uint64_t)data);
-			printf("0x%8zx", (uint64_t)data);
+			Write(out, data); printf("%p", data);
 			return;
 
 		case CODE_TYPE_POINTER: {
 			auto pointer_type = (Code_Type_Pointer *)type;
 			void *raw_ptr = *(void **)data;
 
-			out.write_fmt("{ ");
-			printf("{ ");
+			Write(out, "{ "); printf("{ ");
 
 			if (raw_ptr)
 			{
-				out.write_fmt("raw: 0x%8zx, ", (uint64_t)raw_ptr);
-				printf("raw: 0x%8zx, ", (uint64_t)raw_ptr);
+				WriteFormatted(out, "raw: %, ", raw_ptr); printf("raw: %p, ", raw_ptr);
 			}
 			else
 			{
-				out.write_fmt("raw: (null), ");
-				printf("raw: (null), ");
+				Write(out, "raw: (null), "); printf("raw: (null), ");
 			}
 
 			auto mem_type = interp_get_memory_type(interp, raw_ptr);
 
-			out.write_fmt("value: ");
-			printf("value: ");
+			Write(out, "value: "); printf("value: ");
+
 			if (mem_type != Memory_Type_INVALID)
 			{
 				stdout_value(interp, out, pointer_type->base_type, raw_ptr);
-				out.write_fmt(" ");
-				printf(" ");
+				Write(out, " "); printf(" ");
 			}
 			else
 			{
-				out.write_fmt("%s ", raw_ptr ? "(garbage)" : "(invalid)");
-				printf("%s ", raw_ptr ? "(garbage)" : "(invalid)");
+				Write(out, raw_ptr ? String("(garbage)") : String("(invalid)")); printf("%s ", raw_ptr ? "(garbage)" : "(invalid)");
 			}
 
-			out.write_fmt("}");
-			printf("}");
+			Write(out, "}"); printf("}");
 			return;
 		}
 
 		case CODE_TYPE_STRUCT: {
 			auto _struct = (Code_Type_Struct *)type;
 
-			out.write_fmt("{ ");
-			printf("{ ");
+			Write(out, "{ "); printf("{ ");
 
 			for (int64_t index = 0; index < _struct->member_count; ++index)
 			{
 				auto member = &_struct->members[index];
-				out.write_fmt("%s: ", member->name.data);
-				printf("%s: ", member->name.data);
+				Write(out, member->name); printf("%*.s: ", (int)member->name.length, member->name.data);
 				stdout_value(interp, out, member->type, (uint8_t *)data + member->offset);
 
 				if (index < _struct->member_count - 1)
 				{
-					out.write_fmt(",");
-					printf(",");
+					Write(out, ","); printf(",");
 				}
 
-				out.write_fmt(" ");
-				printf(" ");
+				Write(out, " "); printf(" ");
 			}
 
-			out.write_fmt("}");
-			printf("}");
+			Write(out, "}"); printf("}");
 			return;
 		}
 
@@ -673,15 +641,14 @@ static void stdout_value(Interpreter *interp, String_Stream &out, Code_Type *typ
 			auto arr_count = *(Kano_Int *)data;
 			auto arr_data = (uint8_t *)data + sizeof(Kano_Int);
 
-			out.write_fmt("[ ");
+			Write(out, "[ ");
 			printf("[ ");
 			for (int64_t index = 0; index < arr_count; ++index)
 			{
 				stdout_value(interp, out, arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
-				out.write_fmt(" ");
+				Write(out, " "); printf(" ");
 			}
-			out.write_fmt("]");
-			printf("]");
+			Write(out, "]"); printf("]");
 
 			return;
 		}
@@ -691,16 +658,14 @@ static void stdout_value(Interpreter *interp, String_Stream &out, Code_Type *typ
 
 			auto arr_data = (uint8_t *)data;
 
-			out.write_fmt("[ ");
+			Write(out, "[ ");
 			printf("[ ");
 			for (int64_t index = 0; index < arr_type->element_count; ++index)
 			{
 				stdout_value(interp, out, arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
-				out.write_fmt(" ");
-				printf(" ");
+				Write(out, " "); printf(" ");
 			}
-			out.write_fmt("]");
-			printf("]");
+			Write(out, "]"); printf("]");
 
 			return;
 		}
@@ -711,7 +676,7 @@ static void basic_print(Interpreter *interp) {
 	Interp_Morph morph(interp);
 
 	auto context = (Interp_User_Context *)interp->user_context;
-	auto &con_out = context->console_out;
+	auto con_out = &context->console_out;
 
 	auto fmt = morph.Arg<String>(sizeof(int64_t));
 	auto args = morph.Arg<uint8_t *>();
@@ -737,26 +702,22 @@ static void basic_print(Interpreter *interp) {
 				if (fmt[index] == 'n')
 				{
 					index += 1;
-					con_out.write_fmt("\\n");
-					printf("\n");
+					Write(con_out, "\\n"); printf("\n");
 				}
 				else if (fmt[index] == '\\')
 				{
-					con_out.write_fmt("\\\\");
-					printf("\\");
+					Write(con_out, "\\\\"); printf("\\");
 					index += 1;
 				}
 			}
 			else
 			{
-				con_out.write_fmt("\\\\");
-				printf("\\");
+				Write(con_out, "\\\\"); printf("\\");
 			}
 		}
 		else
 		{
-			con_out.write_fmt("%c", fmt[index]);
-			printf("%c", fmt[index]);
+			Write(con_out, (char)fmt[index]); printf("%c", fmt[index]);
 			index += 1;
 		}
 	}
