@@ -152,7 +152,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="CodeNode.h" />
-    <ClInclude Include="Error.h" />
     <ClInclude Include="Flags.h" />
     <ClInclude Include="HeapAllocator.h" />
     <ClInclude Include="Interp.h" />

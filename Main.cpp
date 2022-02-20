@@ -254,19 +254,6 @@ struct Call_Stack {
 	Symbol_Table *symbols;
 };
 
-static bool print_error(Error_List *list)
-{
-	for (auto error = list->first.next; error; error = error->next)
-	{
-		auto row     = error->location.start_row;
-		auto column  = error->location.start_column;
-		auto message = error->message.data;
-		fprintf(stderr, "%zu,%zu: %s\n", row, column, message);
-	}
-
-	return list->first.next != nullptr;
-}
-
 static void json_write_symbol(Json_Writer *json, Interpreter *interp, String name, Code_Type *type, void *data);
 
 static void json_write_type(Json_Writer *json, Code_Type *type)
@@ -935,12 +922,14 @@ int main()
 
 	String content = read_entire_file("Simple.kano");
 
+	String_Builder builder;
+
 	Parser parser;
-	parser_init(&parser, content);
+	parser_init(&parser, content, &builder);
 
 	auto node = parse_global_scope(&parser);
 
-	if (print_error(&parser.error))
+	if (parser.error_count)
 		return 1;
 
 	auto resolver = code_type_resolver_create();

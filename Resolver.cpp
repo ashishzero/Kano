@@ -139,7 +139,7 @@ static void report_error(Syntax_Node *node, const char *fmt, ...) {
 
 	fprintf(stderr, "\n");
 
-	exit(1);
+	Unimplemented();
 }
 
 //

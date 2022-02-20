@@ -80,11 +80,26 @@ static inline void parser_error(Parser *parser, Token *token, const char *fmt, .
 	va_list args;
 	va_start(args, fmt);
 
-	error_vfmt(&parser->error, location, fmt, args);
+	auto arena = ThreadScratchpad();
+	auto temp = BeginTemporaryMemory(arena);
+
+	int len = vsnprintf(NULL, 0, fmt, args);
+	char *mem = (char *)PushSize(arena, len + 1);
+	vsnprintf(mem, len + 1, fmt, args);
+
+	EndTemporaryMemory(&temp);
 
 	va_end(args);
 
+	WriteFormatted(parser->error, "ERROR:%,% : ", token->row, token->column);
+	WriteBuffer(parser->error, mem, len);
+	Write(parser->error, '\n');
+
+	parser->error_count += 1;
+
 	parser->parsing = false;
+
+	Unimplemented();
 }
 
 //
@@ -128,7 +143,7 @@ static bool parser_accept_token(Parser *parser, Token_Kind kind)
 	return false;
 }
 
-static bool parser_expect_token(Parser *parser, Token_Kind kind, bool terminate = true)
+static bool parser_expect_token(Parser *parser, Token_Kind kind)
 {
 	if (parser_accept_token(parser, kind))
 	{
@@ -1120,14 +1135,13 @@ Syntax_Node_Global_Scope *parse_global_scope(Parser *parser)
 //
 //
 
-void parser_init(Parser *parser, String content)
+void parser_init(Parser *parser, String content, String_Builder *builder)
 {
 	lexer_init(&parser->lexer, content);
 
-	parser->error.first.message = "";
-	parser->error.first.next    = nullptr;
+	parser->error_count = 0;
+	parser->error = builder;
 
-	parser->error.last          = &parser->error.first;
 	parser->parsing             = true;
 
 	if (!ParseTableInitialize)

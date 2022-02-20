@@ -20,7 +20,6 @@
     <ClInclude Include="Printer.h" />
     <ClInclude Include="Token.h" />
     <ClInclude Include="Flags.h" />
-    <ClInclude Include="Error.h" />
     <ClInclude Include="Resolver.h" />
     <ClInclude Include="HeapAllocator.h" />
     <ClInclude Include="Kr\KrBasic.h" />

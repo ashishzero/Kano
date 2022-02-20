@@ -1,7 +1,6 @@
 #include "Lexer.h"
 #include "SyntaxNode.h"
 #include "StringBuilder.h"
-#include "Error.h"
 
 struct Parser
 {
@@ -9,7 +8,8 @@ struct Parser
 	Syntax_Location location;
 	Token_Value     value;
 
-	Error_List      error;
+	int             error_count;
+	String_Builder *error;
 	bool            parsing;
 };
 
@@ -23,4 +23,4 @@ Syntax_Node_Statement *   parse_statement(Parser *parser);
 Syntax_Node_Block *       parse_block(Parser *parser);
 Syntax_Node_Global_Scope *parse_global_scope(Parser *parser);
 
-void                      parser_init(Parser *parser, String content);
+void                      parser_init(Parser *parser, String content, String_Builder *builder);
