@@ -198,17 +198,21 @@ uint32_t Murmur3Hash32(const uint8_t *key, size_t len, uint32_t seed);
 //
 //
 
-constexpr size_t TABLE_BUCKET_SIZE = 8;
-constexpr size_t TABLE_BUCKET_SHIFT = 3;
+constexpr size_t TABLE_BUCKET_SIZE = sizeof(size_t);
+constexpr size_t TABLE_BUCKET_SHIFT = (TABLE_BUCKET_SIZE == 8 ? 3 : 2);
 constexpr size_t TABLE_BUCKET_MASK = TABLE_BUCKET_SIZE - 1;
 
+static_assert(TABLE_BUCKET_SIZE == 8 || TABLE_BUCKET_SIZE == 4);
+
 struct Index_Bucket {
+	int8_t flags[TABLE_BUCKET_SIZE] = {};
 	size_t hash[TABLE_BUCKET_SIZE] = {};
 	ptrdiff_t index[TABLE_BUCKET_SIZE] = {};
 };
 
-constexpr size_t TABLE_BUCKET_HASH_EMPTY = 0;
-constexpr size_t TABLE_BUCKET_HASH_DELETED = 1;
+constexpr size_t TABLE_BUCKET_FLAG_EMPTY = 0;
+constexpr size_t TABLE_BUCKET_FLAG_DELETED = 1;
+constexpr size_t TABLE_BUCKET_FLAG_PRESENT = 2;
 
 struct Index_Table {
 	size_t slot_count_pow2 = 0;
@@ -258,12 +262,12 @@ struct Table {
 
 	inline size_t GetKeyHash(const Key_Type key) const {
 		auto hash = Hash_Method::Hash(key);
-		if (hash < 2) // 0=EMPTY, 1=DELETED
-			hash += 2;
 		return hash;
 	}
 
 	ptrdiff_t IndexTableFindSlotPosition(const Key_Type key) {
+		if (index.used_count == 0) return -1;
+
 		auto hash = GetKeyHash(key);
 
 		auto step = TABLE_BUCKET_SIZE;
@@ -275,26 +279,28 @@ struct Table {
 			auto bucket = &index.buckets[bucket_index];
 
 			for (auto iter = pos & TABLE_BUCKET_MASK; iter < TABLE_BUCKET_SIZE; ++iter) {
-				if (bucket->hash[iter] == hash) {
-					auto si = bucket->index[iter];
-					if (storage[si].key == key) {
-						return (pos & ~TABLE_BUCKET_MASK) + iter;
+				if (bucket->flags[iter] == TABLE_BUCKET_FLAG_PRESENT) {
+					if (bucket->hash[iter] == hash) {
+						auto si = bucket->index[iter];
+						if (storage[si].key == key) {
+							return (pos & ~TABLE_BUCKET_MASK) + iter;
+						}
 					}
-				}
-				else if (bucket->hash[iter] == TABLE_BUCKET_HASH_EMPTY) {
+				} else if (bucket->flags[iter] == TABLE_BUCKET_FLAG_EMPTY) {
 					return -1;
 				}
 			}
 
 			auto limit = pos & TABLE_BUCKET_MASK;
 			for (auto iter = 0; iter < limit; ++iter) {
-				if (bucket->hash[iter] == hash) {
-					auto si = bucket->index[iter];
-					if (storage[si].key == key) {
-						return (pos & ~TABLE_BUCKET_MASK) + iter;
+				if (bucket->flags[iter] == TABLE_BUCKET_FLAG_PRESENT) {
+					if (bucket->hash[iter] == hash) {
+						auto si = bucket->index[iter];
+						if (storage[si].key == key) {
+							return (pos & ~TABLE_BUCKET_MASK) + iter;
+						}
 					}
-				}
-				else if (bucket->hash[iter] == TABLE_BUCKET_HASH_EMPTY) {
+				} else if (bucket->flags[iter] == TABLE_BUCKET_FLAG_EMPTY) {
 					return -1;
 				}
 			}
@@ -337,34 +343,34 @@ struct Table {
 			auto bucket = &index.buckets[bucket_index];
 
 			for (auto iter = pos & TABLE_BUCKET_MASK; iter < TABLE_BUCKET_SIZE; ++iter) {
-				if (bucket->hash[iter] == hash) {
-					auto si = bucket->index[iter];
-					if (storage[si].key == key) {
-						return &storage[si].value;
+				if (bucket->flags[iter] == TABLE_BUCKET_FLAG_PRESENT) {
+					if (bucket->hash[iter] == hash) {
+						auto si = bucket->index[iter];
+						if (storage[si].key == key) {
+							return &storage[si].value;
+						}
 					}
-				}
-				else if (bucket->hash[iter] == TABLE_BUCKET_HASH_EMPTY) {
+				} else if (bucket->flags[iter] == TABLE_BUCKET_FLAG_EMPTY) {
 					pos = (pos & ~TABLE_BUCKET_MASK) + iter;
 					goto EmptyFound;
-				}
-				else if (tombstone < 0 && bucket->hash[iter] == TABLE_BUCKET_HASH_DELETED) {
+				} else if (tombstone < 0) {
 					tombstone = (pos & ~TABLE_BUCKET_MASK) + iter;
 				}
 			}
 
 			auto limit = pos & TABLE_BUCKET_MASK;
 			for (auto iter = 0; iter < limit; ++iter) {
-				if (bucket->hash[iter] == hash) {
-					auto si = bucket->index[iter];
-					if (storage[si].key == key) {
-						return &storage[si].value;
+				if (bucket->flags[iter] == TABLE_BUCKET_FLAG_PRESENT) {
+					if (bucket->hash[iter] == hash) {
+						auto si = bucket->index[iter];
+						if (storage[si].key == key) {
+							return &storage[si].value;
+						}
 					}
-				}
-				else if (bucket->hash[iter] == TABLE_BUCKET_HASH_EMPTY) {
+				} else if (bucket->flags[iter] == TABLE_BUCKET_FLAG_EMPTY) {
 					pos = (pos & ~TABLE_BUCKET_MASK) + iter;
 					goto EmptyFound;
-				}
-				else if (tombstone < 0 && bucket->hash[iter] == TABLE_BUCKET_HASH_DELETED) {
+				} else if (tombstone < 0) {
 					tombstone = (pos & ~TABLE_BUCKET_MASK) + iter;
 				}
 			}
@@ -384,6 +390,7 @@ struct Table {
 
 		auto bucket = &index.buckets[pos >> TABLE_BUCKET_SHIFT];
 
+		bucket->flags[pos & TABLE_BUCKET_MASK] = TABLE_BUCKET_FLAG_PRESENT;
 		bucket->hash[pos & TABLE_BUCKET_MASK] = hash;
 		bucket->index[pos & TABLE_BUCKET_MASK] = (ptrdiff_t)storage.count;
 
@@ -412,7 +419,8 @@ struct Table {
 		ptrdiff_t old_offset = bucket->index[iter];
 		ptrdiff_t last_offset = (ptrdiff_t)storage.count - 1;
 
-		bucket->hash[iter] = TABLE_BUCKET_HASH_DELETED;
+		bucket->flags[iter] = TABLE_BUCKET_FLAG_DELETED;
+		bucket->hash[iter] = 0;
 		bucket->index[iter] = -1;
 
 		index.used_count -= 1;
@@ -470,12 +478,12 @@ struct STable {
 
 	inline size_t GetKeyHash(const Key_Type key) const {
 		auto hash = Hash_Method::Hash(key);
-		if (hash < 2) // 0=EMPTY, 1=DELETED
-			hash += 2;
 		return hash;
 	}
 
 	ptrdiff_t IndexTableFindSlotPosition(const Key_Type key) {
+		if (index.used_count == 0) return -1;
+
 		auto hash = GetKeyHash(key);
 
 		auto step = TABLE_BUCKET_SIZE;
@@ -487,26 +495,30 @@ struct STable {
 			auto bucket = &index.buckets[bucket_index];
 
 			for (auto iter = pos & TABLE_BUCKET_MASK; iter < TABLE_BUCKET_SIZE; ++iter) {
-				if (bucket->hash[iter] == hash) {
-					auto si = bucket->index[iter];
-					if (storage[si].key == key) {
-						return (pos & ~TABLE_BUCKET_MASK) + iter;
+				if (bucket->flags[iter] == TABLE_BUCKET_FLAG_PRESENT) {
+					if (bucket->hash[iter] == hash) {
+						auto si = bucket->index[iter];
+						if (storage[si].key == key) {
+							return (pos & ~TABLE_BUCKET_MASK) + iter;
+						}
 					}
 				}
-				else if (bucket->hash[iter] == TABLE_BUCKET_HASH_EMPTY) {
+				else if (bucket->flags[iter] == TABLE_BUCKET_FLAG_EMPTY) {
 					return -1;
 				}
 			}
 
 			auto limit = pos & TABLE_BUCKET_MASK;
 			for (auto iter = 0; iter < limit; ++iter) {
-				if (bucket->hash[iter] == hash) {
-					auto si = bucket->index[iter];
-					if (storage[si].key == key) {
-						return (pos & ~TABLE_BUCKET_MASK) + iter;
+				if (bucket->flags[iter] == TABLE_BUCKET_FLAG_PRESENT) {
+					if (bucket->hash[iter] == hash) {
+						auto si = bucket->index[iter];
+						if (storage[si].key == key) {
+							return (pos & ~TABLE_BUCKET_MASK) + iter;
+						}
 					}
 				}
-				else if (bucket->hash[iter] == TABLE_BUCKET_HASH_EMPTY) {
+				else if (bucket->flags[iter] == TABLE_BUCKET_FLAG_EMPTY) {
 					return -1;
 				}
 			}
@@ -549,34 +561,38 @@ struct STable {
 			auto bucket = &index.buckets[bucket_index];
 
 			for (auto iter = pos & TABLE_BUCKET_MASK; iter < TABLE_BUCKET_SIZE; ++iter) {
-				if (bucket->hash[iter] == hash) {
-					auto si = bucket->index[iter];
-					if (storage[si].key == key) {
-						return &storage[si].value;
+				if (bucket->flags[iter] == TABLE_BUCKET_FLAG_PRESENT) {
+					if (bucket->hash[iter] == hash) {
+						auto si = bucket->index[iter];
+						if (storage[si].key == key) {
+							return &storage[si].value;
+						}
 					}
 				}
-				else if (bucket->hash[iter] == TABLE_BUCKET_HASH_EMPTY) {
+				else if (bucket->flags[iter] == TABLE_BUCKET_FLAG_EMPTY) {
 					pos = (pos & ~TABLE_BUCKET_MASK) + iter;
 					goto EmptyFound;
 				}
-				else if (tombstone < 0 && bucket->hash[iter] == TABLE_BUCKET_HASH_DELETED) {
+				else if (tombstone < 0) {
 					tombstone = (pos & ~TABLE_BUCKET_MASK) + iter;
 				}
 			}
 
 			auto limit = pos & TABLE_BUCKET_MASK;
 			for (auto iter = 0; iter < limit; ++iter) {
-				if (bucket->hash[iter] == hash) {
-					auto si = bucket->index[iter];
-					if (storage[si].key == key) {
-						return &storage[si].value;
+				if (bucket->flags[iter] == TABLE_BUCKET_FLAG_PRESENT) {
+					if (bucket->hash[iter] == hash) {
+						auto si = bucket->index[iter];
+						if (storage[si].key == key) {
+							return &storage[si].value;
+						}
 					}
 				}
-				else if (bucket->hash[iter] == TABLE_BUCKET_HASH_EMPTY) {
+				else if (bucket->flags[iter] == TABLE_BUCKET_FLAG_EMPTY) {
 					pos = (pos & ~TABLE_BUCKET_MASK) + iter;
 					goto EmptyFound;
 				}
-				else if (tombstone < 0 && bucket->hash[iter] == TABLE_BUCKET_HASH_DELETED) {
+				else if (tombstone < 0) {
 					tombstone = (pos & ~TABLE_BUCKET_MASK) + iter;
 				}
 			}
@@ -596,6 +612,7 @@ struct STable {
 
 		auto bucket = &index.buckets[pos >> TABLE_BUCKET_SHIFT];
 
+		bucket->flags[pos & TABLE_BUCKET_MASK] = TABLE_BUCKET_FLAG_PRESENT;
 		bucket->hash[pos & TABLE_BUCKET_MASK] = hash;
 		bucket->index[pos & TABLE_BUCKET_MASK] = (ptrdiff_t)storage.count;
 
@@ -604,6 +621,11 @@ struct STable {
 		key_copy.data = (uint8_t *)MemoryAllocate(key.length + 1, string_allocator);
 		memcpy(key_copy.data, key.data, key.length);
 		key_copy.data[key.length] = 0;
+
+		auto pair = storage.Add();
+		pair->key = key_copy;
+		pair->value = Value_Type{};
+		return &pair->value;
 
 		auto pair = storage.Add();
 		pair->key = key_copy;
@@ -630,7 +652,8 @@ struct STable {
 		ptrdiff_t old_offset = bucket->index[iter];
 		ptrdiff_t last_offset = (ptrdiff_t)storage.count - 1;
 
-		bucket->hash[iter] = TABLE_BUCKET_HASH_DELETED;
+		bucket->flags[iter] = TABLE_BUCKET_FLAG_DELETED;
+		bucket->hash[iter] = 0;
 		bucket->index[iter] = -1;
 
 		index.used_count -= 1;

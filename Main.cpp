@@ -466,8 +466,10 @@ static void json_write_symbol(Json_Writer *json, Interpreter *interp, String nam
 
 static void json_write_symbols(Interpreter *interp, Json_Writer *json, Symbol_Table *symbols, uint64_t stack_top, uint64_t skip_stack_offset)
 {
-	for (auto symbol : symbols->buffer)
+	for (auto &pair : symbols->map)
 	{
+		auto symbol = pair.value;
+
 		if ((symbol->flags & SYMBOL_BIT_TYPE))
 			continue;
 		

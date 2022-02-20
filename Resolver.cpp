@@ -210,6 +210,9 @@ static inline uint32_t next_power2(uint32_t n)
 
 static void symbol_table_put(Symbol_Table *table, Symbol *sym)
 {
+	table->map.Put(sym->name, sym);
+
+	/*
 	const String name      = sym->name;
 	auto         hash      = murmur3_32(name.data, name.length, HASH_SEED);
 	
@@ -244,10 +247,28 @@ static void symbol_table_put(Symbol_Table *table, Symbol *sym)
 			bucket->next = new Symbol_Index;
 		}
 	}
+	*/
 }
 
 static const Symbol *symbol_table_get(Symbol_Table *root_table, String name, bool recursive = true)
 {
+	if (recursive)
+	{
+		for (auto table = root_table; table; table = table->parent)
+		{
+			auto symbol = table->map.Find(name);
+			if (symbol)
+				return *symbol;
+		}
+
+		return nullptr;
+	}
+	
+	auto symbol = root_table->map.Find(name);
+
+	return symbol ? *symbol : nullptr;
+
+	/*
 	auto hash      = murmur3_32(name.data, name.length, HASH_SEED);
 	
 	auto pos       = hash & (SYMBOL_TABLE_BUCKET_COUNT - 1);
@@ -275,6 +296,7 @@ static const Symbol *symbol_table_get(Symbol_Table *root_table, String name, boo
 	}
 	
 	return nullptr;
+	*/
 }
 
 template <typename T, uint32_t N> struct Bucket_Array {

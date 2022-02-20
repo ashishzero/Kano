@@ -214,12 +214,19 @@ struct Symbol_Lookup
 	Symbol_Index buckets[SYMBOL_TABLE_BUCKET_COUNT];
 };
 
+struct Symbol_Table {
+	Table<String, Symbol *> map;
+	Symbol_Table *parent = nullptr;
+};
+
+/*
 struct Symbol_Table
 {
 	Symbol_Lookup   lookup;
 	Array<Symbol *> buffer;
 	Symbol_Table *  parent = nullptr;
 };
+*/
 
 //
 //
