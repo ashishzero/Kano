@@ -796,6 +796,9 @@ bool GenerateDebugCodeInfo(String code, Memory_Arena *arena, String_Builder *bui
 	
 	ThreadContext.allocator = MemoryArenaAllocator(arena);
 
+	auto temp = BeginTemporaryMemory(arena);
+	Defer{ EndTemporaryMemory(&temp); };
+
 	Parser parser;
 	parser_init(&parser, code, builder);
 
