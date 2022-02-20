@@ -1,9 +1,8 @@
-﻿#include "Common.h"
+﻿#include "Kr/KrBasic.h"
 
 #include "Parser.h"
 #include "Resolver.h"
 #include "Interp.h"
-#include "Printer.h"
 #include "HeapAllocator.h"
 
 struct String_Stream {
@@ -16,7 +15,7 @@ struct String_Stream {
 		va_copy(args1, args0);
 		
 		int   len = 1 + vsnprintf(NULL, 0, fmt, args1);
-		buffer.reserve(buffer.count + len);
+		buffer.Reserve(buffer.count + len);
 		char *buf = buffer.data + buffer.count;
 		vsnprintf(buf, len, fmt, args0);
 		buffer.count += (len - 1);
@@ -26,7 +25,7 @@ struct String_Stream {
 	}
 
 	const char *get_cstring() {
-		buffer.reserve(buffer.count + 1);
+		buffer.Reserve(buffer.count + 1);
 		buffer.data[buffer.count] = 0;
 		return buffer.data;
 	}
@@ -42,7 +41,7 @@ struct Json_Writer {
 	void init(FILE *fp)
 	{
 		out = fp;
-		depth.add(0);
+		depth.Add(0);
 	}
 
 	void write_newline(int count = 1)
@@ -53,7 +52,7 @@ struct Json_Writer {
 
 	void next_element(int newline_count = 1)
 	{
-		auto value = depth.last();
+		auto value = &depth.Last();
 		if (*value)
 		{
 			fprintf(out, ",");
@@ -67,12 +66,12 @@ struct Json_Writer {
 	void push_scope(int newline_count = 1)
 	{
 		next_element(newline_count);
-		depth.add(0);
+		depth.Add(0);
 	}
 
 	void pop_scope()
 	{
-		depth.remove_last();
+		depth.RemoveLast();
 	}
 
 	void write_indent()
@@ -215,7 +214,7 @@ struct Interp_User_Context {
 //
 //
 
-void handle_assertion(const char *reason, const char *file, int line, const char *proc)
+void AssertHandle(const char *reason, const char *file, int line, const char *proc)
 {
 	fprintf(stderr, "%s. File: %s(%d)\n", reason, file, line);
 	DebugTriggerbreakpoint();
@@ -228,7 +227,7 @@ static String read_entire_file(const char *file)
 	long fsize = ftell(f);
 	fseek(f, 0, SEEK_SET);
 
-	uint8_t *string = (uint8_t *)malloc(fsize + 1);
+	uint8_t *string = (uint8_t *)MemoryAllocate(fsize + 1);
 	fread(string, 1, fsize, f);
 	fclose(f);
 
@@ -599,12 +598,12 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 
 		if (intercept == INTERCEPT_PROCEDURE_CALL)
 		{
-			context->callstack.add(make_procedure_call(procedure_type->name, interp->stack_top, &proc->symbols));
+			context->callstack.Add(make_procedure_call(procedure_type->name, interp->stack_top, &proc->symbols));
 		}
 		else
 		{
 			Assert(intercept == INTERCEPT_PROCEDURE_RETURN);
-			context->callstack.remove_last();
+			context->callstack.RemoveLast();
 		}
 	}
 	else if (intercept == INTERCEPT_STATEMENT)
@@ -932,12 +931,12 @@ static void include_basic(Code_Type_Resolver *resolver)
 
 int main()
 {
+	InitThreadContext(0);
+
 	String content = read_entire_file("Simple.kano");
 
-	auto   builder = new String_Builder;
-
 	Parser parser;
-	parser_init(&parser, content, builder);
+	parser_init(&parser, content);
 
 	auto node = parse_global_scope(&parser);
 
@@ -951,8 +950,6 @@ int main()
 	auto exprs = code_type_resolve(resolver, node);
 
 	auto expr = code_type_resolver_find(resolver, "factorial");
-	print_code(expr->address.code);
-
 
 	FILE *out = fopen("DebugInfo.json", "wb");
 

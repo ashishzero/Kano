@@ -1,5 +1,5 @@
 #pragma once
-#include "Common.h"
+#include "Kr/KrBasic.h"
 #include "Token.h"
 #include "Flags.h"
 
@@ -120,7 +120,7 @@ struct Syntax_Node_Literal : public Syntax_Node
 		kind = SYNTAX_NODE_LITERAL;
 	}
 
-	Literal value;
+	Literal value = {};
 };
 
 struct Syntax_Node_Identifier : public Syntax_Node

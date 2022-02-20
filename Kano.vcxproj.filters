@@ -6,16 +6,16 @@
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Parser.cpp" />
     <ClCompile Include="Printer.cpp" />
-    <ClCompile Include="StringBuilder.cpp" />
     <ClCompile Include="Resolver.cpp" />
+    <ClCompile Include="Kr\KrBasic.cpp" />
+    <ClCompile Include="Kr\KrCommon.cpp" />
+    <ClCompile Include="StringBuilder.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CodeNode.h" />
-    <ClInclude Include="Common.h" />
     <ClInclude Include="Interp.h" />
     <ClInclude Include="Lexer.h" />
     <ClInclude Include="Parser.h" />
-    <ClInclude Include="StringBuilder.h" />
     <ClInclude Include="SyntaxNode.h" />
     <ClInclude Include="Printer.h" />
     <ClInclude Include="Token.h" />
@@ -23,8 +23,15 @@
     <ClInclude Include="Error.h" />
     <ClInclude Include="Resolver.h" />
     <ClInclude Include="HeapAllocator.h" />
+    <ClInclude Include="Kr\KrBasic.h" />
+    <ClInclude Include="Kr\KrCommon.h" />
+    <ClInclude Include="Kr\KrString.h" />
+    <ClInclude Include="StringBuilder.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Simple.kano" />
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="Kr\KrVisualizer.natvis" />
   </ItemGroup>
 </Project>

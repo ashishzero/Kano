@@ -1,4 +1,4 @@
-#include "Common.h"
+#include "Kr/KrBasic.h"
 #include "CodeNode.h"
 #include "Parser.h"
 #include "Interp.h"
@@ -122,7 +122,7 @@ static void type_to_string_internal(Code_Type *type)
 static char *type_to_string(Code_Type *type) {
 	TempBufferIndex = 0;
 	type_to_string_internal(type);
-	char *string = (char *)malloc(TempBufferIndex + 1);
+	char *string = (char *)MemoryAllocate(TempBufferIndex + 1);
 	memcpy(string, TempBuffer, TempBufferIndex);
 	string[TempBufferIndex] = 0;
 	return string;
@@ -270,7 +270,7 @@ static void symbol_table_put(Symbol_Table *table, Symbol *sym)
 				uint32_t offset      = (uint32_t)table->buffer.count;
 				bucket->hash[index]  = hash;
 				bucket->index[index] = offset;
-				table->buffer.add(sym);
+				table->buffer.Add(sym);
 				return;
 			}
 		}
@@ -312,6 +312,47 @@ static const Symbol *symbol_table_get(Symbol_Table *root_table, String name, boo
 	
 	return nullptr;
 }
+
+template <typename T, uint32_t N> struct Bucket_Array {
+	struct Bucket {
+		T       data[N] = {};
+		Bucket *next = nullptr;
+	};
+
+	Bucket   first;
+	Bucket *last;
+	uint32_t index;
+
+	Bucket_Array() {
+		last = &first;
+		index = 0;
+	}
+
+	T *add() {
+		if (index == N) {
+			Bucket *buk = new Bucket;
+			index = 0;
+			last->next = buk;
+			last = buk;
+		}
+
+		return &last->data[index++];
+	}
+
+	void add(T d) {
+		auto dst = add();
+		*dst = d;
+	}
+
+	constexpr uint32_t bucket_size() {
+		return N;
+	}
+
+	Bucket *begin() { return &first; }
+	Bucket *end() { return nullptr; }
+	const Bucket *begin() const { return &first; }
+	const Bucket *end() const { return nullptr; }
+};
 
 struct Code_Type_Resolver
 {
@@ -620,7 +661,7 @@ static Code_Node_Return *code_resolve_return(Code_Type_Resolver *resolver, Symbo
 	
 	if (resolver->return_stack.count)
 	{
-		auto return_type = *resolver->return_stack.last();
+		auto return_type = resolver->return_stack.Last();
 		if (!code_type_are_same(return_type, node->type))
 		{
 			auto cast = code_type_cast(node->expression, return_type);
@@ -932,7 +973,7 @@ static Code_Node_Block *code_resolve_procedure(Code_Type_Resolver *resolver, Syn
 		}
 	}
 
-	resolver->return_stack.add(proc_type->return_type);
+	resolver->return_stack.Add(proc_type->return_type);
 	auto procedure_body = code_resolve_block(resolver, proc_symbols, (int64_t)proc->location.start_row, proc->body);
 	resolver->return_stack.count -= 1;
 
@@ -1006,20 +1047,22 @@ static Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver 
 	auto  op_kind   = token_to_unary_operator(root->op);
 	
 	auto &operators = resolver->unary_operators[op_kind];
-	ForBucketArray(bucket, operators)
+
+	for (const auto &bucket : operators)
 	{
-		ForBucket(index, bucket, operators)
+		uint32_t count = ((& bucket == operators.last) ? operators.index : ArrayCount(bucket.data));
+		for (uint32_t index = 0; index < count; ++index)
 		{
-			auto op    = &bucket->data[index];
-			
+			const auto &op = bucket.data[index];
+
 			bool found = false;
-			if (code_type_are_same(op->parameter, child->type))
+			if (code_type_are_same(op.parameter, child->type))
 			{
 				found = true;
 			}
 			else
 			{
-				auto cast = code_type_cast(child, op->output);
+				auto cast = code_type_cast(child, op.output);
 				if (cast)
 				{
 					child = cast;
@@ -1030,7 +1073,7 @@ static Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver 
 			if (found)
 			{
 				auto node     = new Code_Node_Unary_Operator;
-				node->type    = op->output;
+				node->type    = op.output;
 				node->child   = child;
 				node->op_kind = op_kind;
 				
@@ -1209,22 +1252,21 @@ static Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Sym
 		
 		auto &operators = resolver->binary_operators[op_kind];
 		
-		ForBucketArray(bucket, operators)
+		for (const auto &bucket : operators)
 		{
-			ForBucket(index, bucket, operators)
-			{
-				auto op          = &bucket->data[index];
-				
+			uint32_t count = ((&bucket == operators.last) ? operators.index : ArrayCount(bucket.data));
+			for (uint32_t index = 0; index < count; ++index) {
+				const auto &op = bucket.data[index];
 				bool left_match  = false;
 				bool right_match = false;
 				
-				if (code_type_are_same(op->parameters[0], left->type, false))
+				if (code_type_are_same(op.parameters[0], left->type, false))
 				{
 					left_match = true;
 				}
 				else
 				{
-					auto cast_left = code_type_cast(left, op->parameters[0]);
+					auto cast_left = code_type_cast(left, op.parameters[0]);
 					if (cast_left)
 					{
 						left       = cast_left;
@@ -1232,13 +1274,13 @@ static Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Sym
 					}
 				}
 				
-				if (code_type_are_same(op->parameters[1], right->type))
+				if (code_type_are_same(op.parameters[1], right->type))
 				{
 					right_match = true;
 				}
 				else
 				{
-					auto cast_right = code_type_cast(right, op->parameters[1]);
+					auto cast_right = code_type_cast(right, op.parameters[1]);
 					if (cast_right)
 					{
 						right       = cast_right;
@@ -1246,13 +1288,13 @@ static Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Sym
 					}
 				}
 				
-				if (left_match && right_match && (!op->compound || (op->compound && (left->flags & SYMBOL_BIT_LVALUE))))
+				if (left_match && right_match && (!op.compound || (op.compound && (left->flags & SYMBOL_BIT_LVALUE))))
 				{
 					auto node     = new Code_Node_Binary_Operator;
 
-					auto type = op->output;
+					auto type = op.output;
 
-					if (op->output->kind == CODE_TYPE_POINTER && op->parameters[0]->kind == CODE_TYPE_POINTER)
+					if (op.output->kind == CODE_TYPE_POINTER && op.parameters[0]->kind == CODE_TYPE_POINTER)
 						type = left->type;
 
 					node->type    = type;
@@ -1577,7 +1619,7 @@ static Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolv
 			if (!symbol->type)
 				symbol->type = proc_type;
 			
-			resolver->return_stack.add(proc_type->return_type);
+			resolver->return_stack.Add(proc_type->return_type);
 			procedure_body = code_resolve_block(resolver, proc_symbols, (int64_t)proc->location.start_row, proc->body);
 			resolver->return_stack.count -= 1;
 			
@@ -2088,7 +2130,7 @@ static Array_View<Code_Node_Assignment *> code_resolve_global_scope(Code_Type_Re
 		{
 			if ((assign->value->flags & SYMBOL_BIT_CONST_EXPR))
 			{
-				global_exe.add(assign);
+				global_exe.Add(assign);
 			}
 			else
 			{
@@ -2464,7 +2506,7 @@ void proc_builder_argument(Procedure_Builder *builder, String name)
 	Assert(builder->is_variadic == false);
 	auto type = code_type_resolver_find_type(builder->resolver, name);
 	Assert(type);
-	builder->arguments.add(type);
+	builder->arguments.Add(type);
 }
 
 void proc_builder_variadic(Procedure_Builder *builder)
@@ -2473,7 +2515,7 @@ void proc_builder_variadic(Procedure_Builder *builder)
 	builder->is_variadic = true;
 	auto type = code_type_resolver_find_type(builder->resolver, "*void");
 	Assert(type);
-	builder->arguments.add(type);
+	builder->arguments.Add(type);
 }
 
 void proc_builder_return(Procedure_Builder *builder, String name)
@@ -2496,14 +2538,14 @@ void proc_builder_register(Procedure_Builder *builder, String name, CCall ccall)
 	
 	Assert(code_type_resolver_register_ccall(builder->resolver, name, ccall, type));
 
-	builder->arguments.reset();
+	builder->arguments.Reset();
 	builder->return_type = nullptr;
 	builder->is_variadic = false;
 }
 
 void proc_builder_free(Procedure_Builder *builder)
 {
-	array_free(&builder->arguments);
+	Free(&builder->arguments);
 	builder->return_type = nullptr;
 	builder->resolver = nullptr;
 }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Common.h"
+#include "Kr/KrCommon.h"
 #include "SyntaxNode.h"
 
 #include <stdio.h>
@@ -24,7 +24,7 @@ static inline String string_vprint(const char *fmt, va_list list)
 	va_list args;
 	va_copy(args, list);
 	int   len = 1 + vsnprintf(NULL, 0, fmt, args);
-	char *buf = (char *)malloc(len);
+	char *buf = (char *)MemoryAllocate(len);
 	vsnprintf(buf, len, fmt, list);
 	va_end(args);
 	return String((uint8_t *)buf, len - 1);

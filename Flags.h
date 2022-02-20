@@ -1,5 +1,5 @@
 #pragma once
-#include "Common.h"
+#include <stdint.h>
 
 constexpr uint32_t SYMBOL_BIT_LVALUE     = 0x1;
 constexpr uint32_t SYMBOL_BIT_CONSTANT   = 0x2;

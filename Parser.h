@@ -11,8 +11,6 @@ struct Parser
 
 	Error_List      error;
 	bool            parsing;
-
-	String_Builder *builder;
 };
 
 Syntax_Node *             parse_subexpression(Parser *parser, uint32_t prec);
@@ -25,4 +23,4 @@ Syntax_Node_Statement *   parse_statement(Parser *parser);
 Syntax_Node_Block *       parse_block(Parser *parser);
 Syntax_Node_Global_Scope *parse_global_scope(Parser *parser);
 
-void                      parser_init(Parser *parser, String content, String_Builder *builder);
+void                      parser_init(Parser *parser, String content);

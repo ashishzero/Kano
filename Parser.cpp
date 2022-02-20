@@ -84,7 +84,7 @@ static inline void parser_error(Parser *parser, Token *token, const char *fmt, .
 
 	va_end(args);
 
-	// DebugTriggerbreakpoint();
+	parser->parsing = false;
 }
 
 //
@@ -263,7 +263,7 @@ Syntax_Node *parse_subexpression(Parser *parser, uint32_t prec)
 		String name;
 		name.length = parser->value.string.length;
 		name.data   = parser->value.string.data;
-		node->name  = string_builder_copy(parser->builder, name);
+		node->name  = name;
 		return node;
 	}
 
@@ -774,7 +774,7 @@ Syntax_Node_Type *parse_type(Parser *parser)
 		String name;
 		name.length      = parser->value.string.length;
 		name.data        = parser->value.string.data;
-		identifier->name = string_builder_copy(parser->builder, name);
+		identifier->name = name;
 
 		type->id         = Syntax_Node_Type::IDENTIFIER;
 		type->type       = identifier;
@@ -855,7 +855,7 @@ Syntax_Node_Declaration *parse_declaration(Parser *parser)
 		String identifier;
 		identifier.length       = parser->value.string.length;
 		identifier.data         = parser->value.string.data;
-		declaration->identifier = string_builder_copy(parser->builder, identifier);
+		declaration->identifier = identifier;
 	}
 
 	parser_expect_token(parser, TOKEN_KIND_COLON);
@@ -1120,7 +1120,7 @@ Syntax_Node_Global_Scope *parse_global_scope(Parser *parser)
 //
 //
 
-void parser_init(Parser *parser, String content, String_Builder *builder)
+void parser_init(Parser *parser, String content)
 {
 	lexer_init(&parser->lexer, content);
 
@@ -1137,8 +1137,6 @@ void parser_init(Parser *parser, String content, String_Builder *builder)
 	}
 
 	lexer_next(&parser->lexer);
-
-	parser->builder = builder;
 }
 
 //

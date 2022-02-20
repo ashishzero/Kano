@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+	<Type Name="Array_View&lt;*&gt;">
+		<DisplayString>{{ count={count} }}</DisplayString>
+		<Expand>
+			<Item Name="[count]" ExcludeView="simple">count</Item>
+			<ArrayItems>
+				<Size>count</Size>
+				<ValuePointer>data</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+
+	<Type Name="Array&lt;*&gt;">
+		<DisplayString>{{ count={count}, allocated={allocated} }}</DisplayString>
+		<Expand>
+			<Item Name="[count]" ExcludeView="simple">count</Item>
+			<Item Name="[allocated]" ExcludeView="simple">allocated</Item>
+			<Item Name="[allocator]" ExcludeView="simple">allocator</Item>
+			<ArrayItems>
+				<Size>count</Size>
+				<ValuePointer>data</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+
+	<Type Name="Index_Table">
+		<DisplayString>{{ count={slot_count_pow2 >> TABLE_BUCKET_SHIFT} }}</DisplayString>
+		<Expand>
+			<Item Name="[count]" ExcludeView="simple">slot_count_pow2 >> TABLE_BUCKET_SHIFT</Item>
+			<ArrayItems>
+				<Size>slot_count_pow2 >> TABLE_BUCKET_SHIFT</Size>
+				<ValuePointer>buckets</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+
+	<Type Name="Table&lt;*&gt;">
+		<DisplayString>{{ count={storage.count} }}</DisplayString>
+		<Expand>
+			<Item Name="[index]" ExcludeView="simple">index</Item>
+			<Item Name="[count]" ExcludeView="simple">storage.count</Item>
+			<Item Name="[allocator]" ExcludeView="simple">storage.allocator</Item>
+			<ArrayItems>
+				<Size>storage.count</Size>
+				<ValuePointer>storage.data</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+
+	<Type Name="STable&lt;*&gt;">
+		<DisplayString>{{ count={storage.count} }}</DisplayString>
+		<Expand>
+			<Item Name="[index]" ExcludeView="simple">index</Item>
+			<Item Name="[count]" ExcludeView="simple">storage.count</Item>
+			<Item Name="[allocator]" ExcludeView="simple">storage.allocator</Item>
+			<ArrayItems>
+				<Size>storage.count</Size>
+				<ValuePointer>storage.data</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+
+	<Type Name="String">
+		<Intrinsic Name="length" Expression="length" />
+		<Intrinsic Name="data" Expression="data" />
+		<DisplayString>{data,[length]}</DisplayString>
+		<StringView>data,[length]</StringView>
+		<Expand>
+			<Item Name="[length]" ExcludeView="simple">length</Item>
+			<ArrayItems>
+				<Size>length</Size>
+				<ValuePointer>data</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+
+</AutoVisualizer>

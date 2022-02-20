@@ -1,5 +1,5 @@
 #pragma once
-#include "Common.h"
+#include "Kr/KrCommon.h"
 
 enum Token_Kind
 {

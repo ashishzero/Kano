@@ -1,5 +1,5 @@
 #pragma once
-#include "Common.h"
+#include "Kr/KrBasic.h"
 #include "CodeNode.h"
 
 struct Code_Type_Resolver;

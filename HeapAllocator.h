@@ -1,4 +1,4 @@
-#include "Common.h"
+#include "Kr/KrBasic.h"
 
 struct Heap_Allocator
 {
@@ -91,9 +91,9 @@ static inline void *heap_alloc(Heap_Allocator *allocator, uint64_t size)
 
 	Heap_Allocator::Memory mem;
 	mem.size = allocator->allocation;
-	mem.ptr = malloc(mem.size);
+	mem.ptr = MemoryAllocate(mem.size);
 
-	allocator->memories.add(mem);
+	allocator->memories.Add(mem);
 	
 	auto buk = (Heap_Allocator::Bucket *)mem.ptr;
 	buk->size = mem.size - sizeof(buk->size);

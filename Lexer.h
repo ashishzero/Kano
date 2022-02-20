@@ -1,5 +1,5 @@
 #pragma once
-#include "Common.h"
+#include "Kr/KrCommon.h"
 #include "Token.h"
 
 struct Lexer
