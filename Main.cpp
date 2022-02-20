@@ -131,7 +131,7 @@ void AssertHandle(const char *reason, const char *file, int line, const char *pr
 	DebugTriggerbreakpoint();
 }
 
-static String read_entire_file(const char *file)
+String read_entire_file(const char *file)
 {
 	FILE *f = fopen(file, "rb");
 	fseek(f, 0, SEEK_END);
@@ -838,6 +838,7 @@ bool GenerateDebugCodeInfo(String code, Memory_Arena *arena, String_Builder *bui
 	return true;
 }
 
+#if 0
 int main()
 {
 	InitThreadContext(0);
@@ -866,3 +867,4 @@ int main()
 
 	return 0;
 }
+#endif

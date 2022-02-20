@@ -10,6 +10,7 @@
     <ClCompile Include="Kr\KrBasic.cpp" />
     <ClCompile Include="Kr\KrCommon.cpp" />
     <ClCompile Include="StringBuilder.cpp" />
+    <ClCompile Include="Server.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CodeNode.h" />
