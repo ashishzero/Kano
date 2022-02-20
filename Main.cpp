@@ -8,36 +8,30 @@
 #include <stdlib.h>
 
 struct Json_Writer {
-	Array<int> depth;
+	bool depth[4096] = {};
+	int depth_index = 0;
 
 	String_Builder *builder = nullptr;
 
-	void init(String_Builder *b)
-	{
-		builder = b;
-		depth.Add(0);
-	}
-
 	void next_element()
 	{
-		auto value = &depth.Last();
-		if (*value)
-		{
+		if (depth[depth_index])
 			Write(builder, ",");
-		}
-
-		*value += 1;
+		else
+			depth[depth_index] = true;
 	}
 
 	void push_scope()
 	{
+		Assert(depth_index < ArrayCount(depth));
 		next_element();
-		depth.Add(0);
+		depth_index += 1;
+		depth[depth_index] = false;
 	}
 
 	void pop_scope()
 	{
-		depth.RemoveLast();
+		depth_index -= 1;
 	}
 
 	void begin_object()
@@ -822,7 +816,7 @@ int main()
 	auto expr = code_type_resolver_find(resolver, "factorial");
 
 	Interp_User_Context context;
-	context.json.init(&builder);
+	context.json.builder = &builder;
 
 	context.json.begin_array();
 
