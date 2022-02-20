@@ -36,38 +36,28 @@ struct String_Stream {
 struct Json_Writer {
 	Array<int> depth;
 
-	FILE *out = nullptr;
-	int indent = 0;
-	bool same_line = false;
+	String_Builder *builder = nullptr;
 
-	void init(FILE *fp)
+	void init(String_Builder *b)
 	{
-		out = fp;
+		builder = b;
 		depth.Add(0);
 	}
 
-	void write_newline(int count = 1)
-	{
-		for (int i = 0; i < count; ++i)
-			fprintf(out, "\n");
-	}
-
-	void next_element(int newline_count = 1)
+	void next_element()
 	{
 		auto value = &depth.Last();
 		if (*value)
 		{
-			fprintf(out, ",");
-			if (!same_line)
-				write_newline(newline_count);
+			Write(builder, ",");
 		}
 
 		*value += 1;
 	}
 
-	void push_scope(int newline_count = 1)
+	void push_scope()
 	{
-		next_element(newline_count);
+		next_element();
 		depth.Add(0);
 	}
 
@@ -76,125 +66,70 @@ struct Json_Writer {
 		depth.RemoveLast();
 	}
 
-	void write_indent()
+	void begin_object()
 	{
-		if (indent == 0) return;
-		fprintf(out, "%*s", indent, "\t");
-	}
-
-	void begin_object(bool imm = false, int newline_count = 1)
-	{
-		push_scope(newline_count);
-
-		if (!imm)
-			write_indent();
-
-		fprintf(out, "{");
-
-		if (!same_line)
-		{
-			fprintf(out, "\n");
-			indent += 1;
-		}
-
-		indent += 1;
+		push_scope();
+		Write(builder, "{");
 	}
 
 	void end_object()
 	{
-		indent -= 1;
-
-		if (!same_line)
-		{
-			indent -= 1;
-			fprintf(out, "\n");
-			write_indent();
-		}
-
-		fprintf(out, "}");
+		Write(builder, "}");
 		pop_scope();
 	}
 
-	void begin_array(bool imm = false, int newline_count = 1)
+	void begin_array()
 	{
-		push_scope(newline_count);
-		
-		if (!imm)
-			write_indent();
-
-		fprintf(out, "[");
-
-		if (!same_line)
-		{
-			fprintf(out, "\n");
-			indent += 1;
-		}
-
-		indent += 1;
+		push_scope();
+		Write(builder, "[");
 	}
 
 	void end_array()
 	{
-		indent -= 1;
-
-		if (!same_line)
-		{
-			indent -= 1;
-			write_newline();
-			write_indent();
-		}
-		fprintf(out, "]");
+		Write(builder, "]");
 		pop_scope();
 	}
 
 	void write_key(const char *key)
 	{
 		push_scope();
-		write_indent();
-		fprintf(out, "\"%s\": ", key);
+		WriteFormatted(builder, "\"%\": ", key);
 	}
 
-	void write_single_value(const char *fmt, ...)
+	template <typename ...Args>
+	void write_single_value(const char *fmt, Args... args)
 	{
-		fprintf(out, "\"");
-		va_list args;
-		va_start(args, fmt);
-		vfprintf(out, fmt, args);
-		va_end(args);
-		fprintf(out, "\"");
+		Write(builder, "\"");
+		WriteFormatted(builder, fmt, args...);
+		Write(builder, "\"");
 		pop_scope();
 	}
 
 	void begin_string_value()
 	{
-		fprintf(out, "\"");
+		Write(builder, "\"");
 	}
 
-	void append_string_value(const char *fmt, ...)
+	template <typename ...Args>
+	void append_string_value(const char *fmt, Args... args)
 	{
-		va_list args;
-		va_start(args, fmt);
-		vfprintf(out, fmt, args);
-		va_end(args);
+		WriteFormatted(builder, fmt, args...);
 	}
 
 	void end_string_value()
 	{
-		fprintf(out, "\"");
+		Write(builder, "\"");
 		pop_scope();
 	}
 
-	void write_key_value(const char *key, const char *fmt, ...)
+	template <typename ...Args>
+	void write_key_value(const char *key, const char *fmt, Args... args)
 	{
 		next_element();
-		write_indent();
-		fprintf(out, "\"%s\": ", key);
-		fprintf(out, "\"");
-		va_list args;
-		va_start(args, fmt);
-		vfprintf(out, fmt, args);
-		va_end(args);
-		fprintf(out, "\"");
+		WriteFormatted(builder, "\"%\": ", key);
+		Write(builder, "\"");
+		WriteFormatted(builder, fmt, args...);
+		Write(builder, "\"");
 	}
 };
 
@@ -300,7 +235,7 @@ static void json_write_type(Json_Writer *json, Code_Type *type)
 
 		case CODE_TYPE_STRUCT: {
 			auto strt = (Code_Type_Struct *)type;
-			json->append_string_value("%s", strt->name.data); 
+			json->append_string_value("%", strt->name.data); 
 			return;
 		}
 
@@ -313,7 +248,7 @@ static void json_write_type(Json_Writer *json, Code_Type *type)
 
 		case CODE_TYPE_STATIC_ARRAY: {
 			auto arr = (Code_Type_Static_Array *)type;
-			json->append_string_value("[%u] ", arr->element_count);
+			json->append_string_value("[%] ", arr->element_count);
 			json_write_type(json, arr->element_type);
 			return;
 		}
@@ -357,20 +292,20 @@ static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *
 	switch (type->kind)
 	{
 		case CODE_TYPE_NULL: json->write_single_value("(null)"); return;
-		case CODE_TYPE_CHARACTER: json->write_single_value("%d", (int) *(Kano_Char *)data); return;
-		case CODE_TYPE_INTEGER: json->write_single_value("%zd", *(Kano_Int *)data); return;
-		case CODE_TYPE_REAL: json->write_single_value("%f", *(Kano_Real *)data); return;
-		case CODE_TYPE_BOOL: json->write_single_value("%s", (*(Kano_Bool *)data) ? "true" : "false"); return;
-		case CODE_TYPE_PROCEDURE: json->write_single_value("0x%8zx", data); return;
+		case CODE_TYPE_CHARACTER: json->write_single_value("%", (int) *(Kano_Char *)data); return;
+		case CODE_TYPE_INTEGER: json->write_single_value("%", *(Kano_Int *)data); return;
+		case CODE_TYPE_REAL: json->write_single_value("%", *(Kano_Real *)data); return;
+		case CODE_TYPE_BOOL: json->write_single_value("%", (*(Kano_Bool *)data) ? "true" : "false"); return;
+		case CODE_TYPE_PROCEDURE: json->write_single_value("%", data); return;
 
 		case CODE_TYPE_POINTER: {
 			auto pointer_type = (Code_Type_Pointer *)type;
 			void *raw_ptr = *(void **)data;
 
-			json->begin_object(true);
+			json->begin_object();
 
 			if (raw_ptr)
-				json->write_key_value("raw", "0x%8zx", raw_ptr);
+				json->write_key_value("raw", "%", raw_ptr);
 			else
 				json->write_key_value("raw", "(null)");
 
@@ -381,7 +316,7 @@ static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *
 
 			auto mem_type = interp_get_memory_type(interp, raw_ptr);
 
-			json->write_key_value("memory", "%s", memory_type_string(mem_type));
+			json->write_key_value("memory", "%", memory_type_string(mem_type));
 
 			json->write_key("value");
 			if (mem_type != Memory_Type_INVALID)
@@ -390,7 +325,7 @@ static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *
 			}
 			else
 			{
-				json->write_single_value("%s", raw_ptr ? "(garbage)" : "(invalid)");
+				json->write_single_value("%", raw_ptr ? String("(garbage)") : String("(invalid)"));
 			}
 
 			json->end_object();
@@ -400,7 +335,7 @@ static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *
 		case CODE_TYPE_STRUCT: {
 			auto _struct = (Code_Type_Struct *)type;
 
-			json->begin_array(true);
+			json->begin_array();
 
 			for (int64_t index = 0; index < _struct->member_count; ++index)
 			{
@@ -419,7 +354,7 @@ static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *
 			auto arr_count = *(Kano_Int *)data;
 			auto arr_data = (uint8_t *)data + sizeof(Kano_Int);
 
-			json->begin_array(true);			
+			json->begin_array();			
 			for (int64_t index = 0; index < arr_count; ++index)
 			{
 				json_write_value(json, interp, arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
@@ -434,7 +369,7 @@ static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *
 
 			auto arr_data = (uint8_t *)data;
 
-			json->begin_array(true);
+			json->begin_array();
 			for (int64_t index = 0; index < arr_type->element_count; ++index)
 			{
 				json_write_value(json, interp, arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
@@ -449,7 +384,7 @@ static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *
 static void json_write_symbol(Json_Writer *json, Interpreter *interp, String name, Code_Type *type, void *data)
 {
 	json->begin_object();
-	json->write_key_value("name", "%s", name.data);
+	json->write_key_value("name", "%", name.data);
 	
 	json->write_key("type");
 	json->begin_string_value();
@@ -457,8 +392,8 @@ static void json_write_symbol(Json_Writer *json, Interpreter *interp, String nam
 	json->end_string_value();
 	
 	auto mem_type = interp_get_memory_type(interp, data);
-	json->write_key_value("address", "0x%8zx", data);
-	json->write_key_value("memory", "%s", memory_type_string(mem_type));
+	json->write_key_value("address", "%", data);
+	json->write_key_value("memory", "%", memory_type_string(mem_type));
 	
 	json->write_key("value");
 	json_write_value(json, interp, type, data);
@@ -514,9 +449,9 @@ static void json_write_procedure_symbols(Interpreter *interp, Json_Writer *json,
 {
 	json->begin_object();
 
-	json->write_key_value("procedure", "%s", procedure_name.data);
+	json->write_key_value("procedure", "%", procedure_name.data);
 	json->write_key("variables");
-	json->begin_array(true);
+	json->begin_array();
 	json_write_table_symbols(interp, json, symbol_table, stack_top, skip_stack_offset);
 	json->end_array();
 	
@@ -536,43 +471,18 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 
 		const char *intercept_type = (intercept == INTERCEPT_PROCEDURE_CALL) ? "call" : "return";
 
-		json->begin_object(false, 2);
+		json->begin_object();
 
-		json->write_key_value("intercept", "procedure_%s", intercept_type);
-		json->write_key_value("line_number", "%d", (int)proc->procedure_source_row);
-
-#if 0
-		json->write_key_value("procedure_name", "%s", procedure_type->name.data);
-
-		json->write_key("procedure_arguments");
-
-		{
-			json->same_line = true;
-			Defer { json->same_line = false; };
-		
-			json->begin_array(true);
-			for (int64_t i = 0; i < procedure_type->argument_count; ++i)
-			{
-				json->begin_string_value();
-				json_write_type(json, procedure_type->arguments[i]);
-				json->end_string_value();
-			}
-			json->end_array();
-		}
-
-		json->write_key("procedure_return");
-		json->begin_string_value();
-		json_write_type(json, procedure_type->return_type);
-		json->end_string_value();
-#endif
+		json->write_key_value("intercept", "procedure_%", intercept_type);
+		json->write_key_value("line_number", "%", (int)proc->procedure_source_row);
 
 		json->write_key("globals");
-		json->begin_array(true);
+		json->begin_array();
 		json_write_symbols(interp, json, interp->global_symbol_table, 0, 0);
 		json->end_array();
 
 		json->write_key("callstack");
-		json->begin_array(true);
+		json->begin_array();
 		
 		// Don't print the last added calstack before we are already printing it
 		for (int64_t index = 0; index < context->callstack.count; ++index)
@@ -583,7 +493,7 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 
 		json->end_array();
 
-		json->write_key_value("console_out", "%s", context->console_out.get_cstring());
+		json->write_key_value("console_out", "%", context->console_out.get_cstring());
 
 		json->end_object();
 
@@ -601,18 +511,18 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 	{
 		auto statement = (Code_Node_Statement *)node;
 
-		json->begin_object(false, 2);
+		json->begin_object();
 		
 		json->write_key_value("intercept", "statement");
-		json->write_key_value("line_number", "%d", (int)statement->source_row);
+		json->write_key_value("line_number", "%", (int)statement->source_row);
 
 		json->write_key("globals");
-		json->begin_array(true);
+		json->begin_array();
 		json_write_symbols(interp, json, interp->global_symbol_table, 0, 0);
 		json->end_array();
 
 		json->write_key("callstack");
-		json->begin_array(true);
+		json->begin_array();
 
 		// Don't print the last added calstack before we are already printing it
 		for (int64_t index = 0; index < context->callstack.count - 1; ++index)
@@ -625,7 +535,7 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 
 		json->end_array();
 
-		json->write_key_value("console_out", "%s", context->console_out.get_cstring());
+		json->write_key_value("console_out", "%", context->console_out.get_cstring());
 
 		json->end_object();
 	}
@@ -927,10 +837,10 @@ int main()
 {
 	InitThreadContext(0);
 
-	String content = read_entire_file("Simple.kano");
-
 	parser_register_error_proc(parser_on_error);
 	code_type_resolver_register_error_proc(code_type_resolver_on_error);
+
+	String content = read_entire_file("Simple.kano");
 
 	String_Builder builder;
 
@@ -950,10 +860,8 @@ int main()
 
 	auto expr = code_type_resolver_find(resolver, "factorial");
 
-	FILE *out = fopen("DebugInfo.json", "wb");
-
 	Interp_User_Context context;
-	context.json.init(out);
+	context.json.init(&builder);
 
 	context.json.begin_array();
 
@@ -968,6 +876,14 @@ int main()
 	int result = interp_eval_main(&interp);
 
 	context.json.end_array();
+
+	FILE *out = fopen("DebugInfo.json", "wb");
+
+	for (auto buk = &builder.head; buk; buk = buk->next)
+	{
+		fwrite(buk->data, buk->written, 1, out);
+	}
+
 	fclose(out);
 
 	return result;
