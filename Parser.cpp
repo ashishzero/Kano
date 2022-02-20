@@ -67,36 +67,13 @@ static void     parser_init_precedence()
 //
 //
 
-static inline void parser_error(Parser *parser, Token *token, const char *fmt, ...)
-{
-	Syntax_Location location;
-	location.start_row     = token->row;
-	location.start_column  = token->column;
-	location.finish_row    = token->row;
-	location.finish_column = token->column;
-	location.start         = token->offset;
-	location.finish        = token->offset + token->content.length;
-
-	va_list args;
-	va_start(args, fmt);
-
-	auto arena = ThreadScratchpad();
-	auto temp = BeginTemporaryMemory(arena);
-
-	int len = vsnprintf(NULL, 0, fmt, args);
-	char *mem = (char *)PushSize(arena, len + 1);
-	vsnprintf(mem, len + 1, fmt, args);
-
-	EndTemporaryMemory(&temp);
-
-	va_end(args);
-
+template <typename ...Args>
+static void parser_error(Parser *parser, Token *token, const char *format, Args... args) {
 	WriteFormatted(parser->error, "ERROR:%,% : ", token->row, token->column);
-	WriteBuffer(parser->error, mem, len);
+	WriteFormatted(parser->error, format, args...);
 	Write(parser->error, '\n');
 
 	parser->error_count += 1;
-
 	parser->parsing = false;
 
 	Unimplemented();
@@ -152,10 +129,10 @@ static bool parser_expect_token(Parser *parser, Token_Kind kind)
 
 	auto        token    = lexer_current_token(&parser->lexer);
 
-	const char *expected = (char *)token_kind_string(kind).data;
-	const char *got      = (char *)token_kind_string(token->kind).data;
+	auto expected = token_kind_string(kind);
+	auto got      = token_kind_string(token->kind);
 
-	parser_error(parser, token, "Expected: %s, Got: %s\n", expected, got);
+	parser_error(parser, token, "Expected: %, Got: %", expected, got);
 	parser->parsing = false;
 
 	return false;
@@ -841,7 +818,7 @@ Syntax_Node_Type *parse_type(Parser *parser)
 	else
 	{
 		auto token = lexer_current_token(&parser->lexer);
-		parser_error(parser, token, "Expected type, got: %s\n", token_kind_string(token->kind).data);
+		parser_error(parser, token, "Expected type, got: %", token_kind_string(token->kind));
 	}
 
 	parser_finish_syntax_node(parser, type);
@@ -858,7 +835,7 @@ Syntax_Node_Declaration *parse_declaration(Parser *parser)
 	else if (!parser_accept_token(parser, TOKEN_KIND_VAR))
 	{
 		auto token = lexer_current_token(&parser->lexer);
-		parser_error(parser, token, "Expected declaration 'var' or 'const'\n");
+		parser_error(parser, token, "Expected declaration 'var' or 'const'");
 		parser->parsing = false;
 	}
 
@@ -961,7 +938,7 @@ Syntax_Node_Statement *parse_statement(Parser *parser)
 		else
 		{
 			auto token = lexer_current_token(&parser->lexer);
-			parser_error(parser, token, "Expected then or a block\n");
+			parser_error(parser, token, "Expected then or a block");
 		}
 
 		if (parser_accept_token(parser, TOKEN_KIND_ELSE))
@@ -1011,7 +988,7 @@ Syntax_Node_Statement *parse_statement(Parser *parser)
 		else
 		{
 			auto token = lexer_current_token(&parser->lexer);
-			parser_error(parser, token, "Expected do or a block\n");
+			parser_error(parser, token, "Expected do or a block");
 		}
 
 		parser_finish_syntax_node(parser, while_statement);
@@ -1053,7 +1030,7 @@ Syntax_Node_Statement *parse_statement(Parser *parser)
 		if (!parser_accept_token(parser, TOKEN_KIND_SEMICOLON))
 		{
 			auto token = lexer_current_token(&parser->lexer);
-			parser_error(parser, token, "Unexpected token: %.*s\n", (int)token->content.length, token->content.data);
+			parser_error(parser, token, "Unexpected token: %", token->content);
 			parser->parsing = false;
 		}
 	}

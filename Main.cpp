@@ -932,7 +932,7 @@ int main()
 	if (parser.error_count)
 		return 1;
 
-	auto resolver = code_type_resolver_create();
+	auto resolver = code_type_resolver_create(&builder);
 
 	include_basic(resolver);
 

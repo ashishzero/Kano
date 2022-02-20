@@ -52,94 +52,58 @@ static uint32_t murmur3_32(const uint8_t *key, size_t len, uint32_t seed)
 //
 //
 
-thread_local static char TempBuffer[4096];
-thread_local static int TempBufferIndex;
+int Write(String_Builder *builder, Code_Type *type) {
+	switch (type->kind) {
+	case CODE_TYPE_NULL: return Write(builder, "void");
+	case CODE_TYPE_CHARACTER: return Write(builder, "byte");
+	case CODE_TYPE_INTEGER: return Write(builder, "int");
+	case CODE_TYPE_REAL: return Write(builder, "float");
+	case CODE_TYPE_BOOL: return Write(builder, "bool");
 
-void tprintf(const char *fmt, ...)
-{
-	va_list arg;
-	va_start(arg, fmt);
-	TempBufferIndex += vsnprintf(TempBuffer + TempBufferIndex, sizeof(TempBuffer) - TempBufferIndex, fmt, arg);
-	va_end(arg);
-}
-
-static void type_to_string_internal(Code_Type *type)
-{
-	switch (type->kind)
-	{
-		case CODE_TYPE_NULL: tprintf("void"); return;
-		case CODE_TYPE_CHARACTER: tprintf("byte"); return;
-		case CODE_TYPE_INTEGER: tprintf("int"); return;
-		case CODE_TYPE_REAL: tprintf("float"); return;
-		case CODE_TYPE_BOOL: tprintf("bool"); return;
-
-		case CODE_TYPE_POINTER: {
-			tprintf("*"); 
-			type_to_string_internal(((Code_Type_Pointer *)type)->base_type);
-			return;
-		}
-
-		case CODE_TYPE_PROCEDURE: {
-			auto proc = (Code_Type_Procedure *)type;
-			tprintf("proc (");
-			for (int64_t index = 0; index < proc->argument_count; ++index)
-			{
-				type_to_string_internal(proc->arguments[index]);
-				if (index < proc->argument_count - 1) tprintf(", ");
-			}
-			tprintf(")");
-
-			if (proc->return_type)
-			{
-				tprintf(" -> ");
-				type_to_string_internal(proc->return_type);
-			}
-			return;
-		}
-
-		case CODE_TYPE_STRUCT: {
-			auto strt = (Code_Type_Struct *)type;
-			tprintf("%s", strt->name.data); 
-			return;
-		}
-
-		case CODE_TYPE_ARRAY_VIEW: {
-			auto arr = (Code_Type_Array_View *)type;
-			tprintf("[] ");
-			type_to_string_internal(arr->element_type);
-			return;
-		}
-
-		case CODE_TYPE_STATIC_ARRAY: {
-			auto arr = (Code_Type_Static_Array *)type;
-			tprintf("[%u] ", arr->element_count);
-			type_to_string_internal(arr->element_type);
-			return;
-		}
+	case CODE_TYPE_POINTER: {
+		int count = Write(builder, "*");
+		return count + Write(builder, ((Code_Type_Pointer *)type)->base_type);
 	}
-}
 
-static char *type_to_string(Code_Type *type) {
-	TempBufferIndex = 0;
-	type_to_string_internal(type);
-	char *string = (char *)MemoryAllocate(TempBufferIndex + 1);
-	memcpy(string, TempBuffer, TempBufferIndex);
-	string[TempBufferIndex] = 0;
-	return string;
-}
+	case CODE_TYPE_PROCEDURE: {
+		auto proc = (Code_Type_Procedure *)type;
+		int count = Write(builder, "proc (");
+		for (int64_t index = 0; index < proc->argument_count; ++index) {
+			count += Write(builder, proc->arguments[index]);
+			if (index < proc->argument_count - 1) 
+				count += Write(builder, ", ");
+		}
 
-static void report_error(Syntax_Node *node, const char *fmt, ...) {
-	int line = (int)node->location.start_row;
-	fprintf(stderr, "ERROR: %d: ", line);
+		count += Write(builder, ")");
 
-	va_list arg;
-	va_start(arg, fmt);
-	vfprintf(stderr, fmt, arg);
-	va_end(arg);
+		if (proc->return_type) {
+			count += Write(builder, " -> ");
+			count += Write(builder, proc->return_type);
+		}
+		return count;
+	}
 
-	fprintf(stderr, "\n");
+	case CODE_TYPE_STRUCT: {
+		auto strt = (Code_Type_Struct *)type;
+		return Write(builder, strt->name.data);
+	}
 
-	Unimplemented();
+	case CODE_TYPE_ARRAY_VIEW: {
+		auto arr = (Code_Type_Array_View *)type;
+		int count = Write(builder, "[] ");
+		return Write(builder, arr->element_type);
+	}
+
+	case CODE_TYPE_STATIC_ARRAY: {
+		auto arr = (Code_Type_Static_Array *)type;
+		int count = WriteFormatted(builder, "[%] ", arr->element_count);
+		return Write(builder, arr->element_type);
+	}
+	}
+
+	Unreachable();
+
+	return 0;
 }
 
 //
@@ -360,6 +324,9 @@ struct Code_Type_Resolver
 	
 	uint32_t                         virtual_address[2] = {0, 0};
 	Symbol_Address::Kind             address_kind       = Symbol_Address::CODE;
+
+	int error_count = 0;
+	String_Builder *error = nullptr;
 	
 	Array<Code_Type *>               return_stack;
 	
@@ -367,6 +334,23 @@ struct Code_Type_Resolver
 	Bucket_Array<Unary_Operator, 8>  unary_operators[_UNARY_OPERATOR_COUNT];
 	Bucket_Array<Binary_Operator, 8> binary_operators[_BINARY_OPERATOR_COUNT];
 };
+
+template <typename ...Args>
+static void report_error(Code_Type_Resolver *resolver, Syntax_Node *node, const char *format, Args... args) {
+	if (resolver->error) {
+
+		int line = (int)node->location.start_row;
+		int column = (int)node->location.start_column;
+
+		WriteFormatted(resolver->error, "ERROR:%,% : ", line, column);
+		WriteFormatted(resolver->error, format, args...);
+		Write(resolver->error, '\n');
+	}
+
+	resolver->error_count += 1;
+
+	Unimplemented();
+}
 
 static bool                 code_type_are_same(Code_Type *a, Code_Type *b, bool recurse_pointer_type = true);
 
@@ -643,7 +627,7 @@ static Code_Node_Address *code_resolve_identifier(Code_Type_Resolver *resolver, 
 		return address;
 	}
 
-	report_error(root, "Identifier not found: %s", root->name.data);
+	report_error(resolver, root, "Identifier not found: %", root->name);
 	
 	return nullptr;
 }
@@ -662,23 +646,37 @@ static Code_Node_Return *code_resolve_return(Code_Type_Resolver *resolver, Symbo
 	if (resolver->return_stack.count)
 	{
 		auto return_type = resolver->return_stack.Last();
-		if (!code_type_are_same(return_type, node->type))
+		if (return_type)
 		{
-			auto cast = code_type_cast(node->expression, return_type);
-			if (cast)
+			if (node->type)
 			{
-				node->expression = cast;
+				if (!code_type_are_same(return_type, node->type)) {
+					auto cast = code_type_cast(node->expression, return_type);
+					if (cast)
+					{
+						node->expression = cast;
+					}
+					else {
+						report_error(resolver, root, 
+							"Type mismatch, procedure return type is %, but got expression of type %",
+							return_type, node->type);
+					}
+				}
 			}
 			else
 			{
-				Unimplemented();
+				report_error(resolver, root, "Expected return of type %, but return is empty", return_type);
 			}
+		}
+		else if (node->type)
+		{
+			report_error(resolver, root, "Procedure does not return anything but return with type % is given", node->type);
 		}
 	}
 	
 	else
 	{
-		Unimplemented();
+		Unreachable();
 	}
 	
 	return node;
@@ -710,7 +708,8 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 
 				if (!code_param->type)
 				{
-					Unimplemented();
+					report_error(resolver, param,
+						"Type mismatch, expected argument of type % but got void", proc->arguments[param_index]);
 				}
 				
 				if (!code_type_are_same(proc->arguments[param_index], code_param->type))
@@ -723,9 +722,8 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 					}
 					else
 					{
-						report_error(param, "On procedure: '%s', expected type '%s' but got '%s' on %u parameter", proc->name.data,
-							type_to_string(proc->arguments[param_index]), type_to_string(code_param->type), param_index + 1);
-						//Unimplemented();
+						report_error(resolver, param, "On procedure: '%', expected type '%' but got '%' on % parameter", 
+							proc->name, proc->arguments[param_index], code_param->type, param_index + 1);
 					}
 				}
 				
@@ -754,7 +752,8 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 
 				if (!code_param->type)
 				{
-					Unimplemented();
+					report_error(resolver, param,
+						"Type mismatch, expected argument of type % but got void", proc->arguments[param_index]);
 				}
 				
 				if (!code_type_are_same(proc->arguments[param_index], code_param->type))
@@ -767,7 +766,9 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 					}
 					else
 					{
-						Unimplemented();
+						report_error(resolver, param, 
+							"Type mismatch, expected argument of type % but got %",
+							proc->arguments[param_index], code_param->type);
 					}
 				}
 				
@@ -804,7 +805,8 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 
 					if (!code_param->type)
 					{
-						Unimplemented();
+						report_error(resolver, param,
+							"Type mismatch, expected argument of type % but got void", proc->arguments[param_index]);
 					}
 
 					node->variadics[index] = code_param;
@@ -830,11 +832,12 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 		}
 		else
 		{
-			Unimplemented();
+			report_error(resolver, root, "Mismatch number of arguments, expected % but % arguments",
+				proc->argument_count, root->parameter_count);
 		}
 	}
 	
-	Unimplemented();
+	report_error(resolver, root, "Invalid procedure call");
 	
 	return nullptr;
 }
@@ -857,7 +860,7 @@ static Code_Node_Address *code_resolve_subscript(Code_Type_Resolver *resolver, S
 		expression->type->kind == CODE_TYPE_STATIC_ARRAY ||
 		expr_type_is_string)
 	{
-		if (subscript->type->kind == CODE_TYPE_INTEGER)
+		if (subscript->type->kind == CODE_TYPE_INTEGER || subscript->type->kind == CODE_TYPE_CHARACTER)
 		{
 			auto node        = new Code_Node_Subscript;
 			node->expression = expression;
@@ -890,12 +893,12 @@ static Code_Node_Address *code_resolve_subscript(Code_Type_Resolver *resolver, S
 		}
 		else
 		{
-			Unimplemented();
+			report_error(resolver, root->subscript, "Invalid expression for subscript");
 		}
 	}
 	else
 	{
-		Unimplemented();
+		report_error(resolver, root->expression, "Invalid subscript. Expression does not support subscript");
 	}
 	
 	return nullptr;
@@ -911,7 +914,7 @@ static Code_Node_Type_Cast *code_resolve_type_cast(Code_Type_Resolver *resolver,
 	
 	if (!cast)
 	{
-		Unimplemented();
+		report_error(resolver, root, "Type cast from % to % is not valid", expression->type, type);
 	}
 	
 	return cast;
@@ -969,7 +972,7 @@ static Code_Node_Block *code_resolve_procedure(Code_Type_Resolver *resolver, Syn
 		}
 		else if (decl_type->id == Syntax_Node_Type::VARIADIC_ARGUMENT)
 		{
-			Unimplemented();
+			report_error(resolver, arg->declaration, "Variadic argument is only valid as the last parameter");
 		}
 	}
 
@@ -1102,29 +1105,35 @@ static Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver 
 		return node;
 	}
 	
-	else if (op_kind == UNARY_OPERATOR_DEREFERENCE && (child->type->kind == CODE_TYPE_POINTER))
+	else if (op_kind == UNARY_OPERATOR_DEREFERENCE)
 	{
-		auto pointer_type = (Code_Type_Pointer *)child->type;
-		
-		if (pointer_type->base_type->kind != CODE_TYPE_NULL)
+		if (child->type->kind == CODE_TYPE_POINTER)
 		{
-			auto node     = new Code_Node_Unary_Operator;
-			auto type     = ((Code_Type_Pointer *)child->type)->base_type;
-			
-			node->type    = type;
-			node->child   = child;
-			node->op_kind = op_kind;
-			
-			if (child->flags & SYMBOL_BIT_CONST_EXPR)
-				node->flags |= SYMBOL_BIT_CONST_EXPR;
-			
-			return node;
+			auto pointer_type = (Code_Type_Pointer *)child->type;
+
+			if (pointer_type->base_type->kind != CODE_TYPE_NULL) {
+				auto node = new Code_Node_Unary_Operator;
+				auto type = ((Code_Type_Pointer *)child->type)->base_type;
+
+				node->type = type;
+				node->child = child;
+				node->op_kind = op_kind;
+
+				if (child->flags & SYMBOL_BIT_CONST_EXPR)
+					node->flags |= SYMBOL_BIT_CONST_EXPR;
+
+				return node;
+			}
+
+			report_error(resolver, root->child, "Dereferencing of *void");
 		}
-		
-		Unimplemented();
+		else
+		{
+			report_error(resolver, root->child, "Dereferencing of non pointer type %", child->type);
+		}
 	}
 	
-	Unimplemented();
+	report_error(resolver, root->child, "Invalid operation on type %", child->type);
 	
 	return nullptr;
 }
@@ -1138,7 +1147,7 @@ static Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Sym
 	{
 		if (root->right->kind != SYNTAX_NODE_IDENTIFIER)
 		{
-			Unimplemented();
+			report_error(resolver, root, "Expected identifier on the right of member operator");
 		}
 
 		if (left->type->kind == CODE_TYPE_POINTER)
@@ -1179,7 +1188,7 @@ static Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Sym
 			}
 			else
 			{
-				Unimplemented();
+				report_error(resolver, root->left, "% is not the member of %", iden->name, left->type);
 			}
 		}
 		else if (type_kind == CODE_TYPE_ARRAY_VIEW)
@@ -1197,7 +1206,7 @@ static Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Sym
 			}
 			else
 			{
-				Unimplemented();
+				report_error(resolver, root->left, "% is not the member of array view", iden->name);
 			}
 		}
 		else if (type_kind == CODE_TYPE_STATIC_ARRAY)
@@ -1220,12 +1229,12 @@ static Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Sym
 			}
 			else
 			{
-				Unimplemented();
+				report_error(resolver, root->left, "% is not the member of static array", iden->name);
 			}
 		}
 		else
 		{
-			Unimplemented();
+			report_error(resolver, root->left, "Invalid member operator", iden->name);
 		}
 
 		Assert(offset_type);
@@ -1309,9 +1318,7 @@ static Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Sym
 		}
 	}
 
-	report_error(root, "Mismatch binary operator and operands");
-	
-	//Unimplemented();
+	report_error(resolver, root, "Mismatch binary operator and operands");
 	
 	return nullptr;
 }
@@ -1366,9 +1373,8 @@ static Code_Node_Assignment *code_resolve_assignment(Code_Type_Resolver *resolve
 		}
 	}
 
-	report_error(root, "Assignment on invalid types: %s, %s", type_to_string(destination->type), type_to_string(value->type));
-	
-	//Unimplemented();
+	report_error(resolver, root, "Assignment on invalid types: %, %", destination->type, value->type);
+
 	return nullptr;
 }
 
@@ -1410,7 +1416,7 @@ static Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *
 			}
 			else
 			{
-				Unimplemented();
+				report_error(resolver, root, "Invalid type");
 			}
 		}
 		break;
@@ -1454,7 +1460,7 @@ static Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *
 				}
 				else if (arg->type->id == Syntax_Node_Type::VARIADIC_ARGUMENT)
 				{
-					Unimplemented();
+					report_error(resolver, arg, "Variadic argument is only valid as the last parameter");
 				}
 			}
 			
@@ -1478,7 +1484,7 @@ static Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *
 			}
 			else
 			{
-				Unimplemented();
+				report_error(resolver, root, "Invalid type");
 			}
 		}
 		break;
@@ -1523,18 +1529,18 @@ static Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *
 				}
 				else
 				{
-					Unimplemented();
+					report_error(resolver, node, "Array size must be integer, got %", expr->type);
 				}
 			}
 			else
 			{
-				Unimplemented();
+				report_error(resolver, node->expression, "Array size must be compile type constant");
 			}
 		}
 		break;
 		
 		default: {
-			Unimplemented();
+			report_error(resolver, root, "Invalid type");
 		}
 	}
 	
@@ -1548,7 +1554,8 @@ static Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolv
 	
 	Assert(root->type || root->initializer);
 	
-	if (!symbol_table_get(symbols, sym_name, false))
+	auto got_symbol = symbol_table_get(symbols, sym_name, false);
+	if (!got_symbol)
 	{
 		Symbol *symbol   = resolver->symbols_allocator.add();
 		symbol->name     = sym_name;
@@ -1559,8 +1566,7 @@ static Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolv
 		
 		if (root->flags & SYMBOL_BIT_CONSTANT && !root->initializer)
 		{
-			// Error: Constanst expression must be initialized
-			Unimplemented();
+			report_error(resolver, root, "Constanst expression must be initialized");
 		}
 		
 		bool                  infer_type     = symbol->type == nullptr;
@@ -1611,7 +1617,7 @@ static Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolv
 				}
 				else if (decl_type->id == Syntax_Node_Type::VARIADIC_ARGUMENT)
 				{
-					Unimplemented();
+					report_error(resolver, arg->declaration, "Variadic argument is only valid as the last parameter");
 				}
 			}
 			
@@ -1657,7 +1663,7 @@ static Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolv
 			{
 				if (code_resolve_declaration(resolver, struct_symbols, member->declaration, &dst_member->type))
 				{
-					Unimplemented();
+					report_error(resolver, member->declaration, "Declaration of struct member can not have initializier");
 				}
 				
 				dst_member->name   = member->declaration->identifier;
@@ -1736,12 +1742,12 @@ static Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolv
 					}
 					else
 					{
-						Unimplemented();
+						report_error(resolver, root->initializer, "Type mismatch, expeted %, got %", symbol->type, type);
 					}
 				}
 				else
 				{
-					Unimplemented();
+					report_error(resolver, root->initializer, "Type mismatch, expeted %, got %", symbol->type, type);
 				}
 			}
 		}
@@ -1851,8 +1857,7 @@ static Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolv
 		}
 	}
 	
-	// Already defined in this scope previously
-	Unimplemented();
+	report_error(resolver, root, "Symbol % already defined previously on line %", sym_name, got_symbol->location.start_row);
 	
 	return nullptr;
 }
@@ -1891,7 +1896,7 @@ static Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver,
 				}
 				else
 				{
-					Unimplemented();
+					report_error(resolver, if_node->condition, "Type mismatch, expected type bool but got %", condition->type);
 				}
 			}
 			
@@ -1934,7 +1939,7 @@ static Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver,
 				}
 				else
 				{
-					Unimplemented();
+					report_error(resolver, for_node->condition, "Type mismatch, expected type bool but got %", condition->type);
 				}
 			}
 			
@@ -1978,8 +1983,7 @@ static Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver,
 				}
 				else
 				{
-					report_error(while_node->condition, "Expected boolean expression, but got %s", type_to_string(condition->child->type));
-					//Unimplemented();
+					report_error(resolver, while_node->condition, "Expected boolean expression, but got %", condition->child->type);
 				}
 			}
 			
@@ -2024,7 +2028,7 @@ static Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver,
 				}
 				else
 				{
-					Unimplemented();
+					report_error(resolver, do_node->condition, "Type mismatch, expected type bool but got %", condition->type);
 				}
 			}
 			
@@ -2134,7 +2138,7 @@ static Array_View<Code_Node_Assignment *> code_resolve_global_scope(Code_Type_Re
 			}
 			else
 			{
-				Unimplemented();
+				report_error(resolver, decl->declaration, "Global assignment must have compile time constant value");
 			}
 		}
 	}
@@ -2146,9 +2150,11 @@ static Array_View<Code_Node_Assignment *> code_resolve_global_scope(Code_Type_Re
 //
 //
 
-Code_Type_Resolver *code_type_resolver_create()
+Code_Type_Resolver *code_type_resolver_create(String_Builder *builder)
 {
 	auto resolver = new Code_Type_Resolver;
+
+	resolver->error = builder;
 
 	Code_Type *        CompilerTypes[_CODE_TYPE_COUNT];
 	

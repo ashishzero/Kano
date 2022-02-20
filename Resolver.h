@@ -4,7 +4,7 @@
 
 struct Code_Type_Resolver;
 
-Code_Type_Resolver *code_type_resolver_create();
+Code_Type_Resolver *code_type_resolver_create(struct String_Builder *builder = nullptr);
 uint64_t code_type_resolver_stack_allocated(Code_Type_Resolver *resolver);
 uint64_t code_type_resolver_bss_allocated(Code_Type_Resolver *resolver);
 

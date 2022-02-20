@@ -72,7 +72,7 @@ static Evaluation_Value interp_eval_address(Interpreter *interp, Code_Node_Addre
 		auto expression = interp_eval_root_expression(interp, node->subscript->expression);
 		auto subscript = interp_eval_root_expression(interp, node->subscript->subscript);
 
-		Assert(subscript.type->kind == CODE_TYPE_INTEGER);
+		Assert(subscript.type->kind == CODE_TYPE_INTEGER || subscript.type->kind == CODE_TYPE_CHARACTER);
 
 		uint8_t *address = nullptr;
 
