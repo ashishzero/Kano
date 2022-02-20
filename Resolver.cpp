@@ -211,46 +211,9 @@ static inline uint32_t next_power2(uint32_t n)
 static void symbol_table_put(Symbol_Table *table, Symbol *sym)
 {
 	table->map.Put(sym->name, sym);
-
-	/*
-	const String name      = sym->name;
-	auto         hash      = murmur3_32(name.data, name.length, HASH_SEED);
-	
-	auto         pos       = hash & (SYMBOL_TABLE_BUCKET_COUNT - 1);
-	auto         buk_index = pos >> SYMBOL_INDEX_SHIFT;
-	
-	for (auto bucket = &table->lookup.buckets[buk_index]; bucket; bucket = bucket->next)
-	{
-		uint32_t count = 0;
-		for (auto index = pos & SYMBOL_INDEX_MASK; count < SYMBOL_INDEX_BUCKET_SIZE;
-		++count, index = (index + 1) & SYMBOL_INDEX_MASK)
-		{
-			auto found_hash = bucket->hash[index];
-			if (found_hash == hash)
-			{
-				auto sym_index           = bucket->index[index];
-				table->buffer[sym_index] = sym;
-				return;
-			}
-			else if (found_hash == 0)
-			{
-				uint32_t offset      = (uint32_t)table->buffer.count;
-				bucket->hash[index]  = hash;
-				bucket->index[index] = offset;
-				table->buffer.Add(sym);
-				return;
-			}
-		}
-		
-		if (!bucket->next)
-		{
-			bucket->next = new Symbol_Index;
-		}
-	}
-	*/
 }
 
-static const Symbol *symbol_table_get(Symbol_Table *root_table, String name, bool recursive = true)
+static const Symbol *symbol_table_find(Symbol_Table *root_table, String name, bool recursive = true)
 {
 	if (recursive)
 	{
@@ -267,36 +230,6 @@ static const Symbol *symbol_table_get(Symbol_Table *root_table, String name, boo
 	auto symbol = root_table->map.Find(name);
 
 	return symbol ? *symbol : nullptr;
-
-	/*
-	auto hash      = murmur3_32(name.data, name.length, HASH_SEED);
-	
-	auto pos       = hash & (SYMBOL_TABLE_BUCKET_COUNT - 1);
-	auto buk_index = pos >> SYMBOL_INDEX_SHIFT;
-	
-	for (auto table = root_table; table; table = table->parent)
-	{
-		for (auto bucket = &table->lookup.buckets[buk_index]; bucket; bucket = bucket->next)
-		{
-			uint32_t count = 0;
-			for (auto index = pos & SYMBOL_INDEX_MASK; count < SYMBOL_INDEX_BUCKET_SIZE;
-			++count, index = (index + 1) & SYMBOL_INDEX_MASK)
-			{
-				auto found_hash = bucket->hash[index];
-				if (found_hash == hash)
-				{
-					auto sym_index = bucket->index[index];
-					return table->buffer[sym_index];
-				}
-			}
-		}
-		
-		if (!recursive)
-			break;
-	}
-	
-	return nullptr;
-	*/
 }
 
 template <typename T, uint32_t N> struct Bucket_Array {
@@ -572,7 +505,7 @@ static Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Sym
 	switch (root->value.kind)
 	{
 		case Literal::BYTE: {
-			auto symbol = symbol_table_get(&resolver->symbols, "byte");
+			auto symbol = symbol_table_find(&resolver->symbols, "byte");
 			Assert(symbol->flags & SYMBOL_BIT_TYPE);
 			
 			node->type               = symbol->type;
@@ -581,7 +514,7 @@ static Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Sym
 		break;
 
 		case Literal::INTEGER: {
-			auto symbol = symbol_table_get(&resolver->symbols, "int");
+			auto symbol = symbol_table_find(&resolver->symbols, "int");
 			Assert(symbol->flags & SYMBOL_BIT_TYPE);
 			
 			node->type               = symbol->type;
@@ -590,7 +523,7 @@ static Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Sym
 		break;
 		
 		case Literal::REAL: {
-			auto symbol = symbol_table_get(&resolver->symbols, "float");
+			auto symbol = symbol_table_find(&resolver->symbols, "float");
 			Assert(symbol->flags & SYMBOL_BIT_TYPE);
 			
 			node->type            = symbol->type;
@@ -599,7 +532,7 @@ static Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Sym
 		break;
 		
 		case Literal::STRING: {
-			auto symbol = symbol_table_get(&resolver->symbols, "string");
+			auto symbol = symbol_table_find(&resolver->symbols, "string");
 			Assert(symbol->flags & SYMBOL_BIT_TYPE);
 			
 			node->type              = symbol->type;
@@ -608,7 +541,7 @@ static Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Sym
 		break;
 		
 		case Literal::BOOL: {
-			auto symbol = symbol_table_get(&resolver->symbols, "bool");
+			auto symbol = symbol_table_find(&resolver->symbols, "bool");
 			Assert(symbol->flags & SYMBOL_BIT_TYPE);
 			
 			node->type               = symbol->type;
@@ -617,7 +550,7 @@ static Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Sym
 		break;
 		
 		case Literal::NULL_POINTER: {
-			auto symbol = symbol_table_get(&resolver->symbols, "*void");
+			auto symbol = symbol_table_find(&resolver->symbols, "*void");
 			Assert(symbol->flags & SYMBOL_BIT_TYPE);
 			
 			node->type = symbol->type;
@@ -633,7 +566,7 @@ static Code_Node_Literal *code_resolve_literal(Code_Type_Resolver *resolver, Sym
 static Code_Node_Address *code_resolve_identifier(Code_Type_Resolver *resolver, Symbol_Table *symbols,
 	Syntax_Node_Identifier *root)
 {
-	auto symbol = symbol_table_get(symbols, root->name);
+	auto symbol = symbol_table_find(symbols, root->name);
 	
 	if (symbol)
 	{
@@ -804,7 +737,7 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 				auto stack_top       = resolver->virtual_address[Symbol_Address::STACK];
 				
 				auto address         = new Code_Node_Address;
-				address->type        = symbol_table_get(&resolver->symbols, "*void")->type;
+				address->type        = symbol_table_find(&resolver->symbols, "*void")->type;
 				address->subscript   = nullptr;
 				address->offset      = stack_top;
 				
@@ -837,7 +770,7 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 			else
 			{
 				auto null_ptr                = new Code_Node_Literal;
-				null_ptr->type               = symbol_table_get(&resolver->symbols, "*void")->type;
+				null_ptr->type               = symbol_table_find(&resolver->symbols, "*void")->type;
 				null_ptr->data.pointer.value = 0;
 				child                        = null_ptr;
 			}
@@ -903,7 +836,7 @@ static Code_Node_Address *code_resolve_subscript(Code_Type_Resolver *resolver, S
 			else if (expression->type->kind == CODE_TYPE_STRUCT)
 			{
 				Assert(expr_type_is_string);
-				node->type = symbol_table_get(&resolver->symbols, "byte", false)->type;
+				node->type = symbol_table_find(&resolver->symbols, "byte", false)->type;
 			}
 			
 			auto address   = new Code_Node_Address;
@@ -947,7 +880,7 @@ static Code_Node_Literal *code_resolve_size_of(Code_Type_Resolver *resolver, Sym
 	auto type                = code_resolve_type(resolver, symbols, root->type);
 	
 	auto node                = new Code_Node_Literal;
-	node->type               = symbol_table_get(&resolver->symbols, "int")->type;
+	node->type               = symbol_table_find(&resolver->symbols, "int")->type;
 	node->data.integer.value = type->runtime_size;
 	
 	return node;
@@ -1194,12 +1127,12 @@ static Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Sym
 		if (type_kind == CODE_TYPE_STRUCT)
 		{
 			auto type = (Code_Type_Struct *)left->type;
-			auto symbol = symbol_table_get(symbols, type->name);
+			auto symbol = symbol_table_find(symbols, type->name);
 			Assert(symbol && symbol->type->kind == CODE_TYPE_STRUCT && symbol->address.kind == Symbol_Address::CODE);
 
 			auto block = symbol->address.code;
 
-			auto member = symbol_table_get(&block->symbols, iden->name, false);
+			auto member = symbol_table_find(&block->symbols, iden->name, false);
 
 			if (member)
 			{
@@ -1217,7 +1150,7 @@ static Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Sym
 		{
 			if (iden->name == "count")
 			{
-				offset_type = symbol_table_get(&resolver->symbols, "int")->type;
+				offset_type = symbol_table_find(&resolver->symbols, "int")->type;
 				offset_value = 0;
 			}
 			else if (iden->name == "data")
@@ -1245,7 +1178,7 @@ static Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Sym
 			{
 				auto type = (Code_Type_Static_Array *)left->type;
 				auto node = new Code_Node_Literal;
-				node->type = symbol_table_get(&resolver->symbols, "int")->type;
+				node->type = symbol_table_find(&resolver->symbols, "int")->type;
 				node->data.integer.value = type->element_count;
 				return node;
 			}
@@ -1407,25 +1340,25 @@ static Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *
 	switch (root->id)
 	{
 		case Syntax_Node_Type::BYTE: {
-			auto symbol = symbol_table_get(&resolver->symbols, "byte");
+			auto symbol = symbol_table_find(&resolver->symbols, "byte");
 			return symbol->type;
 		}
 		break;
 
 		case Syntax_Node_Type::INT: {
-			auto symbol = symbol_table_get(&resolver->symbols, "int");
+			auto symbol = symbol_table_find(&resolver->symbols, "int");
 			return symbol->type;
 		}
 		break;
 		
 		case Syntax_Node_Type::FLOAT: {
-			auto symbol = symbol_table_get(&resolver->symbols, "float");
+			auto symbol = symbol_table_find(&resolver->symbols, "float");
 			return symbol->type;
 		}
 		break;
 		
 		case Syntax_Node_Type::BOOL: {
-			auto symbol = symbol_table_get(&resolver->symbols, "bool");
+			auto symbol = symbol_table_find(&resolver->symbols, "bool");
 			return symbol->type;
 		}
 		break;
@@ -1433,7 +1366,7 @@ static Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *
 		case Syntax_Node_Type::VARIADIC_ARGUMENT: {
 			if (depth == 1)
 			{
-				auto symbol = symbol_table_get(&resolver->symbols, "*void");
+				auto symbol = symbol_table_find(&resolver->symbols, "*void");
 				return symbol->type;
 			}
 			else
@@ -1498,7 +1431,7 @@ static Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *
 		case Syntax_Node_Type::IDENTIFIER: {
 			auto node   = (Syntax_Node_Identifier *)root->type;
 			
-			auto symbol = symbol_table_get(symbols, node->name);
+			auto symbol = symbol_table_find(symbols, node->name);
 			if (symbol && symbol->flags & SYMBOL_BIT_TYPE)
 			{
 				Assert(symbol->type->kind == CODE_TYPE_STRUCT && symbol->address.kind == Symbol_Address::CODE);
@@ -1576,7 +1509,7 @@ static Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolv
 	
 	Assert(root->type || root->initializer);
 	
-	auto got_symbol = symbol_table_get(symbols, sym_name, false);
+	auto got_symbol = symbol_table_find(symbols, sym_name, false);
 	if (!got_symbol)
 	{
 		Symbol *symbol   = resolver->symbols_allocator.add();
@@ -1732,7 +1665,7 @@ static Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolv
 				type = expression->type;
 				if (type->kind == CODE_TYPE_CHARACTER)
 				{
-					type = symbol_table_get(&resolver->symbols, "int", false)->type;
+					type = symbol_table_find(&resolver->symbols, "int", false)->type;
 				}
 			}
 		}
@@ -1908,7 +1841,7 @@ static Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver,
 			
 			auto condition = code_resolve_root_expression(resolver, symbols, if_node->condition);
 			
-			auto boolean   = symbol_table_get(symbols, "bool");
+			auto boolean   = symbol_table_find(symbols, "bool");
 			if (!code_type_are_same(condition->child->type, boolean->type))
 			{
 				auto cast = code_type_cast(condition->child, boolean->type);
@@ -1951,7 +1884,7 @@ static Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver,
 			
 			auto condition           = code_resolve_root_expression(resolver, &for_code->symbols, for_node->condition);
 			
-			auto boolean             = symbol_table_get(&for_code->symbols, "bool");
+			auto boolean             = symbol_table_find(&for_code->symbols, "bool");
 			if (!code_type_are_same(condition->child->type, boolean->type))
 			{
 				auto cast = code_type_cast(condition->child, boolean->type);
@@ -1995,7 +1928,7 @@ static Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver,
 			
 			auto condition  = code_resolve_root_expression(resolver, symbols, while_node->condition);
 			
-			auto boolean    = symbol_table_get(symbols, "bool");
+			auto boolean    = symbol_table_find(symbols, "bool");
 			if (!code_type_are_same(condition->child->type, boolean->type))
 			{
 				auto cast = code_type_cast(condition->child, boolean->type);
@@ -2040,7 +1973,7 @@ static Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver,
 			
 			auto condition = code_resolve_root_expression(resolver, do_symbols, do_node->condition);
 			
-			auto boolean   = symbol_table_get(do_symbols, "bool");
+			auto boolean   = symbol_table_find(do_symbols, "bool");
 			if (!code_type_are_same(condition->child->type, boolean->type))
 			{
 				auto cast = code_type_cast(condition->child, boolean->type);
@@ -2241,13 +2174,13 @@ Code_Type_Resolver *code_type_resolver_create(String_Builder *builder)
 		length->name           = "length";
 		length->address.kind   = Symbol_Address::STACK;
 		length->address.offset = 0;
-		length->type           = symbol_table_get(&resolver->symbols, "int")->type;
+		length->type           = symbol_table_find(&resolver->symbols, "int")->type;
 		
 		auto data              = resolver->symbols_allocator.add();
 		data->name             = "data";
 		data->address.kind     = Symbol_Address::STACK;
 		data->address.offset   = sizeof(int64_t);
-		data->type             = symbol_table_get(&resolver->symbols, "*void")->type;
+		data->type             = symbol_table_find(&resolver->symbols, "*void")->type;
 		
 		symbol_table_put(&block->symbols, length);
 		symbol_table_put(&block->symbols, data);
@@ -2491,7 +2424,7 @@ Array_View<Code_Node_Assignment *> code_type_resolve(Code_Type_Resolver *resolve
 
 const Symbol *code_type_resolver_find(Code_Type_Resolver *resolver, String name)
 {
-	return symbol_table_get(&resolver->symbols, name, false);
+	return symbol_table_find(&resolver->symbols, name, false);
 }
 
 Code_Type *code_type_resolver_find_type(Code_Type_Resolver *resolver, String name)
