@@ -5,6 +5,8 @@
 #include "Interp.h"
 #include "HeapAllocator.h"
 
+#include <stdlib.h>
+
 struct String_Stream {
 	Array<char> buffer;
 
@@ -918,11 +920,17 @@ static void include_basic(Code_Type_Resolver *resolver)
 	proc_builder_free(&builder);
 }
 
+static void parser_on_error(Parser *parser) { exit(0); }
+static void code_type_resolver_on_error(Code_Type_Resolver *parser) { exit(0); }
+
 int main()
 {
 	InitThreadContext(0);
 
 	String content = read_entire_file("Simple.kano");
+
+	parser_register_error_proc(parser_on_error);
+	code_type_resolver_register_error_proc(code_type_resolver_on_error);
 
 	String_Builder builder;
 

@@ -8,6 +8,13 @@ static bool     ParseTableInitialize = false;
 static uint32_t UnaryOperatorPrecedence[_TOKEN_KIND_COUNT];
 static uint32_t BinaryOperatorPrecedence[_TOKEN_KIND_COUNT];
 
+static Parser_On_Error ParserOnError;
+
+void parser_register_error_proc(Parser_On_Error proc)
+{
+	ParserOnError = proc;
+}
+
 static void     parser_init_precedence()
 {
 	UnaryOperatorPrecedence[TOKEN_KIND_PLUS]        = 150;
@@ -76,7 +83,9 @@ static void parser_error(Parser *parser, Token *token, const char *format, Args.
 	parser->error_count += 1;
 	parser->parsing = false;
 
-	Unimplemented();
+	if (ParserOnError) {
+		ParserOnError(parser);
+	}
 }
 
 //

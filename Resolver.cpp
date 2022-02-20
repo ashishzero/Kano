@@ -246,6 +246,13 @@ struct Code_Type_Resolver
 	Bucket_Array<Binary_Operator, 8> binary_operators[_BINARY_OPERATOR_COUNT];
 };
 
+static Code_Type_Resolver_On_Error ResolverOnError;
+
+void code_type_resolver_register_error_proc(Code_Type_Resolver_On_Error proc)
+{
+	ResolverOnError = proc;
+}
+
 template <typename ...Args>
 static void report_error(Code_Type_Resolver *resolver, Syntax_Node *node, const char *format, Args... args) {
 	if (resolver->error) {
@@ -260,7 +267,9 @@ static void report_error(Code_Type_Resolver *resolver, Syntax_Node *node, const 
 
 	resolver->error_count += 1;
 
-	Unimplemented();
+	if (ResolverOnError) {
+		ResolverOnError(resolver);
+	}
 }
 
 static bool                 code_type_are_same(Code_Type *a, Code_Type *b, bool recurse_pointer_type = true);
@@ -2371,6 +2380,16 @@ uint64_t code_type_resolver_stack_allocated(Code_Type_Resolver *resolver)
 uint64_t code_type_resolver_bss_allocated(Code_Type_Resolver *resolver)
 {
 	return resolver->virtual_address[Symbol_Address::GLOBAL];
+}
+
+int code_type_resolver_error_count(Code_Type_Resolver *resolver)
+{
+	return resolver->error_count;
+}
+
+String_Builder *code_type_resolver_error_stream(Code_Type_Resolver *resolver)
+{
+	return resolver->error;
 }
 
 Array_View<Code_Node_Assignment *> code_type_resolve(Code_Type_Resolver *resolver, Syntax_Node_Global_Scope *node)

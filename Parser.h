@@ -13,6 +13,10 @@ struct Parser
 	bool            parsing;
 };
 
+typedef void (*Parser_On_Error)(struct Parser *parser);
+
+void parser_register_error_proc(Parser_On_Error proc);
+
 Syntax_Node *             parse_subexpression(Parser *parser, uint32_t prec);
 Syntax_Node *             parse_expression(Parser *parser, uint32_t prec);
 
