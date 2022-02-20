@@ -168,7 +168,7 @@ static void *MemoryArenaAllocatorReallocate(void *ptr, size_t previous_size, siz
 
 	void *new_ptr = PushSizeAligned(arena, new_size, sizeof(size_t));
 	if (new_ptr) {
-		memmove(ptr, new_ptr, previous_size);
+		memmove(new_ptr, ptr, previous_size);
 		return new_ptr;
 	}
 	return 0;

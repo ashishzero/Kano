@@ -788,36 +788,33 @@ static void include_basic(Code_Type_Resolver *resolver)
 static void parser_on_error(Parser *parser) { exit(0); }
 static void code_type_resolver_on_error(Code_Type_Resolver *parser) { exit(0); }
 
-int main()
+
+bool GenerateDebugCodeInfo(String code, Memory_Arena *arena, String_Builder *builder)
 {
-	InitThreadContext(0);
-
-	parser_register_error_proc(parser_on_error);
-	code_type_resolver_register_error_proc(code_type_resolver_on_error);
-
-	String content = read_entire_file("Simple.kano");
-
-	String_Builder builder;
+	auto prev_allocator = ThreadContext.allocator;
+	Defer{ ThreadContext.allocator = prev_allocator; };
+	
+	ThreadContext.allocator = MemoryArenaAllocator(arena);
 
 	Parser parser;
-	parser_init(&parser, content, &builder);
+	parser_init(&parser, code, builder);
 
 	auto node = parse_global_scope(&parser);
 
 	if (parser.error_count)
-		return 1;
+		return false;
 
-	auto resolver = code_type_resolver_create(&builder);
+	auto resolver = code_type_resolver_create(builder);
 
 	if (code_type_resolver_error_count(resolver))
-		return 1;
+		return false;
 
 	include_basic(resolver);
 
 	auto exprs = code_type_resolve(resolver, node);
 
 	Interp_User_Context context;
-	context.json.builder = &builder;
+	context.json.builder = builder;
 
 	context.json.begin_array();
 
@@ -835,6 +832,24 @@ int main()
 
 	context.json.end_array();
 
+	return true;
+}
+
+int main()
+{
+	InitThreadContext(0);
+
+	parser_register_error_proc(parser_on_error);
+	code_type_resolver_register_error_proc(code_type_resolver_on_error);
+
+	String content = read_entire_file("Simple.kano");
+
+	auto arena = MemoryArenaCreate(MegaBytes(128));
+
+	String_Builder builder;
+
+	GenerateDebugCodeInfo(content, arena, &builder);
+
 	FILE *out = fopen("DebugInfo.json", "wb");
 
 	for (auto buk = &builder.head; buk; buk = buk->next)
@@ -844,5 +859,7 @@ int main()
 
 	fclose(out);
 
-	return result;
+	FreeBuilder(&builder);
+
+	return 0;
 }
