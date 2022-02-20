@@ -809,22 +809,25 @@ int main()
 
 	auto resolver = code_type_resolver_create(&builder);
 
+	if (code_type_resolver_error_count(resolver))
+		return 1;
+
 	include_basic(resolver);
 
 	auto exprs = code_type_resolve(resolver, node);
-
-	auto expr = code_type_resolver_find(resolver, "factorial");
 
 	Interp_User_Context context;
 	context.json.builder = &builder;
 
 	context.json.begin_array();
 
+	Heap_Allocator heap_allocator;
+
 	Interpreter interp;
 	interp.intercept = intercept;
 	interp.user_context = &context;
 	interp.global_symbol_table = code_type_resolver_global_symbol_table(resolver);
-	interp.heap = new Heap_Allocator;
+	interp.heap = &heap_allocator;
 	interp_init(&interp, resolver, 1024 * 1024 * 4, code_type_resolver_bss_allocated(resolver));
 
 	interp_eval_globals(&interp, exprs);
