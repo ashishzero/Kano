@@ -216,7 +216,7 @@ void Listen(HANDLE req_queue)
 		{
 			switch (request->Verb)
 			{
-			case HttpVerbGET:
+			case HttpVerbPOST:
 			{
 				auto scratch = ThreadScratchpad();
 				auto temp = BeginTemporaryMemory(scratch);
