@@ -104,6 +104,7 @@ void handle_request(struct http_request_s *request)
 	http_response_status(response, 200);
 	http_response_header(response, "Content-Type", content_type);
 	http_response_header(response, "Access-Control-Allow-Origin", "*");
+	http_response_header(response, "Access-Control-Allow-Headers", "*");
 	http_response_body(response, (char *)body, length);
 	http_respond(request, response);
 
@@ -274,14 +275,20 @@ void Listen(HANDLE req_queue)
 					fprintf(stdout, "\n");
 				}
 
-				const String name = "Access-Control-Allow-Origin";
+				const String origin_name = "Access-Control-Allow-Origin";
+				const String headers_name = "Access-Control-Allow-Headers";
 				const String value = "*";
 
-				HTTP_UNKNOWN_HEADER unknown_headers[1];
-				unknown_headers[0].NameLength = (USHORT)name.length;
+				HTTP_UNKNOWN_HEADER unknown_headers[2];
+				unknown_headers[0].NameLength = (USHORT)origin_name.length;
 				unknown_headers[0].RawValueLength = (USHORT)value.length;
-				unknown_headers[0].pName = (char *)name.data;
+				unknown_headers[0].pName = (char *)origin_name.data;
 				unknown_headers[0].pRawValue = (char *)value.data;
+
+				unknown_headers[1].NameLength = (USHORT)headers_name.length;
+				unknown_headers[1].RawValueLength = (USHORT)value.length;
+				unknown_headers[1].pName = (char *)headers_name.data;
+				unknown_headers[1].pRawValue = (char *)value.data;
 
 				const String reason = "OK";
 				HTTP_RESPONSE response;
