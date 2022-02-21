@@ -13,10 +13,7 @@ bool GenerateDebugCodeInfo(String code, Memory_Arena *arena, String_Builder *bui
 
 #include <pthread.h>
 
-static void parser_on_error(Parser *parser)
-{
-	pthread_exit(NULL);
-}
+static void parser_on_error(Parser *parser) { pthread_exit(NULL); }
 static void code_type_resolver_on_error(Code_Type_Resolver *parser) { pthread_exit(NULL); }
 
 struct Code_Execution
@@ -44,8 +41,6 @@ void *ExecuteCodeThreadProc(void *param)
 
 void handle_request(struct http_request_s *request)
 {
-	InitThreadContext(0);
-
 	auto code = http_request_body(request);
 
 	String content;
@@ -112,6 +107,11 @@ void handle_request(struct http_request_s *request)
 
 int main()
 {
+	InitThreadContext(0);
+
+	parser_register_error_proc(parser_on_error);
+	code_type_resolver_register_error_proc(code_type_resolver_on_error);
+
 	struct http_server_s *server = http_server_init(8000, handle_request);
 	http_server_listen(server);
 	return 0;
@@ -345,6 +345,9 @@ void Listen(HANDLE req_queue)
 		}
 	}
 }
+
+static void parser_on_error(Parser *parser) { ExitThread(1); }
+static void code_type_resolver_on_error(Code_Type_Resolver *parser) { ExitThread(1); }
 
 int main()
 {
