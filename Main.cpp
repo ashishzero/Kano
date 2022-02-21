@@ -558,7 +558,7 @@ static void stdout_value(Interpreter *interp, String_Builder *out, Code_Type *ty
 			Write(out, "(null)"); printf("(null)");
 			return;
 		case CODE_TYPE_CHARACTER: 
-			Write(out, *(Kano_Char *)data); printf("%c", *(Kano_Char *)data);
+			Write(out, *(Kano_Char *)data); printf("%d", (int) *(Kano_Char *)data);
 			return;
 		case CODE_TYPE_INTEGER: 
 			Write(out, *(Kano_Int *)data); printf("%zd", *(Kano_Int *)data);

@@ -30,11 +30,12 @@ Memory_Arena *MemoryArenaCreate(size_t max_size) {
 	max_size = AlignPower2Up(max_size, 64 * 1024);
 	uint8_t *mem = (uint8_t *)VirtualMemoryAllocate(0, max_size);
 	if (mem) {
-		if (VirtualMemoryCommit(mem, MEMORY_ARENA_COMMIT_SIZE)) {
+		size_t commit_size = Minimum(MEMORY_ARENA_COMMIT_SIZE, max_size);
+		if (VirtualMemoryCommit(mem, commit_size)) {
 			Memory_Arena *arena = (Memory_Arena *)mem;
 			arena->current = sizeof(Memory_Arena);
 			arena->reserved = max_size;
-			arena->committed = MEMORY_ARENA_COMMIT_SIZE;
+			arena->committed = commit_size;
 			return arena;
 		}
 	}
