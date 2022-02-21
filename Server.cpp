@@ -103,6 +103,7 @@ void handle_request(struct http_request_s *request)
 	struct http_response_s *response = http_response_init();
 	http_response_status(response, 200);
 	http_response_header(response, "Content-Type", content_type);
+	http_response_header(response, "Access-Control-Allow-Origin", "*");
 	http_response_body(response, (char *)body, length);
 	http_respond(request, response);
 
@@ -273,6 +274,15 @@ void Listen(HANDLE req_queue)
 					fprintf(stdout, "\n");
 				}
 
+				const String name = "Access-Control-Allow-Origin";
+				const String value = "*";
+
+				HTTP_UNKNOWN_HEADER unknown_headers[1];
+				unknown_headers[0].NameLength = (USHORT)name.length;
+				unknown_headers[0].RawValueLength = (USHORT)value.length;
+				unknown_headers[0].pName = (char *)name.data;
+				unknown_headers[0].pRawValue = (char *)value.data;
+
 				const String reason = "OK";
 				HTTP_RESPONSE response;
 				memset(&response, 0, sizeof(response));
@@ -283,6 +293,9 @@ void Listen(HANDLE req_queue)
 				String content_type = exe.failed ? String("text/plain") : String("application/json");
 				response.Headers.KnownHeaders[HttpHeaderContentType].pRawValue = (char *)content_type.data;
 				response.Headers.KnownHeaders[HttpHeaderContentType].RawValueLength = (USHORT)content_type.length;
+
+				response.Headers.UnknownHeaderCount = (USHORT)ArrayCount(unknown_headers);
+				response.Headers.pUnknownHeaders = unknown_headers;
 
 				int chunk_count = 0;
 				for (auto buk = &builder.head; buk; buk = buk->next)
