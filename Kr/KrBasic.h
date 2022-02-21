@@ -626,11 +626,6 @@ struct STable {
 		pair->key = key_copy;
 		pair->value = Value_Type{};
 		return &pair->value;
-
-		auto pair = storage.Add();
-		pair->key = key_copy;
-		pair->value = Value_Type{};
-		return &pair->value;
 	}
 
 	void Put(const Key_Type key, const Value_Type &value) {

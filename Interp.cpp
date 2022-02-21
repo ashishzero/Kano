@@ -1382,6 +1382,8 @@ void interp_eval_globals(Interpreter *interp, Array_View<Code_Node_Assignment *>
 		interp_eval_assignment(interp, expr);
 }
 
+#include "StringBuilder.h"
+
 int interp_eval_main(Interpreter *interp)
 {
 	auto resolver = interp->resolver;
@@ -1389,26 +1391,34 @@ int interp_eval_main(Interpreter *interp)
 	
 	if (!main_proc)
 	{
-		fprintf(stderr, "\"main\" procedure not defined!\n");
+		auto error = code_type_resolver_error_stream(resolver);
+		ResetBuilder(error);
+		Write(error, "\"main\" procedure not defined!\n");
 		return 1;
 	}
 
 	if (!(main_proc->flags & SYMBOL_BIT_CONSTANT) || main_proc->address.kind != Symbol_Address::CODE)
 	{
-		fprintf(stderr, "The \"main\" procedure must be constant!\n");
+		auto error = code_type_resolver_error_stream(resolver);
+		ResetBuilder(error);
+		Write(error, "The \"main\" procedure must be constant!\n");
 		return 1;
 	}
 
 	if (main_proc->type->kind != CODE_TYPE_PROCEDURE)
 	{
-		fprintf(stderr, "The \"main\" symbol must be a procedure!\n");
+		auto error = code_type_resolver_error_stream(resolver);
+		ResetBuilder(error);
+		Write(error, "The \"main\" symbol must be a procedure!\n");
 		return 1;
 	}
 
 	auto proc_type = (Code_Type_Procedure *)main_proc->type;
 	if (proc_type->argument_count != 0 || proc_type->return_type || proc_type->is_variadic)
 	{
-		fprintf(stderr, "The \"main\" procedure must not take any arguments and should return nothing!\n");
+		auto error = code_type_resolver_error_stream(resolver);
+		ResetBuilder(error);
+		Write(error, "The \"main\" procedure must not take any arguments and should return nothing!\n");
 		return 1;
 	}
 

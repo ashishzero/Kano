@@ -209,7 +209,7 @@ static void json_write_type(Json_Writer *json, Code_Type *type)
 
 		case CODE_TYPE_STRUCT: {
 			auto strt = (Code_Type_Struct *)type;
-			json->append_string_value("%", strt->name.data); 
+			json->append_string_value("%", strt->name); 
 			return;
 		}
 
@@ -358,7 +358,7 @@ static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *
 static void json_write_symbol(Json_Writer *json, Interpreter *interp, String name, Code_Type *type, void *data)
 {
 	json->begin_object();
-	json->write_key_value("name", "%", name.data);
+	json->write_key_value("name", "%", name);
 	
 	json->write_key("type");
 	json->begin_string_value();
@@ -423,7 +423,7 @@ static void json_write_procedure_symbols(Interpreter *interp, Json_Writer *json,
 {
 	json->begin_object();
 
-	json->write_key_value("procedure", "%", procedure_name.data);
+	json->write_key_value("procedure", "%", procedure_name);
 	json->write_key("variables");
 	json->begin_array();
 	json_write_table_symbols(interp, json, symbol_table, stack_top, skip_stack_offset);
@@ -558,7 +558,7 @@ static void stdout_value(Interpreter *interp, String_Builder *out, Code_Type *ty
 			Write(out, "(null)"); printf("(null)");
 			return;
 		case CODE_TYPE_CHARACTER: 
-			Write(out, *(Kano_Char *)data); printf("%d", (int) *(Kano_Char *)data);
+			Write(out, (int)*(Kano_Char *)data); printf("%d", (int) *(Kano_Char *)data);
 			return;
 		case CODE_TYPE_INTEGER: 
 			Write(out, *(Kano_Int *)data); printf("%zd", *(Kano_Int *)data);
@@ -614,7 +614,7 @@ static void stdout_value(Interpreter *interp, String_Builder *out, Code_Type *ty
 			for (int64_t index = 0; index < _struct->member_count; ++index)
 			{
 				auto member = &_struct->members[index];
-				Write(out, member->name); printf("%*.s: ", (int)member->name.length, member->name.data);
+				Write(out, member->name); printf("%.*s: ", (int)member->name.length, member->name.data);
 				stdout_value(interp, out, member->type, (uint8_t *)data + member->offset);
 
 				if (index < _struct->member_count - 1)
@@ -832,6 +832,8 @@ bool GenerateDebugCodeInfo(String code, Memory_Arena *arena, String_Builder *bui
 
 	interp_eval_globals(&interp, exprs);
 	int result = interp_eval_main(&interp);
+	if (result)
+		return false;
 
 	context.json.end_array();
 
