@@ -13,7 +13,10 @@ bool GenerateDebugCodeInfo(String code, Memory_Arena *arena, String_Builder *bui
 
 #include <pthread.h>
 
-static void parser_on_error(Parser *parser) { pthread_exit(NULL); }
+static void parser_on_error(Parser *parser)
+{
+	pthread_exit(NULL);
+}
 static void code_type_resolver_on_error(Code_Type_Resolver *parser) { pthread_exit(NULL); }
 
 struct Code_Execution
@@ -79,7 +82,8 @@ void handle_request(struct http_request_s *request)
 	uint8_t *body = PushArray(arena, uint8_t, length + 1);
 
 	int written = 0;
-	for (auto buk = &builder.head; buk; buk = buk->next) {
+	for (auto buk = &builder.head; buk; buk = buk->next)
+	{
 		memcpy(body + written, buk->data, buk->written);
 		written += buk->written;
 	}
@@ -89,7 +93,8 @@ void handle_request(struct http_request_s *request)
 
 	const char *content_type = exe.failed ? "text/plain" : "application/json";
 
-	if (exe.failed) {
+	if (exe.failed)
+	{
 		fprintf(stdout, "Execution Error:\n");
 		fprintf(stdout, "%.*s", length, body);
 		fprintf(stdout, "\n");
@@ -216,8 +221,14 @@ void Listen(HANDLE req_queue)
 				auto scratch = ThreadScratchpad();
 				auto temp = BeginTemporaryMemory(scratch);
 
-				const int64_t allocation = atoi(request->Headers.KnownHeaders[HttpHeaderContentLength].pRawValue);
-				int64_t allocated = allocation;
+				const char *content_len_str = request->Headers.KnownHeaders[HttpHeaderContentLength].pRawValue;
+				if (!content_len_str)
+				{
+					content_len_str = "0";
+				}
+
+				const int64_t allocation = atoi(content_len_str);
+				int64_t allocated = allocation ? allocation : 512;
 
 				String content;
 				content.length = 0;
@@ -238,71 +249,73 @@ void Listen(HANDLE req_queue)
 					}
 				}
 
-				if (result == NO_ERROR)
+				auto arena = MemoryArenaCreate(MegaBytes(128));
+
+				String_Builder builder;
+
+				Code_Execution exe;
+				exe.arena = arena;
+				exe.builder = &builder;
+				exe.code = content;
+				exe.failed = false;
+
+				HANDLE thread = CreateThread(nullptr, 0, ExecuteCodeThreadProc, &exe, 0, nullptr);
+				WaitForSingleObject(thread, INFINITE);
+				CloseHandle(thread);
+
+				if (exe.failed)
 				{
-					auto arena = MemoryArenaCreate(MegaBytes(128));
-
-					String_Builder builder;
-
-					Code_Execution exe;
-					exe.arena = arena;
-					exe.builder = &builder;
-					exe.code = content;
-					exe.failed = false;
-
-					HANDLE thread = CreateThread(nullptr, 0, ExecuteCodeThreadProc, &exe, 0, nullptr);
-					WaitForSingleObject(thread, INFINITE);
-					CloseHandle(thread);
-
-					const String reason = "OK";
-					HTTP_RESPONSE response;
-					memset(&response, 0, sizeof(response));
-					response.StatusCode = 200;
-					response.pReason = (char *)reason.data;
-					response.ReasonLength = (USHORT)reason.length;
-
-					String content_type = exe.failed ? String("text/plain") : String("application/json");
-					response.Headers.KnownHeaders[HttpHeaderContentType].pRawValue = (char *)content_type.data;
-					response.Headers.KnownHeaders[HttpHeaderContentType].RawValueLength = (USHORT)content_type.length;
-
-					int chunk_count = 0;
+					fprintf(stdout, "Execution Error:\n");
 					for (auto buk = &builder.head; buk; buk = buk->next)
 					{
-						chunk_count += 1;
+						fprintf(stdout, "%.*s", (int)buk->written, buk->data);
 					}
-
-					HTTP_DATA_CHUNK *data = PushArrayAligned(scratch, HTTP_DATA_CHUNK, chunk_count, sizeof(size_t));
-
-					int chunk_index = 0;
-					int content_len = 0;
-					for (auto buk = &builder.head; buk; buk = buk->next)
-					{
-						data[chunk_index].DataChunkType = HttpDataChunkFromMemory;
-						data[chunk_index].FromMemory.pBuffer = buk->data;
-						data[chunk_index].FromMemory.BufferLength = buk->written;
-						chunk_index += 1;
-						content_len += buk->written;
-					}
-
-					response.EntityChunkCount = chunk_count;
-					response.pEntityChunks = data;
-
-					DWORD bytes_sent = 0;
-					result = HttpSendHttpResponse(req_queue, request->RequestId, 0, &response, NULL, &bytes_sent, NULL, 0, NULL, NULL);
-
-					if (result != NO_ERROR)
-					{
-						printf("HttpSendHttpResponse failed with %lu \n", result);
-					}
-
-					MemoryArenaDestroy(arena);
-					FreeBuilder(&builder);
+					fprintf(stdout, "\n");
 				}
-				else
+
+				const String reason = "OK";
+				HTTP_RESPONSE response;
+				memset(&response, 0, sizeof(response));
+				response.StatusCode = 200;
+				response.pReason = (char *)reason.data;
+				response.ReasonLength = (USHORT)reason.length;
+
+				String content_type = exe.failed ? String("text/plain") : String("application/json");
+				response.Headers.KnownHeaders[HttpHeaderContentType].pRawValue = (char *)content_type.data;
+				response.Headers.KnownHeaders[HttpHeaderContentType].RawValueLength = (USHORT)content_type.length;
+
+				int chunk_count = 0;
+				for (auto buk = &builder.head; buk; buk = buk->next)
 				{
-					result = SendHttpResponse(req_queue, request, 400, "Bad Request", "text/html", "");
+					chunk_count += 1;
 				}
 
+				HTTP_DATA_CHUNK *data = PushArrayAligned(scratch, HTTP_DATA_CHUNK, chunk_count, sizeof(size_t));
+
+				int chunk_index = 0;
+				int content_len = 0;
+				for (auto buk = &builder.head; buk; buk = buk->next)
+				{
+					data[chunk_index].DataChunkType = HttpDataChunkFromMemory;
+					data[chunk_index].FromMemory.pBuffer = buk->data;
+					data[chunk_index].FromMemory.BufferLength = buk->written;
+					chunk_index += 1;
+					content_len += buk->written;
+				}
+
+				response.EntityChunkCount = chunk_count;
+				response.pEntityChunks = data;
+
+				DWORD bytes_sent = 0;
+				result = HttpSendHttpResponse(req_queue, request->RequestId, 0, &response, NULL, &bytes_sent, NULL, 0, NULL, NULL);
+
+				if (result != NO_ERROR)
+				{
+					printf("HttpSendHttpResponse failed with %lu \n", result);
+				}
+
+				MemoryArenaDestroy(arena);
+				FreeBuilder(&builder);
 				EndTemporaryMemory(&temp);
 			}
 			break;
