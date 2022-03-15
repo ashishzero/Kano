@@ -76,9 +76,11 @@ static void     parser_init_precedence()
 
 template <typename ...Args>
 static void parser_error(Parser *parser, Token *token, const char *format, Args... args) {
-	WriteFormatted(parser->error, "ERROR:%,% : ", token->row, token->column);
-	WriteFormatted(parser->error, format, args...);
-	Write(parser->error, '\n');
+	//parser->error->next_element();
+	parser->error->begin_string_value();
+	WriteFormatted(parser->error->builder, "ERROR:%,% : ", token->row, token->column);
+	WriteFormatted(parser->error->builder, format, args...);
+	parser->error->end_string_value();
 
 	parser->error_count += 1;
 	parser->parsing = false;
@@ -1121,12 +1123,12 @@ Syntax_Node_Global_Scope *parse_global_scope(Parser *parser)
 //
 //
 
-void parser_init(Parser *parser, String content, String_Builder *builder)
+void parser_init(Parser *parser, String content, Json_Writer *error)
 {
 	lexer_init(&parser->lexer, content);
 
 	parser->error_count = 0;
-	parser->error = builder;
+	parser->error = error;
 
 	parser->parsing             = true;
 

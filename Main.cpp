@@ -7,107 +7,7 @@
 
 #include <stdlib.h>
 
-struct Json_Writer {
-	bool depth[4096] = {};
-	int depth_index = 0;
-
-	String_Builder *builder = nullptr;
-
-	void next_element()
-	{
-		if (depth[depth_index])
-			Write(builder, ",");
-		else
-			depth[depth_index] = true;
-	}
-
-	void push_scope()
-	{
-		Assert(depth_index < ArrayCount(depth));
-		next_element();
-		depth_index += 1;
-		depth[depth_index] = false;
-	}
-
-	void pop_scope()
-	{
-		depth_index -= 1;
-	}
-
-	void begin_object()
-	{
-		push_scope();
-		Write(builder, "{");
-	}
-
-	void end_object()
-	{
-		Write(builder, "}");
-		pop_scope();
-	}
-
-	void begin_array()
-	{
-		push_scope();
-		Write(builder, "[");
-	}
-
-	void end_array()
-	{
-		Write(builder, "]");
-		pop_scope();
-	}
-
-	void write_key(const char *key)
-	{
-		push_scope();
-		WriteFormatted(builder, "\"%\": ", key);
-	}
-
-	template <typename ...Args>
-	void write_single_value(const char *fmt, Args... args)
-	{
-		Write(builder, "\"");
-		WriteFormatted(builder, fmt, args...);
-		Write(builder, "\"");
-		pop_scope();
-	}
-
-	void begin_string_value()
-	{
-		Write(builder, "\"");
-	}
-
-	void append_builder(String_Builder *src)
-	{
-		for (auto buk = &src->head; buk; buk = buk->next)
-		{
-			WriteBuffer(builder, buk->data, buk->written);
-		}
-	}
-
-	template <typename ...Args>
-	void append_string_value(const char *fmt, Args... args)
-	{
-		WriteFormatted(builder, fmt, args...);
-	}
-
-	void end_string_value()
-	{
-		Write(builder, "\"");
-		pop_scope();
-	}
-
-	template <typename ...Args>
-	void write_key_value(const char *key, const char *fmt, Args... args)
-	{
-		next_element();
-		WriteFormatted(builder, "\"%\": ", key);
-		Write(builder, "\"");
-		WriteFormatted(builder, fmt, args...);
-		Write(builder, "\"");
-	}
-};
+#include "StringBuilder.h"
 
 struct Call_Info {
 	String procedure_name;
@@ -686,7 +586,13 @@ static void basic_print(Interpreter *interp) {
 			auto ptr = args;
 			args += type->runtime_size;
 
-			stdout_value(interp, con_out, type, ptr);
+			if (args >= interp->stack &&
+				(args < interp->stack + interp->stack_top) &&
+				interp_get_memory_type(interp, ptr) != Memory_Type_INVALID) {
+				stdout_value(interp, con_out, type, ptr);
+			} else {
+				Write(con_out, '%'); printf("%%");
+			}
 		}
 		else if (fmt[index] == '\\')
 		{
@@ -785,12 +691,25 @@ static void include_basic(Code_Type_Resolver *resolver)
 	proc_builder_free(&builder);
 }
 
-static void parser_on_error(Parser *parser) { exit(0); }
-static void code_type_resolver_on_error(Code_Type_Resolver *parser) { exit(0); }
-
+static void parser_on_error(Parser *parser) { 
+	parser->error->end_array();
+	parser->error->end_object();
+	exit(0); 
+}
+static void code_type_resolver_on_error(Code_Type_Resolver *resolver) {
+	auto error = code_type_resolver_error_stream(resolver);
+	error->end_array();
+	error->end_object();
+	exit(0);
+}
 
 bool GenerateDebugCodeInfo(String code, Memory_Arena *arena, String_Builder *builder)
 {
+	Interp_User_Context context;
+	context.json.builder = builder;
+
+	context.json.begin_object();
+
 	auto prev_allocator = ThreadContext.allocator;
 	Defer{ ThreadContext.allocator = prev_allocator; };
 	
@@ -800,26 +719,30 @@ bool GenerateDebugCodeInfo(String code, Memory_Arena *arena, String_Builder *bui
 	Defer{ EndTemporaryMemory(&temp); };
 
 	Parser parser;
-	parser_init(&parser, code, builder);
+	parser_init(&parser, code, &context.json);
+
+	context.json.write_key("errors");
+	context.json.begin_array();
 
 	auto node = parse_global_scope(&parser);
 
-	if (parser.error_count)
+	if (parser.error_count) {
+		context.json.end_array();
+		context.json.end_object();
 		return false;
+	}
 
-	auto resolver = code_type_resolver_create(builder);
+	auto resolver = code_type_resolver_create(&context.json);
 
-	if (code_type_resolver_error_count(resolver))
+	if (code_type_resolver_error_count(resolver)) {
+		context.json.end_array();
+		context.json.end_object();
 		return false;
+	}
 
 	include_basic(resolver);
 
 	auto exprs = code_type_resolve(resolver, node);
-
-	Interp_User_Context context;
-	context.json.builder = builder;
-
-	context.json.begin_array();
 
 	Heap_Allocator heap_allocator;
 
@@ -831,11 +754,23 @@ bool GenerateDebugCodeInfo(String code, Memory_Arena *arena, String_Builder *bui
 	interp_init(&interp, resolver, 1024 * 1024 * 4, code_type_resolver_bss_allocated(resolver));
 
 	interp_eval_globals(&interp, exprs);
-	int result = interp_eval_main(&interp);
-	if (result)
+	auto main_proc = interp_find_main(&interp);
+
+	if (!main_proc) {
+		context.json.end_array();
+		context.json.end_object();
 		return false;
+	}
 
 	context.json.end_array();
+
+	context.json.write_key("runtime");
+	context.json.begin_array();
+
+	interp_evaluate_procedure(&interp, main_proc);
+
+	context.json.end_array();
+	context.json.end_object();
 
 	return true;
 }

@@ -70,9 +70,9 @@ INLINE_PROCEDURE int64_t StrCopy(String src, char *const dst, int64_t dst_size, 
 	return copied;
 }
 
-INLINE_PROCEDURE String StrDuplicate(String src) {
+INLINE_PROCEDURE String StrDuplicate(String src, Memory_Allocator allocator = ThreadContext.allocator) {
 	String dst;
-	dst.data = (uint8_t *)MemoryAllocate(src.length + 1, ThreadContext.allocator);
+	dst.data = (uint8_t *)MemoryAllocate(src.length + 1, allocator);
 	memcpy(dst.data, src.data, src.length);
 	dst.length = src.length;
 	dst.data[dst.length] = 0;

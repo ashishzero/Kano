@@ -3,6 +3,7 @@
 #include "Parser.h"
 #include "Interp.h"
 #include "Resolver.h"
+#include "JsonWriter.h"
 
 //
 //
@@ -237,7 +238,7 @@ struct Code_Type_Resolver
 	Symbol_Address::Kind             address_kind       = Symbol_Address::CODE;
 
 	int error_count = 0;
-	String_Builder *error = nullptr;
+	Json_Writer *error = nullptr;
 	
 	Array<Code_Type *>               return_stack;
 	
@@ -260,9 +261,11 @@ static void report_error(Code_Type_Resolver *resolver, Syntax_Node *node, const 
 		int line = (int)node->location.start_row;
 		int column = (int)node->location.start_column;
 
-		WriteFormatted(resolver->error, "ERROR:%,% : ", line, column);
-		WriteFormatted(resolver->error, format, args...);
-		Write(resolver->error, '\n');
+		//resolver->error->next_element();
+		resolver->error->begin_string_value();
+		WriteFormatted(resolver->error->builder, "ERROR:%,% : ", line, column);
+		WriteFormatted(resolver->error->builder, format, args...);
+		resolver->error->end_string_value();
 	}
 
 	resolver->error_count += 1;
@@ -2070,11 +2073,11 @@ static Array_View<Code_Node_Assignment *> code_resolve_global_scope(Code_Type_Re
 //
 //
 
-Code_Type_Resolver *code_type_resolver_create(String_Builder *builder)
+Code_Type_Resolver *code_type_resolver_create(Json_Writer *error)
 {
 	auto resolver = new Code_Type_Resolver;
 
-	resolver->error = builder;
+	resolver->error = error;
 
 	Code_Type *        CompilerTypes[_CODE_TYPE_COUNT];
 	
@@ -2387,7 +2390,7 @@ int code_type_resolver_error_count(Code_Type_Resolver *resolver)
 	return resolver->error_count;
 }
 
-String_Builder *code_type_resolver_error_stream(Code_Type_Resolver *resolver)
+Json_Writer *code_type_resolver_error_stream(Code_Type_Resolver *resolver)
 {
 	return resolver->error;
 }

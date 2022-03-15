@@ -27,6 +27,7 @@
     <ClInclude Include="Kr\KrCommon.h" />
     <ClInclude Include="Kr\KrString.h" />
     <ClInclude Include="StringBuilder.h" />
+    <ClInclude Include="JsonWriter.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Simple.kano" />

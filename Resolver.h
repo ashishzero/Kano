@@ -9,11 +9,11 @@ typedef void (*Code_Type_Resolver_On_Error)(Code_Type_Resolver *parser);
 void code_type_resolver_register_error_proc(Code_Type_Resolver_On_Error proc);
 
 
-Code_Type_Resolver *code_type_resolver_create(struct String_Builder *builder = nullptr);
+Code_Type_Resolver *code_type_resolver_create(struct Json_Writer *error = nullptr);
 uint64_t code_type_resolver_stack_allocated(Code_Type_Resolver *resolver);
 uint64_t code_type_resolver_bss_allocated(Code_Type_Resolver *resolver);
 int code_type_resolver_error_count(Code_Type_Resolver *resolver);
-struct String_Builder *code_type_resolver_error_stream(Code_Type_Resolver *resolver);
+struct Json_Writer *code_type_resolver_error_stream(Code_Type_Resolver *resolver);
 
 Array_View<Code_Node_Assignment *> code_type_resolve(Code_Type_Resolver *resolver, Syntax_Node_Global_Scope *code_node);
 

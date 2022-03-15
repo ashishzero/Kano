@@ -34,4 +34,5 @@ struct Interpreter
 void            interp_init(Interpreter *interp, struct Code_Type_Resolver *resolver, size_t stack_size, size_t bss_size);
 
 void interp_eval_globals(Interpreter *interp, Array_View<Code_Node_Assignment *> exprs);
-int interp_eval_main(Interpreter *interp);
+Code_Node_Procedure_Call *interp_find_main(Interpreter *interp);
+void interp_evaluate_procedure(Interpreter *interp, Code_Node_Procedure_Call *proc);

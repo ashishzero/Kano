@@ -1382,44 +1382,43 @@ void interp_eval_globals(Interpreter *interp, Array_View<Code_Node_Assignment *>
 		interp_eval_assignment(interp, expr);
 }
 
-#include "StringBuilder.h"
+#include "JsonWriter.h"
 
-int interp_eval_main(Interpreter *interp)
-{
+Code_Node_Procedure_Call *interp_find_main(Interpreter *interp) {
 	auto resolver = interp->resolver;
 	auto main_proc = code_type_resolver_find(resolver, "main");
-	
-	if (!main_proc)
-	{
+
+	if (!main_proc) {
 		auto error = code_type_resolver_error_stream(resolver);
-		ResetBuilder(error);
-		Write(error, "\"main\" procedure not defined!\n");
-		return 1;
+		error->begin_string_value();
+		Write(error->builder, "\"main\" procedure not defined!\n");
+		error->end_string_value();
+		return nullptr;
 	}
 
-	if (!(main_proc->flags & SYMBOL_BIT_CONSTANT) || main_proc->address.kind != Symbol_Address::CODE)
-	{
+	if (!(main_proc->flags & SYMBOL_BIT_CONSTANT) || main_proc->address.kind != Symbol_Address::CODE) {
 		auto error = code_type_resolver_error_stream(resolver);
-		ResetBuilder(error);
-		Write(error, "The \"main\" procedure must be constant!\n");
-		return 1;
+		error->begin_string_value();
+		Write(error->builder, "The \"main\" procedure must be constant!\n");
+		error->end_string_value();
+		return nullptr;
 	}
 
-	if (main_proc->type->kind != CODE_TYPE_PROCEDURE)
-	{
+	if (main_proc->type->kind != CODE_TYPE_PROCEDURE) {
 		auto error = code_type_resolver_error_stream(resolver);
-		ResetBuilder(error);
-		Write(error, "The \"main\" symbol must be a procedure!\n");
-		return 1;
+		error->begin_string_value();
+		Write(error->builder, "The \"main\" symbol must be a procedure!\n");
+		error->end_string_value();
+		return nullptr;
 	}
 
 	auto proc_type = (Code_Type_Procedure *)main_proc->type;
-	if (proc_type->argument_count != 0 || proc_type->return_type || proc_type->is_variadic)
-	{
+	if (proc_type->argument_count != 0 || proc_type->return_type || proc_type->is_variadic) {
 		auto error = code_type_resolver_error_stream(resolver);
-		ResetBuilder(error);
-		Write(error, "The \"main\" procedure must not take any arguments and should return nothing!\n");
-		return 1;
+		error->begin_string_value();
+		Write(error->builder, "The \"main\" procedure must not take any arguments and should return nothing!\n");
+		error->end_string_value();
+		return nullptr;
 	}
 
 	auto proc = (Code_Type_Procedure *)main_proc->type;
@@ -1439,7 +1438,9 @@ int interp_eval_main(Interpreter *interp)
 	proc_call->flags = main_proc->flags;
 	proc_call->procedure = expr;
 
-	interp_eval_procedure_call(interp, proc_call);
+	return proc_call;
+}
 
-	return 0;
+void interp_evaluate_procedure(Interpreter *interp, Code_Node_Procedure_Call *proc) {
+	interp_eval_procedure_call(interp, proc);
 }
