@@ -586,8 +586,8 @@ static void basic_print(Interpreter *interp) {
 			auto ptr = args;
 			args += type->runtime_size;
 
-			if (args >= interp->stack &&
-				(args < interp->stack + interp->stack_top) &&
+			if (ptr >= interp->stack &&
+				(ptr < interp->stack + interp->stack_top) &&
 				interp_get_memory_type(interp, ptr) != Memory_Type_INVALID) {
 				stdout_value(interp, con_out, type, ptr);
 			} else {

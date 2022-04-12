@@ -1439,7 +1439,7 @@ static Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *
 			
 			if (expr->flags & SYMBOL_BIT_CONST_EXPR)
 			{
-				if (expr->type->kind == CODE_TYPE_INTEGER)
+				if (expr->type->kind == CODE_TYPE_INTEGER || expr->type->kind == CODE_TYPE_CHARACTER)
 				{
 					Assert(expr->child->kind == CODE_NODE_LITERAL);
 					
