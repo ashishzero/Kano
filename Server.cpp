@@ -182,7 +182,7 @@ DWORD SendHttpResponse(HANDLE req_queue, PHTTP_REQUEST request, USHORT status, c
 	{
 		data.DataChunkType = HttpDataChunkFromMemory;
 		data.FromMemory.pBuffer = content.data;
-		data.FromMemory.BufferLength = content.length;
+		data.FromMemory.BufferLength = (ULONG)content.length;
 
 		response.EntityChunkCount = 1;
 		response.pEntityChunks = &data;
@@ -219,7 +219,7 @@ void Listen(HANDLE req_queue)
 		memset(request, 0, request_buffer_length);
 
 		DWORD bytes_read = 0;
-		auto result = HttpReceiveHttpRequest(req_queue, request_id, 0, request, request_buffer_length, &bytes_read, NULL);
+		auto result = HttpReceiveHttpRequest(req_queue, request_id, 0, request, (ULONG)request_buffer_length, &bytes_read, NULL);
 
 		if (result == NO_ERROR)
 		{
@@ -245,7 +245,7 @@ void Listen(HANDLE req_queue)
 
 				while (true)
 				{
-					result = HttpReceiveRequestEntityBody(req_queue, request->RequestId, 0, content.data + content.length, allocated, &bytes_read, NULL);
+					result = HttpReceiveRequestEntityBody(req_queue, request->RequestId, 0, content.data + content.length, (ULONG)allocated, &bytes_read, NULL);
 					content.length += bytes_read;
 					if (result != ERROR_HANDLE_EOF)
 						break;

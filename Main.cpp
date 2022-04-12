@@ -803,7 +803,7 @@ void json_write_syntax_node(Json_Writer *json, Syntax_Node *root)
 			auto        node = (Syntax_Node_Type *)root;
 
 			static const String TypeIdNames[] = { 
-				"error", "void", "int", "float", "bool", "variadic-argument",
+				"error", "void", "byte", "int", "float", "bool", "variadic-argument",
 				"pointer", "procedure", "identifier", "type_of", "array-view", "static-array" };
 
 			Assert(node->id < ArrayCount(TypeIdNames));
@@ -1125,8 +1125,8 @@ bool GenerateDebugCodeInfo(String code, Memory_Arena *arena, String_Builder *bui
 	context.json.end_array();
 	context.json.end_object();
 
-	//context.json.write_key("ast");
-	//json_write_syntax_node(&context.json, node);
+	context.json.write_key("ast");
+	json_write_syntax_node(&context.json, node);
 
 	return true;
 }

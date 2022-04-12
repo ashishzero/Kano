@@ -1443,7 +1443,7 @@ static Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *
 			{
 				if (expr->type->kind == CODE_TYPE_INTEGER || expr->type->kind == CODE_TYPE_CHARACTER)
 				{
-					type->element_count = interp_evaluate_constant_expression(expr);
+					type->element_count = (uint32_t)interp_evaluate_constant_expression(expr);
 					type->runtime_size  = type->element_count * type->element_type->runtime_size;					
 					return type;
 				}

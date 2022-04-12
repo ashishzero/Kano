@@ -2,27 +2,30 @@
 #include "StringBuilder.h"
 
 struct Json_Writer {
-	bool depth[4096*2] = {};
-	int depth_index = 0;
+	bool elements[4096 * 2] = {};
+	int index = 0;
 
 	String_Builder *builder = nullptr;
 
-	void next_element() {
-		if (depth[depth_index])
+	void next_element(bool is_key = false) {
+		if (elements[index])
 			Write(builder, ",");
+		if (is_key)
+			elements[index] = 0;
 		else
-			depth[depth_index] = true;
+			elements[index] = true;
 	}
 
 	void push_scope() {
-		Assert(depth_index < ArrayCount(depth));
 		next_element();
-		depth_index = Minimum(depth_index+1, ArrayCount(depth)-1);
-		depth[depth_index] = false;
+		Assert(index >= 0 && index < ArrayCount(elements) - 1);
+		index += 1;
+		elements[index] = 0;
 	}
 
 	void pop_scope() {
-		depth_index = Maximum(depth_index - 1, 0);
+		Assert(index > 0 && index < ArrayCount(elements));
+		index -= 1;
 	}
 
 	void begin_object() {
@@ -46,21 +49,20 @@ struct Json_Writer {
 	}
 
 	void write_key(const char *key) {
-		next_element();
+		next_element(true);
 		WriteFormatted(builder, "\"%\": ", key);
 	}
 
 	template <typename ...Args>
 	void write_single_value(const char *fmt, Args... args) {
-		push_scope();
+		next_element();
 		Write(builder, "\"");
 		WriteFormatted(builder, fmt, args...);
 		Write(builder, "\"");
-		pop_scope();
 	}
 
 	void begin_string_value() {
-		push_scope();
+		next_element();
 		Write(builder, "\"");
 	}
 
@@ -77,7 +79,6 @@ struct Json_Writer {
 
 	void end_string_value() {
 		Write(builder, "\"");
-		pop_scope();
 	}
 
 	template <typename ...Args>
