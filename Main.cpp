@@ -778,42 +778,278 @@ void json_write_syntax_node(Json_Writer *json, Syntax_Node *root)
 
 		case SYNTAX_NODE_PROCEDURE_PROTOTYPE:
 		{
-			//auto node = (Syntax_Node_Procedure_Prototype *)root;
-			//json->write_key("arg_types");
-			//for (auto arg = node->arguments_type; arg; arg = arg->next)
-			//{
-			//	print_syntax(arg, fp, child_indent);
-			//}
-			//
-			//if (node->return_type)
-			//{
-			//	print_syntax(node->return_type, fp, child_indent, "Return-Type");
-			//}
+			auto node = (Syntax_Node_Procedure_Prototype *)root;
+			json->write_key("arg_types");
+			json->begin_array();
+			for (auto arg = node->arguments_type; arg; arg = arg->next)
+			{
+				json_write_syntax_node(json, arg);
+			}
+			json->end_array();
+			
+			if (node->return_type)
+			{
+				json->write_key("return_type");
+				json_write_syntax_node(json, node->return_type);
+			}
+			else
+			{
+				json->write_key_value("return_type", "null");
+			}
 		} break;
 
-		//case SYNTAX_NODE_TYPE:
-		//case SYNTAX_NODE_SIZE_OF:
-		//case SYNTAX_NODE_TYPE_OF:
-		//case SYNTAX_NODE_TYPE_CAST:
-		//case SYNTAX_NODE_RETURN:
-		//case SYNTAX_NODE_ASSIGNMENT:
-		//case SYNTAX_NODE_EXPRESSION:
-		//case SYNTAX_NODE_PROCEDURE_PARAMETER:
-		//case SYNTAX_NODE_PROCEDURE_CALL:
-		//case SYNTAX_NODE_SUBSCRIPT:
-		//case SYNTAX_NODE_IF:
-		//case SYNTAX_NODE_FOR:
-		//case SYNTAX_NODE_WHILE:
-		//case SYNTAX_NODE_DO:
-		//case SYNTAX_NODE_PROCEDURE_ARGUMENT:
-		//case SYNTAX_NODE_PROCEDURE:
-		//case SYNTAX_NODE_DECLARATION:
-		//case SYNTAX_NODE_STRUCT:
-		//case SYNTAX_NODE_ARRAY_VIEW:
-		//case SYNTAX_NODE_STATIC_ARRAY:
-		//case SYNTAX_NODE_STATEMENT:
-		//case SYNTAX_NODE_BLOCK:
-		//case SYNTAX_NODE_GLOBAL_SCOPE:
+		case SYNTAX_NODE_TYPE:
+		{
+			auto        node = (Syntax_Node_Type *)root;
+
+			static const String TypeIdNames[] = { 
+				"error", "void", "int", "float", "bool", "variadic-argument",
+				"pointer", "procedure", "identifier", "type_of", "array-view", "static-array" };
+
+			Assert(node->id < ArrayCount(TypeIdNames));
+			json->write_key_value("name", "%", TypeIdNames[node->id]);
+
+			if (node->type)
+			{
+				json_write_syntax_node(json, node->type);
+			}
+		} break;
+
+		case SYNTAX_NODE_SIZE_OF:
+		{
+			auto node = (Syntax_Node_Size_Of *)root;
+			json->write_key("child");
+			json_write_syntax_node(json, node->type);
+		} break;
+
+		case SYNTAX_NODE_TYPE_OF:
+		{
+			auto node = (Syntax_Node_Type_Of *)root;
+			json->write_key("child");
+			json_write_syntax_node(json, node->expression);
+		} break;
+
+		case SYNTAX_NODE_TYPE_CAST:
+		{
+			auto node = (Syntax_Node_Type_Cast *)root;
+			json->write_key("target_type");
+			json_write_syntax_node(json, node->type);
+			json->write_key("src_expr");
+			json_write_syntax_node(json, node->expression);
+		} break;
+
+		case SYNTAX_NODE_RETURN:
+		{
+			auto node = (Syntax_Node_Return *)root;
+			json->write_key("child");
+			json_write_syntax_node(json, node->expression);
+		} break;
+
+		case SYNTAX_NODE_ASSIGNMENT:
+		{
+			auto node = (Syntax_Node_Assignment *)root;
+			json->write_key("left");
+			json_write_syntax_node(json, node->left);
+			json->write_key("right");
+			json_write_syntax_node(json, node->right);
+		} break;
+
+		case SYNTAX_NODE_EXPRESSION:
+		{
+			auto node = (Syntax_Node_Expression *)root;
+			json->write_key("child");
+			json_write_syntax_node(json, node->child);
+		} break;
+
+		case SYNTAX_NODE_PROCEDURE_PARAMETER:
+		{
+			auto node = (Syntax_Node_Procedure_Parameter *)root;
+			json->write_key("child");
+			json_write_syntax_node(json, node->expression);
+		} break;
+
+		case SYNTAX_NODE_PROCEDURE_CALL:
+		{
+			auto node = (Syntax_Node_Procedure_Call *)root;
+			json->write_key("parameters");
+			json->begin_array();
+			for (auto param = node->parameters; param; param = param->next)
+			{
+				json_write_syntax_node(json, param);
+			}
+			json->end_array();
+		} break;
+
+		case SYNTAX_NODE_SUBSCRIPT:
+		{
+			auto node = (Syntax_Node_Subscript *)root;
+			json->write_key("expr");
+			json_write_syntax_node(json, node->expression);
+			json->write_key("subscript");
+			json_write_syntax_node(json, node->subscript);
+		} break;
+
+		case SYNTAX_NODE_IF:
+		{
+			auto node = (Syntax_Node_If *)root;
+			json->write_key("condition");
+			json_write_syntax_node(json, node->condition);
+			json->write_key("true-block");
+			json_write_syntax_node(json, node->true_statement);
+
+			if (node->false_statement)
+			{
+				json->write_key("false-block");
+				json_write_syntax_node(json, node->false_statement);
+			}
+			else
+			{
+				json->write_key_value("false-block", "null");
+			}
+		} break;
+
+		case SYNTAX_NODE_FOR:
+		{
+			auto node = (Syntax_Node_For *)root;
+			json->write_key("initialization"); json_write_syntax_node(json, node->initialization);
+			json->write_key("condition"); json_write_syntax_node(json, node->condition);
+			json->write_key("increment"); json_write_syntax_node(json, node->increment);
+			json->write_key("body"); json_write_syntax_node(json, node->body);
+		} break;
+
+		case SYNTAX_NODE_WHILE:
+		{
+			auto node = (Syntax_Node_While *)root;
+			json->write_key("condition"); json_write_syntax_node(json, node->condition);
+			json->write_key("body"); json_write_syntax_node(json, node->body);
+		} break;
+
+		case SYNTAX_NODE_DO:
+		{
+			auto node = (Syntax_Node_Do *)root;
+			json->write_key("body"); json_write_syntax_node(json, node->body);
+			json->write_key("condition"); json_write_syntax_node(json, node->condition);
+		} break;
+
+		case SYNTAX_NODE_PROCEDURE_ARGUMENT:
+		{
+			auto node = (Syntax_Node_Procedure_Argument *)root;
+			json->write_key("child");
+			json_write_syntax_node(json, node->declaration);
+		} break;
+
+		case SYNTAX_NODE_PROCEDURE:
+		{
+			auto node = (Syntax_Node_Procedure *)root;
+
+			json->write_key("arguments");
+			json->begin_array();
+			for (auto arg = node->arguments; arg; arg = arg->next)
+			{
+				json_write_syntax_node(json, arg);
+			}
+			json->end_array();
+
+			if (node->return_type)
+			{
+				json->write_key("return_type");
+				json_write_syntax_node(json, node->return_type);
+			}
+			else
+			{
+				json->write_key_value("return_type", "null");
+			}
+
+			json->write_key("body");
+			json_write_syntax_node(json, node->body);
+		} break;
+
+		case SYNTAX_NODE_DECLARATION:
+		{
+			auto node = (Syntax_Node_Declaration *)root;
+			json->write_key_value("decl_type", "%", (node->flags & SYMBOL_BIT_CONSTANT) ? "const" : "var");
+			json->write_key_value("identifier", "%", node->identifier);
+
+			if (node->type)
+			{
+				json->write_key("type");
+				json_write_syntax_node(json, node->type);
+			}
+			else
+			{
+				json->write_key_value("type", "null");
+			}
+			
+			if (node->initializer)
+			{
+				json->write_key("initializer");
+				json_write_syntax_node(json, node->initializer);
+			}
+			else
+			{
+				json->write_key_value("initializer", "null");
+			}
+		} break;
+
+		case SYNTAX_NODE_STRUCT:
+		{
+			auto node = (Syntax_Node_Struct *)root;
+			json->write_key("decls");
+			json->begin_array();
+			for (auto decl = node->members; decl; decl = decl->next)
+			{
+				json_write_syntax_node(json, decl->declaration);
+			}
+			json->end_array();
+		} break;
+
+		case SYNTAX_NODE_ARRAY_VIEW:
+		{
+			auto node = (Syntax_Node_Array_View *)root;
+			json->write_key("element_type");
+			json_write_syntax_node(json, node->element_type);
+		} break;
+
+		case SYNTAX_NODE_STATIC_ARRAY:
+		{
+			auto node = (Syntax_Node_Static_Array *)root;
+			json->write_key("count");
+			json_write_syntax_node(json, node->expression);
+			json->write_key("element_type");
+			json_write_syntax_node(json, node->element_type);
+		} break;
+
+		case SYNTAX_NODE_STATEMENT:
+		{
+			auto node = (Syntax_Node_Statement *)root;
+			json->write_key_value("line", "%", (int)node->location.start_row);
+			json->write_key("child");
+			json_write_syntax_node(json, node->node);
+		} break;
+
+		case SYNTAX_NODE_BLOCK:
+		{
+			auto node = (Syntax_Node_Block *)root;
+			json->write_key("statements");
+			json->begin_array();
+			for (auto statement = node->statements; statement; statement = statement->next)
+			{
+				json_write_syntax_node(json, statement);
+			}
+			json->end_array();
+		} break;
+
+		case SYNTAX_NODE_GLOBAL_SCOPE:
+		{
+			auto node = (Syntax_Node_Global_Scope *)root;
+			json->write_key("decls");
+			json->begin_array();
+			for (auto decl = node->declarations; decl; decl = decl->next)
+			{
+				json_write_syntax_node(json, decl->declaration);
+			}
+			json->end_array();
+		} break;
 	}
 
 	json->end_object();

@@ -2,7 +2,7 @@
 #include "StringBuilder.h"
 
 struct Json_Writer {
-	bool depth[4096] = {};
+	bool depth[4096*2] = {};
 	int depth_index = 0;
 
 	String_Builder *builder = nullptr;
@@ -17,7 +17,7 @@ struct Json_Writer {
 	void push_scope() {
 		Assert(depth_index < ArrayCount(depth));
 		next_element();
-		depth_index += 1;
+		depth_index = Minimum(depth_index+1, ArrayCount(depth)-1);
 		depth[depth_index] = false;
 	}
 
@@ -46,12 +46,13 @@ struct Json_Writer {
 	}
 
 	void write_key(const char *key) {
-		push_scope();
+		next_element();
 		WriteFormatted(builder, "\"%\": ", key);
 	}
 
 	template <typename ...Args>
 	void write_single_value(const char *fmt, Args... args) {
+		push_scope();
 		Write(builder, "\"");
 		WriteFormatted(builder, fmt, args...);
 		Write(builder, "\"");
@@ -59,6 +60,7 @@ struct Json_Writer {
 	}
 
 	void begin_string_value() {
+		push_scope();
 		Write(builder, "\"");
 	}
 
