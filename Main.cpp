@@ -703,6 +703,123 @@ static void code_type_resolver_on_error(Code_Type_Resolver *resolver) {
 	exit(0);
 }
 
+void json_write_syntax_node(Json_Writer *json, Syntax_Node *root)
+{
+	static const String SyntaxNodeTypeNames[] = {
+		"null", "literal", "identifier", "unary_operator", "binary_operator",
+		"procedure_prototype_argument", "procedure_prototype", "type", "size_of", "type_of", "type_cast",
+		"return", "assignment", "expression", "procedure_parameter", "procedure_call",
+		"subscript", "if", "for", "while", "do", "procedure_argument", "procedure", "declaration",
+		"struct", "array_view", "static_array", "statement", "block", "global_scope"
+	};
+
+	Assert(root->kind < ArrayCount(SyntaxNodeTypeNames));
+
+	json->begin_object();
+	json->write_key_value("id", "%", SyntaxNodeTypeNames[root->kind]);
+
+	json->write_key("payload");
+	json->begin_object();
+
+	switch (root->kind)
+	{
+		case SYNTAX_NODE_NULL: break;
+
+		case SYNTAX_NODE_LITERAL:
+		{
+			auto node = (Syntax_Node_Literal *)root;
+
+			static const String LiteralTypes[] = { "byte", "integer", "real", "bool", "string", "null" };
+			Assert(node->value.kind < ArrayCount(LiteralTypes));
+
+			json->write_key_value("type", "%", LiteralTypes[node->value.kind]);
+			switch (node->value.kind)
+			{
+				case Literal::BYTE: json->write_key_value("value", "%", node->value.data.integer); break;
+				case Literal::INTEGER: json->write_key_value("value", "%", node->value.data.integer); break;
+				case Literal::REAL: json->write_key_value("value", "%", node->value.data.real); break;
+				case Literal::BOOL: json->write_key_value("value", "%", node->value.data.boolean ? "true" : "false"); break;
+				case Literal::STRING: json->write_key_value("value", "%", node->value.data.string.data); break;
+				case Literal::NULL_POINTER: json->write_key_value("value", "null"); break;
+				NoDefaultCase();
+			}
+		} break;
+
+		case SYNTAX_NODE_IDENTIFIER:
+		{
+			auto node = (Syntax_Node_Identifier *)root;
+			json->write_key_value("name", "%", node->name);
+		} break;
+
+		case SYNTAX_NODE_UNARY_OPERATOR:
+		{
+			auto node = (Syntax_Node_Unary_Operator *)root;
+			json->write_key_value("sym", "%", token_kind_string(node->op));
+			json->write_key("child");
+			json_write_syntax_node(json, node->child);
+		} break;
+
+		case SYNTAX_NODE_BINARY_OPERATOR:
+		{
+			auto node = (Syntax_Node_Binary_Operator *)root;
+			json->write_key_value("sym", "%", token_kind_string(node->op));
+			json->write_key("left");
+			json_write_syntax_node(json, node->left);
+			json->write_key("right");
+			json_write_syntax_node(json, node->right);
+		} break;
+
+		case SYNTAX_NODE_PROCEDURE_PROTOTYPE_ARGUMENT:
+		{
+			auto node = (Syntax_Node_Procedure_Prototype_Argument *)root;
+			json->write_key("arg_type");
+			json_write_syntax_node(json, node->type);
+		} break;
+
+		case SYNTAX_NODE_PROCEDURE_PROTOTYPE:
+		{
+			//auto node = (Syntax_Node_Procedure_Prototype *)root;
+			//json->write_key("arg_types");
+			//for (auto arg = node->arguments_type; arg; arg = arg->next)
+			//{
+			//	print_syntax(arg, fp, child_indent);
+			//}
+			//
+			//if (node->return_type)
+			//{
+			//	print_syntax(node->return_type, fp, child_indent, "Return-Type");
+			//}
+		} break;
+
+		//case SYNTAX_NODE_TYPE:
+		//case SYNTAX_NODE_SIZE_OF:
+		//case SYNTAX_NODE_TYPE_OF:
+		//case SYNTAX_NODE_TYPE_CAST:
+		//case SYNTAX_NODE_RETURN:
+		//case SYNTAX_NODE_ASSIGNMENT:
+		//case SYNTAX_NODE_EXPRESSION:
+		//case SYNTAX_NODE_PROCEDURE_PARAMETER:
+		//case SYNTAX_NODE_PROCEDURE_CALL:
+		//case SYNTAX_NODE_SUBSCRIPT:
+		//case SYNTAX_NODE_IF:
+		//case SYNTAX_NODE_FOR:
+		//case SYNTAX_NODE_WHILE:
+		//case SYNTAX_NODE_DO:
+		//case SYNTAX_NODE_PROCEDURE_ARGUMENT:
+		//case SYNTAX_NODE_PROCEDURE:
+		//case SYNTAX_NODE_DECLARATION:
+		//case SYNTAX_NODE_STRUCT:
+		//case SYNTAX_NODE_ARRAY_VIEW:
+		//case SYNTAX_NODE_STATIC_ARRAY:
+		//case SYNTAX_NODE_STATEMENT:
+		//case SYNTAX_NODE_BLOCK:
+		//case SYNTAX_NODE_GLOBAL_SCOPE:
+	}
+
+	json->end_object();
+	json->end_object();
+}
+
 bool GenerateDebugCodeInfo(String code, Memory_Arena *arena, String_Builder *builder)
 {
 	Interp_User_Context context;
@@ -734,15 +851,15 @@ bool GenerateDebugCodeInfo(String code, Memory_Arena *arena, String_Builder *bui
 
 	auto resolver = code_type_resolver_create(&context.json);
 
+	include_basic(resolver);
+
+	auto exprs = code_type_resolve(resolver, node);
+
 	if (code_type_resolver_error_count(resolver)) {
 		context.json.end_array();
 		context.json.end_object();
 		return false;
 	}
-
-	include_basic(resolver);
-
-	auto exprs = code_type_resolve(resolver, node);
 
 	Heap_Allocator heap_allocator;
 
@@ -771,6 +888,9 @@ bool GenerateDebugCodeInfo(String code, Memory_Arena *arena, String_Builder *bui
 
 	context.json.end_array();
 	context.json.end_object();
+
+	//context.json.write_key("ast");
+	//json_write_syntax_node(&context.json, node);
 
 	return true;
 }

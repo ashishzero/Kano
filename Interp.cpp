@@ -1235,9 +1235,9 @@ int64_t interp_evaluate_constant_expression(Code_Node_Expression *root) {
 	auto value = interp_eval_root_expression(&interp, root);
 
 	if (value.type->kind == CODE_TYPE_INTEGER)
-		return (int64_t)value.imm.int_value;
+		return (int64_t)EvaluationTypeValue(value, Kano_Int);
 	else if (value.type->kind == CODE_TYPE_CHARACTER)
-		return (int64_t)value.imm.char_value;
+		return (int64_t)EvaluationTypeValue(value, Kano_Char);
 	else
 		Unreachable();
 	return 0;

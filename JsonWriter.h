@@ -22,7 +22,7 @@ struct Json_Writer {
 	}
 
 	void pop_scope() {
-		depth_index -= 1;
+		depth_index = Maximum(depth_index - 1, 0);
 	}
 
 	void begin_object() {
