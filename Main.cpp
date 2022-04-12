@@ -1124,10 +1124,11 @@ bool GenerateDebugCodeInfo(String code, Memory_Arena *arena, String_Builder *bui
 	interp_evaluate_procedure(&interp, main_proc);
 
 	context.json.end_array();
-	context.json.end_object();
 
 	context.json.write_key("ast");
 	json_write_syntax_node(&context.json, node);
+
+	context.json.end_object();
 
 	return true;
 }
