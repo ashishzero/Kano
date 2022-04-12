@@ -36,3 +36,6 @@ void            interp_init(Interpreter *interp, struct Code_Type_Resolver *reso
 void interp_eval_globals(Interpreter *interp, Array_View<Code_Node_Assignment *> exprs);
 Code_Node_Procedure_Call *interp_find_main(Interpreter *interp);
 void interp_evaluate_procedure(Interpreter *interp, Code_Node_Procedure_Call *proc);
+
+int64_t interp_evaluate_constant_expression(Code_Node_Expression *root);
+

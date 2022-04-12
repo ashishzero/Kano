@@ -1226,6 +1226,23 @@ static Evaluation_Value interp_eval_root_expression(Interpreter *interp, Code_No
 	return interp_eval_expression(interp, root->child);
 }
 
+int64_t interp_evaluate_constant_expression(Code_Node_Expression *root) {
+	Interpreter interp;
+	interp_init(&interp, nullptr, 0, 0);
+
+	Assert(root->type->kind == CODE_TYPE_INTEGER || root->type->kind == CODE_TYPE_CHARACTER);
+
+	auto value = interp_eval_root_expression(&interp, root);
+
+	if (value.type->kind == CODE_TYPE_INTEGER)
+		return (int64_t)value.imm.int_value;
+	else if (value.type->kind == CODE_TYPE_CHARACTER)
+		return (int64_t)value.imm.char_value;
+	else
+		Unreachable();
+	return 0;
+}
+
 static bool interp_eval_statement(Interpreter *interp, Code_Node_Statement *root, Evaluation_Value *value);
 
 static void interp_eval_do(Interpreter *interp, Code_Node_Do *root)

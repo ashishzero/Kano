@@ -839,6 +839,8 @@ static Code_Node_Type_Cast *code_resolve_type_cast(Code_Type_Resolver *resolver,
 	{
 		report_error(resolver, root, "Type cast from % to % is not valid", expression->type, type);
 	}
+
+	cast->flags |= expression->flags;
 	
 	return cast;
 }
@@ -1441,13 +1443,8 @@ static Code_Type *code_resolve_type(Code_Type_Resolver *resolver, Symbol_Table *
 			{
 				if (expr->type->kind == CODE_TYPE_INTEGER || expr->type->kind == CODE_TYPE_CHARACTER)
 				{
-					Assert(expr->child->kind == CODE_NODE_LITERAL);
-					
-					auto literal        = (Code_Node_Literal *)expr->child;
-					
-					type->element_count = (uint32_t)literal->data.integer.value;
-					type->runtime_size  = type->element_count * type->element_type->runtime_size;
-					
+					type->element_count = interp_evaluate_constant_expression(expr);
+					type->runtime_size  = type->element_count * type->element_type->runtime_size;					
 					return type;
 				}
 				else
