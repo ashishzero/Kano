@@ -803,14 +803,15 @@ void json_write_syntax_node(Json_Writer *json, Syntax_Node *root)
 			auto        node = (Syntax_Node_Type *)root;
 
 			static const String TypeIdNames[] = { 
-				"error", "void", "byte", "int", "float", "bool", "variadic-argument",
-				"pointer", "procedure", "identifier", "type_of", "array-view", "static-array" };
+				"error", "void", "byte", "int", "float", "bool", "variadic_argument",
+				"pointer", "procedure", "identifier", "type_of", "array_view", "static_array" };
 
 			Assert(node->id < ArrayCount(TypeIdNames));
 			json->write_key_value("name", "%", TypeIdNames[node->id]);
 
 			if (node->type)
 			{
+				json->write_key("underlying_type");
 				json_write_syntax_node(json, node->type);
 			}
 		} break;
