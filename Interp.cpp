@@ -1252,9 +1252,12 @@ static void interp_eval_do(Interpreter *interp, Code_Node_Do *root)
 	
 	Evaluation_Value cond;
 	
+	auto return_index = interp->return_count;
 	do
 	{
 		interp_eval_statement(interp, do_body, nullptr);
+		if (return_index != interp->return_count)
+			break;
 		Assert(interp_eval_statement(interp, do_cond, &cond));
 	} while (EvaluationTypeValue(cond, bool));
 }
@@ -1267,9 +1270,12 @@ static void interp_eval_while(Interpreter *interp, Code_Node_While *root)
 	Evaluation_Value cond;
 	Assert(interp_eval_statement(interp, while_cond, &cond));
 	
+	auto return_index = interp->return_count;
 	while (EvaluationTypeValue(cond, bool))
 	{
 		interp_eval_statement(interp, while_body, nullptr);
+		if (return_index != interp->return_count)
+			break;
 		Assert(interp_eval_statement(interp, while_cond, &cond));
 	}
 }
@@ -1298,9 +1304,12 @@ static void interp_eval_for(Interpreter *interp, Code_Node_For *root)
 	interp_eval_statement(interp, for_init, nullptr);
 	Assert(interp_eval_statement(interp, for_cond, &cond));
 	
+	auto return_index = interp->return_count;
 	while (EvaluationTypeValue(cond, bool))
 	{
 		interp_eval_statement(interp, for_body, nullptr);
+		if (return_index != interp->return_count)
+			break;
 		Assert(interp_eval_statement(interp, for_incr, nullptr));
 		Assert(interp_eval_statement(interp, for_cond, &cond));
 	}

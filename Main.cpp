@@ -637,15 +637,19 @@ static void basic_print(Interpreter *interp) {
 		{
 			index += 1;
 
-			auto type = *(Code_Type **)args;
-			args += sizeof(Code_Type *);
-			auto ptr = args;
-			args += type->runtime_size;
+			if (args) {
+				auto type = *(Code_Type **)args;
+				args += sizeof(Code_Type *);
+				auto ptr = args;
+				args += type->runtime_size;
 
-			if (ptr >= interp->stack &&
-				(ptr < interp->stack + interp->stack_top) &&
-				interp_get_memory_type(interp, ptr) != Memory_Type_INVALID) {
-				stdout_value(interp, con_out, type, ptr);
+				if (ptr >= interp->stack &&
+					(ptr < interp->stack + interp->stack_top) &&
+					interp_get_memory_type(interp, ptr) != Memory_Type_INVALID) {
+					stdout_value(interp, con_out, type, ptr);
+				} else {
+					Write(con_out, '%'); printf("%%");
+				}
 			} else {
 				Write(con_out, '%'); printf("%%");
 			}
@@ -695,6 +699,10 @@ static void basic_read_int(Interpreter *interp)
 		result = (Kano_Int)strtoll((char *)input.data, &end, 10);
 		input.length -= (end - (char *)input.data);
 		input.data = (uint8_t *)end;
+
+		Write(&context->console_out, result);
+		WriteFormatted(&context->console_out, "\n");
+		printf("%d\n", (int)result);
 	}
 	else
 	{
@@ -722,6 +730,9 @@ static void basic_read_float(Interpreter *interp)
 		result = (Kano_Real)strtod((char *)input.data, &end);
 		input.length -= (end - (char *)input.data);
 		input.data = (uint8_t *)end;
+		Write(&context->console_out, result);
+		WriteFormatted(&context->console_out, "\n");
+		printf("%f\n", (double)result);
 	}
 	else
 	{
