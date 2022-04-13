@@ -25,6 +25,8 @@ struct Interpreter
 	Symbol_Table *global_symbol_table = nullptr;
 	struct Heap_Allocator *heap = nullptr;
 
+	uint64_t current_row = 0;
+
 	struct Code_Type_Resolver *resolver = nullptr;
 
 	Intercep_Proc intercept = intercept_default;

@@ -26,6 +26,7 @@ static Request ParseRequest(String content)
 			content.data[pos] = 0;
 			request.input = SubStr(content, 0, pos);
 			request.input = StrRemovePrefix(request.input, header.length);
+			request.input = StrTrim(request.input);
 			request.code  = SubStr(content, pos + 1, content.length);
 			return request;
 		}

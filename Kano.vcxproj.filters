@@ -34,5 +34,6 @@
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="Kr\KrVisualizer.natvis" />
+    <Natvis Include="KrVisualizer.natvis" />
   </ItemGroup>
 </Project>

@@ -226,7 +226,7 @@ static Evaluation_Value interp_eval_type_cast(Interpreter *interp, Code_Node_Typ
 		
 		case CODE_TYPE_ARRAY_VIEW: {
 			Assert(value.type->kind == CODE_TYPE_STATIC_ARRAY);
-			type_value.imm.array_value.data   = EvaluationTypeValue(value, uint8_t *);
+			type_value.imm.array_value.data   = EvaluationTypePointer(value, uint8_t);
 			auto type                         = (Code_Type_Static_Array *)value.type;
 			type_value.imm.array_value.length = type->element_count;
 		}
@@ -1310,6 +1310,7 @@ static bool interp_eval_statement(Interpreter *interp, Code_Node_Statement *root
 {
 	Assert(root->symbol_table);
 
+	interp->current_row = root->source_row;
 	interp->intercept(interp, INTERCEPT_STATEMENT, root);
 
 	Evaluation_Value value;

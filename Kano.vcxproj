@@ -183,6 +183,7 @@
     <None Include="Simple.kano" />
   </ItemGroup>
   <ItemGroup>
+    <Natvis Include="KrVisualizer.natvis" />
     <Natvis Include="Kr\KrVisualizer.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
