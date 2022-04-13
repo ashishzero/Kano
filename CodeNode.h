@@ -243,6 +243,8 @@ enum Code_Node_Kind
 	CODE_NODE_EXPRESSION,
 	CODE_NODE_ASSIGNMENT,
 	CODE_NODE_RETURN,
+	CODE_NODE_BREAK,
+	CODE_NODE_CONTINUE,
 	CODE_NODE_STATEMENT,
 	CODE_NODE_PROCEDURE_CALL,
 	CODE_NODE_OFFSET,
@@ -446,6 +448,22 @@ struct Code_Node_Return : public Code_Node
 	}
 
 	Code_Node *expression = nullptr;
+};
+
+struct Code_Node_Break : public Code_Node
+{
+	Code_Node_Break()
+	{
+		kind = CODE_NODE_BREAK;
+	}
+};
+
+struct Code_Node_Continue : public Code_Node
+{
+	Code_Node_Continue()
+	{
+		kind = CODE_NODE_CONTINUE;
+	}
 };
 
 struct Code_Node_Statement : public Code_Node

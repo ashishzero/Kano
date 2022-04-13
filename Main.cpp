@@ -836,7 +836,7 @@ void json_write_syntax_node(Json_Writer *json, Syntax_Node *root)
 	static const String SyntaxNodeTypeNames[] = {
 		"null", "literal", "identifier", "unary_operator", "binary_operator",
 		"procedure_prototype_argument", "procedure_prototype", "type", "size_of", "type_of", "type_cast",
-		"return", "assignment", "expression", "procedure_parameter", "procedure_call",
+		"return", "break", "continue", "assignment", "expression", "procedure_parameter", "procedure_call",
 		"subscript", "if", "for", "while", "do", "procedure_argument", "procedure", "declaration",
 		"struct", "array_view", "static_array", "statement", "block", "global_scope"
 	};
@@ -973,6 +973,9 @@ void json_write_syntax_node(Json_Writer *json, Syntax_Node *root)
 			json->write_key("child");
 			json_write_syntax_node(json, node->expression);
 		} break;
+
+		case SYNTAX_NODE_BREAK: break;
+		case SYNTAX_NODE_CONTINUE: break;
 
 		case SYNTAX_NODE_ASSIGNMENT:
 		{

@@ -248,6 +248,16 @@ static Evaluation_Value interp_eval_return(Interpreter *interp, Code_Node_Return
 	return result;
 }
 
+static void interp_eval_break(Interpreter *interp, Code_Node_Break *node)
+{
+	interp->break_count += 1;
+}
+
+static void interp_eval_continue(Interpreter *interp, Code_Node_Continue *node)
+{
+	interp->continue_count += 1;
+}
+
 static Evaluation_Value interp_eval_literal(Interpreter *interp, Code_Node_Literal *node)
 {
 	Evaluation_Value type_value;
@@ -1213,6 +1223,8 @@ static Evaluation_Value interp_eval_expression(Interpreter *interp, Code_Node *r
 		case CODE_NODE_IF: return interp_eval_expression(interp, (Code_Node *)root);
 		case CODE_NODE_PROCEDURE_CALL: return interp_eval_procedure_call(interp, (Code_Node_Procedure_Call *)root);
 		case CODE_NODE_RETURN: return interp_eval_return(interp, (Code_Node_Return *)root);
+		case CODE_NODE_BREAK: interp_eval_break(interp, (Code_Node_Break *)root); return Evaluation_Value{};
+		case CODE_NODE_CONTINUE: interp_eval_continue(interp, (Code_Node_Continue *)root); return Evaluation_Value{};
 		
 		NoDefaultCase();
 	}
@@ -1253,11 +1265,23 @@ static void interp_eval_do(Interpreter *interp, Code_Node_Do *root)
 	Evaluation_Value cond;
 	
 	auto return_index = interp->return_count;
+	auto break_index = interp->break_count;
+	auto continue_index = interp->continue_count;
 	do
 	{
 		interp_eval_statement(interp, do_body, nullptr);
 		if (return_index != interp->return_count)
 			break;
+		if (continue_index != interp->continue_count)
+		{
+			interp->continue_count = continue_index;
+			continue;
+		}
+		if (break_index != interp->break_count)
+		{
+			interp->break_count = break_index;
+			break;
+		}
 		Assert(interp_eval_statement(interp, do_cond, &cond));
 	} while (EvaluationTypeValue(cond, bool));
 }
@@ -1271,11 +1295,23 @@ static void interp_eval_while(Interpreter *interp, Code_Node_While *root)
 	Assert(interp_eval_statement(interp, while_cond, &cond));
 	
 	auto return_index = interp->return_count;
+	auto break_index = interp->break_count;
+	auto continue_index = interp->continue_count;
 	while (EvaluationTypeValue(cond, bool))
 	{
 		interp_eval_statement(interp, while_body, nullptr);
 		if (return_index != interp->return_count)
 			break;
+		if (continue_index != interp->continue_count)
+		{
+			interp->continue_count = continue_index;
+			continue;
+		}
+		if (break_index != interp->break_count)
+		{
+			interp->break_count = break_index;
+			break;
+		}
 		Assert(interp_eval_statement(interp, while_cond, &cond));
 	}
 }
@@ -1305,11 +1341,23 @@ static void interp_eval_for(Interpreter *interp, Code_Node_For *root)
 	Assert(interp_eval_statement(interp, for_cond, &cond));
 	
 	auto return_index = interp->return_count;
+	auto break_index = interp->break_count;
+	auto continue_index = interp->continue_count;
 	while (EvaluationTypeValue(cond, bool))
 	{
 		interp_eval_statement(interp, for_body, nullptr);
 		if (return_index != interp->return_count)
 			break;
+		if (continue_index != interp->continue_count)
+		{
+			interp->continue_count = continue_index;
+			continue;
+		}
+		if (break_index != interp->break_count)
+		{
+			interp->break_count = break_index;
+			break;
+		}
 		Assert(interp_eval_statement(interp, for_incr, nullptr));
 		Assert(interp_eval_statement(interp, for_cond, &cond));
 	}
@@ -1371,15 +1419,21 @@ static void interp_eval_block(Interpreter *interp, Code_Node_Block *root, bool i
 	}
 
 	auto return_index = interp->return_count;
+	auto break_index = interp->break_count;
+	auto continue_index = interp->continue_count;
 	for (auto statement = root->statement_head; statement; statement = statement->next)
 	{
 		interp_eval_statement(interp, statement, nullptr);
+
 		if (return_index != interp->return_count)
 		{
 			if (isproc)
 				interp->return_count -= 1;
 			break;
 		}
+
+		if (break_index != interp->break_count || continue_index != interp->continue_count)
+			break;
 	}
 
 	if (isproc)

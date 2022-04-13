@@ -33,6 +33,8 @@ enum Syntax_Node_Kind
 	SYNTAX_NODE_TYPE_OF,
 	SYNTAX_NODE_TYPE_CAST,
 	SYNTAX_NODE_RETURN,
+	SYNTAX_NODE_BREAK,
+	SYNTAX_NODE_CONTINUE,
 	SYNTAX_NODE_ASSIGNMENT,
 	SYNTAX_NODE_EXPRESSION,
 	SYNTAX_NODE_PROCEDURE_PARAMETER,
@@ -246,6 +248,22 @@ struct Syntax_Node_Return : public Syntax_Node
 	}
 
 	Syntax_Node *expression = nullptr;
+};
+
+struct Syntax_Node_Break : public Syntax_Node
+{
+	Syntax_Node_Break()
+	{
+		kind = SYNTAX_NODE_BREAK;
+	}
+};
+
+struct Syntax_Node_Continue : public Syntax_Node
+{
+	Syntax_Node_Continue()
+	{
+		kind = SYNTAX_NODE_CONTINUE;
+	}
 };
 
 struct Syntax_Node_Assignment : public Syntax_Node

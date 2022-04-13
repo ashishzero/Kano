@@ -509,6 +509,18 @@ Syntax_Node_Expression *parse_root_expression(Parser *parser)
 		parser_finish_syntax_node(parser, return_node);
 		expression->child = return_node;
 	}
+	else if (parser_accept_token(parser, TOKEN_KIND_BREAK))
+	{
+		auto break_node = parser_new_syntax_node<Syntax_Node_Break>(parser);
+		parser_finish_syntax_node(parser, break_node);
+		expression->child = break_node;
+	}
+	else if (parser_accept_token(parser, TOKEN_KIND_CONTINUE))
+	{
+		auto continue_node = parser_new_syntax_node<Syntax_Node_Continue>(parser);
+		parser_finish_syntax_node(parser, continue_node);
+		expression->child = continue_node;
+	}
 	else
 	{
 		auto token = lexer_current_token(&parser->lexer);

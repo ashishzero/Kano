@@ -21,6 +21,8 @@ struct Interpreter
 	uint64_t global_size = 0;
 	uint64_t stack_top = 0;
 	int64_t  return_count = 0;
+	int64_t break_count = 0;
+	int64_t continue_count = 0;
 	struct Code_Type_Procedure *current_procedure = nullptr;
 	Symbol_Table *global_symbol_table = nullptr;
 	struct Heap_Allocator *heap = nullptr;

@@ -86,6 +86,8 @@ enum Token_Kind
 	TOKEN_KIND_PROC,
 	TOKEN_KIND_STRUCT,
 	TOKEN_KIND_RETURN,
+	TOKEN_KIND_BREAK,
+	TOKEN_KIND_CONTINUE,
 	TOKEN_KIND_CAST,
 	TOKEN_KIND_VOID,
 	TOKEN_KIND_NULL,
@@ -178,7 +180,8 @@ static inline String token_kind_string(Token_Kind kind)
 	                           "size_of",     "type_of",
 
 	                           "proc",        "struct",
-	                           "return",      "cast",
+	                           "return",  "break", "continue",
+								"cast",
 	                           "void",        "null",
 
 	                           "identifier",

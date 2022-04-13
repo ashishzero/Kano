@@ -241,6 +241,7 @@ struct Code_Type_Resolver
 	Json_Writer *error = nullptr;
 	
 	Array<Code_Type *>               return_stack;
+	uint64_t                         loop = 0;
 	
 	Bucket_Array<Symbol, 64>         symbols_allocator;
 	Bucket_Array<Unary_Operator, 8>  unary_operators[_UNARY_OPERATOR_COUNT];
@@ -553,6 +554,26 @@ static Code_Node_Address *code_resolve_identifier(Code_Type_Resolver *resolver, 
 	report_error(resolver, root, "Identifier not found: %", root->name);
 	
 	return nullptr;
+}
+
+static Code_Node_Break *code_resolve_break(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Break *root)
+{
+	auto node = new Code_Node_Break;
+	if (!resolver->loop)
+	{
+		report_error(resolver, root, "Invalid break statement, break statement are only allowed with loops(for, while, do)");
+	}
+	return node;
+}
+
+static Code_Node_Continue *code_resolve_continue(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Continue *root)
+{
+	auto node = new Code_Node_Continue;
+	if (!resolver->loop)
+	{
+		report_error(resolver, root, "Invalid continue statement, break statement are only allowed with loops(for, while, do)");
+	}
+	return node;
 }
 
 static Code_Node_Return *code_resolve_return(Code_Type_Resolver *resolver, Symbol_Table *symbols, Syntax_Node_Return *root)
@@ -949,6 +970,12 @@ static Code_Node *code_resolve_expression(Code_Type_Resolver *resolver, Symbol_T
 			
 		case SYNTAX_NODE_RETURN:
 			return code_resolve_return(resolver, symbols, (Syntax_Node_Return *)root);
+
+		case SYNTAX_NODE_BREAK:
+			return code_resolve_break(resolver, symbols, (Syntax_Node_Break *)root);
+
+		case SYNTAX_NODE_CONTINUE:
+			return code_resolve_continue(resolver, symbols, (Syntax_Node_Continue *)root);
 			
 		case SYNTAX_NODE_PROCEDURE_CALL:
 			return code_resolve_procedure_call(resolver, symbols, (Syntax_Node_Procedure_Call *)root);
@@ -1838,6 +1865,9 @@ static Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver,
 		break;
 		
 		case SYNTAX_NODE_FOR: {
+			resolver->loop += 1;
+			Defer { resolver->loop -= 1; };
+
 			auto for_node            = (Syntax_Node_For *)node;
 			
 			auto for_code            = new Code_Node_For;
@@ -1889,6 +1919,9 @@ static Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver,
 		break;
 		
 		case SYNTAX_NODE_WHILE: {
+			resolver->loop += 1;
+			Defer { resolver->loop -= 1; };
+
 			auto while_node = (Syntax_Node_While *)node;
 			
 			auto condition  = code_resolve_root_expression(resolver, symbols, while_node->condition);
@@ -1925,6 +1958,9 @@ static Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver,
 		break;
 		
 		case SYNTAX_NODE_DO: {
+			resolver->loop += 1;
+			Defer { resolver->loop -= 1; };
+
 			auto do_node    = (Syntax_Node_Do *)node;
 			
 			auto body       = code_resolve_statement(resolver, symbols, do_node->body);
