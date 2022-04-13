@@ -1408,7 +1408,7 @@ Code_Node_Procedure_Call *interp_find_main(Interpreter *interp) {
 	if (!main_proc) {
 		auto error = code_type_resolver_error_stream(resolver);
 		error->begin_string_value();
-		Write(error->builder, "\"main\" procedure not defined!\n");
+		Write(error->builder, "\'main\' procedure not defined!");
 		error->end_string_value();
 		return nullptr;
 	}
@@ -1416,7 +1416,7 @@ Code_Node_Procedure_Call *interp_find_main(Interpreter *interp) {
 	if (!(main_proc->flags & SYMBOL_BIT_CONSTANT) || main_proc->address.kind != Symbol_Address::CODE) {
 		auto error = code_type_resolver_error_stream(resolver);
 		error->begin_string_value();
-		Write(error->builder, "The \"main\" procedure must be constant!\n");
+		Write(error->builder, "The \'main\' procedure must be constant!\n");
 		error->end_string_value();
 		return nullptr;
 	}
@@ -1424,7 +1424,7 @@ Code_Node_Procedure_Call *interp_find_main(Interpreter *interp) {
 	if (main_proc->type->kind != CODE_TYPE_PROCEDURE) {
 		auto error = code_type_resolver_error_stream(resolver);
 		error->begin_string_value();
-		Write(error->builder, "The \"main\" symbol must be a procedure!\n");
+		Write(error->builder, "The \'main\' symbol must be a procedure!\n");
 		error->end_string_value();
 		return nullptr;
 	}
