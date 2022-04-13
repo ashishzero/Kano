@@ -275,8 +275,10 @@ static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *
 		case CODE_TYPE_ARRAY_VIEW: {
 			auto arr_type = (Code_Type_Array_View *)type;
 			
-			auto arr_count = *(Kano_Int *)data;
-			auto arr_data = (uint8_t *)data + sizeof(Kano_Int);
+			Kano_Int *ptr = (Kano_Int *)data;
+
+			auto arr_count = ptr[0];
+			auto arr_data  = reinterpret_cast<uint8_t *>(*(size_t *)(ptr + 1));
 
 			json->begin_array();			
 			for (int64_t index = 0; index < arr_count; ++index)
