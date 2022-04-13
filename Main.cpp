@@ -235,7 +235,7 @@ static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *
 
 			json->write_key("base_type");
 			json->begin_string_value();
-			json_write_type(json, pointer_type->base_type);
+			json_write_type_name(json, pointer_type->base_type);
 			json->end_string_value();
 
 			auto mem_type = interp_get_memory_type(interp, raw_ptr);
