@@ -1,11 +1,47 @@
 #include "Parser.h"
 #include "Resolver.h"
 #include "Interp.h"
+#include "Kr/KrString.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 
-bool GenerateDebugCodeInfo(String code, Memory_Arena *arena, String_Builder *builder);
+bool GenerateDebugCodeInfo(String code, String input, Memory_Arena *arena, String_Builder *builder);
+
+struct Request
+{
+	String code;
+	String input;
+};
+
+static Request ParseRequest(String content)
+{
+	Request request;
+	String header = "##INPUT ";
+	if (StrStartsWith(content, header))
+	{
+		auto pos = StrFindCharacter(content, '\n', 0);
+		if (pos >= 0)
+		{
+			content.data[pos] = 0;
+			request.input = SubStr(content, 0, pos);
+			request.input = StrRemovePrefix(request.input, header.length);
+			request.code  = SubStr(content, pos + 1, content.length);
+			return request;
+		}
+		else
+		{
+			request.input = content;
+			request.input = StrRemovePrefix(request.input, header.length);
+			request.code  = "";
+			return request;
+		}
+	}
+
+	request.input = "";
+	request.code  = content;
+	return request;
+}
 
 #if PLATFORM_LINUX
 #define HTTPSERVER_IMPL
@@ -57,19 +93,20 @@ void handle_request(struct http_request_s *request)
 	content.data = (uint8_t *)code.buf;
 	content.length = code.len;
 
-	fprintf(stdout, "Executing code::\n");
-	fprintf(stdout, "%.*s", (int)content.length, content.data);
-	fprintf(stdout, "\n");
+	Request req = ParseRequest(content);
+
+	printf("Requested code::\n%s\nInput::%s\n\n", req.code.data, req.input.data);
 
 	auto arena = MemoryArenaCreate(MegaBytes(128));
 
 	String_Builder builder;
 
 	Code_Execution exe;
-	exe.arena = arena;
+	exe.arena   = arena;
 	exe.builder = &builder;
-	exe.code = content;
-	exe.failed = false;
+	exe.code    = req.code;
+	exe.input   = req.input;
+	exe.failed  = false;
 
 	pthread_t thread;
 	int result = pthread_create(&thread, NULL, ExecuteCodeThreadProc, &exe);
@@ -145,6 +182,7 @@ int main()
 struct Code_Execution
 {
 	String code;
+	String input;
 	Memory_Arena *arena;
 	String_Builder *builder;
 	bool failed;
@@ -156,7 +194,7 @@ DWORD WINAPI ExecuteCodeThreadProc(void *param)
 
 	InitThreadContext(0);
 
-	exe->failed = !GenerateDebugCodeInfo(exe->code, exe->arena, exe->builder);
+	exe->failed = !GenerateDebugCodeInfo(exe->code, exe->input, exe->arena, exe->builder);
 	if (exe->failed)
 	{
 		return 1;
@@ -258,15 +296,18 @@ void Listen(HANDLE req_queue)
 					}
 				}
 
-				auto arena = MemoryArenaCreate(MegaBytes(128));
+				Request req = ParseRequest(content);
+				printf("Requested code::\n%s\nInput::%s\n\n", req.code.data, req.input.data);
 
 				String_Builder builder;
+				auto arena = MemoryArenaAllocate(MegaBytes(128));
 
 				Code_Execution exe;
-				exe.arena = arena;
+				exe.arena   = arena;
 				exe.builder = &builder;
-				exe.code = content;
-				exe.failed = false;
+				exe.code    = req.code;
+				exe.input   = req.input;
+				exe.failed  = false;
 
 				HANDLE thread = CreateThread(nullptr, 0, ExecuteCodeThreadProc, &exe, 0, nullptr);
 				WaitForSingleObject(thread, INFINITE);
@@ -304,7 +345,7 @@ void Listen(HANDLE req_queue)
 				response.pReason = (char *)reason.data;
 				response.ReasonLength = (USHORT)reason.length;
 
-				String content_type = exe.failed ? String("text/plain") : String("application/json");
+				String content_type = "application/json";
 				response.Headers.KnownHeaders[HttpHeaderContentType].pRawValue = (char *)content_type.data;
 				response.Headers.KnownHeaders[HttpHeaderContentType].RawValueLength = (USHORT)content_type.length;
 
@@ -341,7 +382,7 @@ void Listen(HANDLE req_queue)
 					printf("HttpSendHttpResponse failed with %lu \n", result);
 				}
 
-				MemoryArenaDestroy(arena);
+				MemoryArenaFree(arena);
 				FreeBuilder(&builder);
 				EndTemporaryMemory(&temp);
 			}

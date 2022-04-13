@@ -28,8 +28,8 @@ INLINE_PROCEDURE bool IsSpace(uint32_t ch) {
 }
 
 INLINE_PROCEDURE String StrTrim(String str) {
-	int64_t trim = 0;
-	for (int64_t index = 0; index < str.length; ++index) {
+	ptrdiff_t trim = 0;
+	for (ptrdiff_t index = 0; index < str.length; ++index) {
 		if (IsSpace(str.data[index]))
 			trim += 1;
 		else
@@ -39,7 +39,7 @@ INLINE_PROCEDURE String StrTrim(String str) {
 	str.data += trim;
 	str.length -= trim;
 
-	for (int64_t index = str.length - 1; index >= 0; --index) {
+	for (ptrdiff_t index = str.length - 1; index >= 0; --index) {
 		if (IsSpace(str.data[index])) {
 			str.data[index] = '\0';
 			str.length -= 1;
@@ -51,28 +51,28 @@ INLINE_PROCEDURE String StrTrim(String str) {
 	return str;
 }
 
-INLINE_PROCEDURE String StrRemovePrefix(String str, int64_t count) {
+INLINE_PROCEDURE String StrRemovePrefix(String str, ptrdiff_t count) {
 	Assert(str.length >= count);
 	str.data += count;
 	str.length -= count;
 	return str;
 }
 
-INLINE_PROCEDURE String StrRemoveSuffix(String str, int64_t count) {
+INLINE_PROCEDURE String StrRemoveSuffix(String str, ptrdiff_t count) {
 	Assert(str.length >= count);
 	str.length -= count;
 	return str;
 }
 
-INLINE_PROCEDURE int64_t StrCopy(String src, char *const dst, int64_t dst_size, int64_t count) {
-	int64_t copied = (int64_t)Clamp(dst_size, src.length, count);
+INLINE_PROCEDURE ptrdiff_t StrCopy(String src, char *const dst, ptrdiff_t dst_size, ptrdiff_t count) {
+	ptrdiff_t copied = (ptrdiff_t)Clamp(dst_size, src.length, count);
 	memcpy(dst, src.data, copied);
 	return copied;
 }
 
-INLINE_PROCEDURE String StrDuplicate(String src, Memory_Allocator allocator = ThreadContext.allocator) {
+INLINE_PROCEDURE String StrDuplicate(String src) {
 	String dst;
-	dst.data = (uint8_t *)MemoryAllocate(src.length + 1, allocator);
+	dst.data = (uint8_t *)MemoryAllocate(src.length + 1, ThreadContext.allocator);
 	memcpy(dst.data, src.data, src.length);
 	dst.length = src.length;
 	dst.data[dst.length] = 0;
@@ -88,20 +88,20 @@ INLINE_PROCEDURE String StrDuplicateArena(String src, Memory_Arena *arena) {
 	return dst;
 }
 
-INLINE_PROCEDURE String SubStr(String str, int64_t index, int64_t count) {
+INLINE_PROCEDURE String SubStr(String str, ptrdiff_t index, ptrdiff_t count) {
 	Assert(index < str.length);
-	count = (int64_t)Minimum(str.length, count);
+	count = (ptrdiff_t)Minimum(str.length - index, count);
 	return String(str.data + index, count);
 }
 
 INLINE_PROCEDURE int StrCompare(String a, String b) {
-	int64_t count = (int64_t)Minimum(a.length, b.length);
+	ptrdiff_t count = (ptrdiff_t)Minimum(a.length, b.length);
 	return memcmp(a.data, b.data, count);
 }
 
 INLINE_PROCEDURE int StrCompareCaseInsensitive(String a, String b) {
-	int64_t count = (int64_t)Minimum(a.length, b.length);
-	for (int64_t index = 0; index < count; ++index) {
+	ptrdiff_t count = (ptrdiff_t)Minimum(a.length, b.length);
+	for (ptrdiff_t index = 0; index < count; ++index) {
 		if (a.data[index] != b.data[index] && a.data[index] + 32 != b.data[index] && a.data[index] != b.data[index] + 32) {
 			return a.data[index] - b.data[index];
 		}
@@ -172,8 +172,8 @@ INLINE_PROCEDURE char *StrNullTerminatedArena(Memory_Arena *arena, String str) {
 	return StrNullTerminated((char *)PushSize(arena, str.length + 1), str);
 }
 
-INLINE_PROCEDURE int64_t StrFind(String str, String key, int64_t pos) {
-	int64_t index = Clamp(0, str.length - 1, pos);
+INLINE_PROCEDURE ptrdiff_t StrFind(String str, String key, ptrdiff_t pos) {
+	ptrdiff_t index = Clamp(0, str.length - 1, pos);
 	while (str.length >= key.length) {
 		if (StrCompare(String(str.data, key.length), key) == 0) {
 			return index;
@@ -184,15 +184,15 @@ INLINE_PROCEDURE int64_t StrFind(String str, String key, int64_t pos) {
 	return -1;
 }
 
-INLINE_PROCEDURE int64_t StrFindCharacter(String str, uint8_t key, int64_t pos) {
-	for (int64_t index = Clamp(0, str.length - 1, pos); index < str.length; ++index)
+INLINE_PROCEDURE ptrdiff_t StrFindCharacter(String str, uint8_t key, ptrdiff_t pos) {
+	for (ptrdiff_t index = Clamp(0, str.length - 1, pos); index < str.length; ++index)
 		if (str.data[index] == key)
 			return index;
 	return -1;
 }
 
-INLINE_PROCEDURE int64_t StrReverseFind(String str, String key, int64_t pos) {
-	int64_t index = Clamp(0, str.length - key.length, pos);
+INLINE_PROCEDURE ptrdiff_t StrReverseFind(String str, String key, ptrdiff_t pos) {
+	ptrdiff_t index = Clamp(0, str.length - key.length, pos);
 	while (index >= 0) {
 		if (StrCompare(String(str.data + index, key.length), key) == 0)
 			return index;
@@ -201,8 +201,8 @@ INLINE_PROCEDURE int64_t StrReverseFind(String str, String key, int64_t pos) {
 	return -1;
 }
 
-INLINE_PROCEDURE int64_t StrReverseFindCharacter(String str, uint8_t key, int64_t pos) {
-	for (int64_t index = Clamp(0, str.length - 1, pos); index >= 0; --index)
+INLINE_PROCEDURE ptrdiff_t StrReverseFindCharacter(String str, uint8_t key, ptrdiff_t pos) {
+	for (ptrdiff_t index = Clamp(0, str.length - 1, pos); index >= 0; --index)
 		if (str.data[index] == key)
 			return index;
 	return -1;

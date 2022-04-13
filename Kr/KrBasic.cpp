@@ -39,7 +39,11 @@ uint32_t Murmur3Hash32(const uint8_t *key, size_t len, uint32_t seed) {
 //
 //
 
-void IndexTableResize(Index_Table *table, size_t slot_count_pow2, Memory_Allocator allocator) {
+void IndexTableFree(Index_Table *table, Memory_Allocator allocator) {
+	MemoryFree(table->buckets, sizeof(Index_Bucket) * (table->slot_count_pow2 >> TABLE_BUCKET_SHIFT), allocator);
+}
+
+void IndexTableAllocate(Index_Table *table, size_t slot_count_pow2, Memory_Allocator allocator) {
 	auto count = slot_count_pow2 >> TABLE_BUCKET_SHIFT;
 	Index_Bucket *buckets = new(allocator) Index_Bucket[count];
 
@@ -50,7 +54,7 @@ void IndexTableResize(Index_Table *table, size_t slot_count_pow2, Memory_Allocat
 		for (size_t i = 0; i < old_count; ++i) {
 			auto src_bucket = &table->buckets[i];
 			for (size_t j = 0; j < TABLE_BUCKET_SIZE; ++j) {
-				if (src_bucket->flags[j] != TABLE_BUCKET_FLAG_PRESENT)
+				if (src_bucket->flags[j] != INDEX_BUCKET_PRESENT)
 					continue;
 
 				auto hash = src_bucket->hash[j];
@@ -63,8 +67,8 @@ void IndexTableResize(Index_Table *table, size_t slot_count_pow2, Memory_Allocat
 					auto dst_bucket = &buckets[bucket_index];
 
 					for (auto iter = pos & TABLE_BUCKET_MASK; iter < TABLE_BUCKET_SIZE; ++iter) {
-						if (dst_bucket->hash[iter] == TABLE_BUCKET_FLAG_EMPTY) {
-							dst_bucket->flags[iter] = TABLE_BUCKET_FLAG_PRESENT;
+						if (dst_bucket->hash[iter] == INDEX_BUCKET_EMPTY) {
+							dst_bucket->flags[iter] = INDEX_BUCKET_PRESENT;
 							dst_bucket->hash[iter] = hash;
 							dst_bucket->index[iter] = src_bucket->index[j];
 							goto Inserted;
@@ -73,8 +77,8 @@ void IndexTableResize(Index_Table *table, size_t slot_count_pow2, Memory_Allocat
 
 					auto limit = pos & TABLE_BUCKET_MASK;
 					for (auto iter = 0; iter < limit; ++iter) {
-						if (dst_bucket->hash[iter] == TABLE_BUCKET_FLAG_EMPTY) {
-							dst_bucket->flags[iter] = TABLE_BUCKET_FLAG_PRESENT;
+						if (dst_bucket->hash[iter] == INDEX_BUCKET_EMPTY) {
+							dst_bucket->flags[iter] = INDEX_BUCKET_PRESENT;
 							dst_bucket->hash[iter] = hash;
 							dst_bucket->index[iter] = src_bucket->index[j];
 							goto Inserted;
@@ -91,7 +95,7 @@ void IndexTableResize(Index_Table *table, size_t slot_count_pow2, Memory_Allocat
 			}
 		}
 
-		MemoryFree(table->buckets, allocator);
+		IndexTableFree(table, allocator);
 	}
 
 	table->slot_count_pow2 = slot_count_pow2;

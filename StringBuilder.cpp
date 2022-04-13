@@ -141,6 +141,6 @@ void FreeBuilder(String_Builder *builder) {
 	while (root) {
 		auto ptr = root;
 		root = root->next;
-		MemoryFree(ptr, builder->allocator);
+		MemoryFree(ptr, sizeof(*ptr), builder->allocator);
 	}
 }

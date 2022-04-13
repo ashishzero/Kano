@@ -4,6 +4,7 @@
 #include "Resolver.h"
 #include "Interp.h"
 #include "HeapAllocator.h"
+#include "Kr/KrString.h"
 
 #include <stdlib.h>
 
@@ -16,8 +17,9 @@ struct Call_Info {
 };
 
 struct Interp_User_Context {
-	String_Builder console_out;
-	Json_Writer json;
+	String_Builder   console_out;
+	String           console_in;
+	Json_Writer      json;
 	Array<Call_Info> callstack;
 };
 
@@ -67,7 +69,7 @@ struct Call_Stack {
 
 static void json_write_symbol(Json_Writer *json, Interpreter *interp, String name, Code_Type *type, void *data);
 
-static void json_write_type(Json_Writer *json, Code_Type *type)
+static void json_write_type_name(Json_Writer *json, Code_Type *type)
 {
 	if (!type)
 	{
@@ -85,7 +87,7 @@ static void json_write_type(Json_Writer *json, Code_Type *type)
 
 		case CODE_TYPE_POINTER: {
 			json->append_string_value("*"); 
-			json_write_type(json, ((Code_Type_Pointer *)type)->base_type);
+			json_write_type_name(json, ((Code_Type_Pointer *)type)->base_type);
 			return;
 		}
 
@@ -94,7 +96,7 @@ static void json_write_type(Json_Writer *json, Code_Type *type)
 			json->append_string_value("proc (");
 			for (int64_t index = 0; index < proc->argument_count; ++index)
 			{
-				json_write_type(json, proc->arguments[index]);
+				json_write_type_name(json, proc->arguments[index]);
 				if (index < proc->argument_count - 1) json->append_string_value(", ");
 			}
 			json->append_string_value(")");
@@ -102,7 +104,7 @@ static void json_write_type(Json_Writer *json, Code_Type *type)
 			if (proc->return_type)
 			{
 				json->append_string_value(" -> ");
-				json_write_type(json, proc->return_type);
+				json_write_type_name(json, proc->return_type);
 			}
 			return;
 		}
@@ -115,18 +117,66 @@ static void json_write_type(Json_Writer *json, Code_Type *type)
 
 		case CODE_TYPE_ARRAY_VIEW: {
 			auto arr = (Code_Type_Array_View *)type;
-			json->append_string_value("[] ");
-			json_write_type(json, arr->element_type);
+			json->append_string_value("[]");
+			json_write_type_name(json, arr->element_type);
 			return;
 		}
 
 		case CODE_TYPE_STATIC_ARRAY: {
 			auto arr = (Code_Type_Static_Array *)type;
-			json->append_string_value("[%] ", arr->element_count);
-			json_write_type(json, arr->element_type);
+			json->append_string_value("[%]", arr->element_count);
+			json_write_type_name(json, arr->element_type);
 			return;
 		}
 	}
+}
+
+static void json_write_type(Json_Writer *json, Code_Type *type)
+{
+	json->begin_object();
+	json->write_key("name");
+	json->begin_string_value();
+	json_write_type_name(json, type);
+	json->end_string_value();
+
+	if (type->kind == CODE_TYPE_POINTER)
+	{
+		json->write_key("pointer");
+		auto base_type = ((Code_Type_Pointer *)type)->base_type;
+		json_write_type(json, base_type);
+	}
+	else
+	{
+		json->write_key_value("pointer", "null");
+	}
+
+	if (type->kind == CODE_TYPE_ARRAY_VIEW)
+	{
+		auto arr = (Code_Type_Array_View *)type;
+		json->write_key("array_view");
+		json_write_type(json, arr->element_type);
+	}
+	else
+	{
+		json->write_key_value("array_view", "null");
+	}
+
+	if (type->kind == CODE_TYPE_STATIC_ARRAY)
+	{
+		auto arr = (Code_Type_Static_Array *)type;
+		json->write_key("static_array");
+		json->begin_object();
+		json->write_key_value("count", "%", arr->element_count);
+		json->write_key("element");
+		json_write_type(json, arr->element_type);
+		json->end_object();
+	}
+	else
+	{
+		json->write_key_value("static_array", "null");
+	}
+
+	json->end_object();
 }
 
 enum Memory_Type {
@@ -262,7 +312,7 @@ static void json_write_symbol(Json_Writer *json, Interpreter *interp, String nam
 	
 	json->write_key("type");
 	json->begin_string_value();
-	json_write_type(json, type);
+	json_write_type_name(json, type);
 	json->end_string_value();
 	
 	auto mem_type = interp_get_memory_type(interp, data);
@@ -372,6 +422,8 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 		json->append_builder(&context->console_out);
 		json->end_string_value();
 
+		json->write_key_value("console_in", "%", context->console_in);
+
 		json->end_object();
 
 		if (intercept == INTERCEPT_PROCEDURE_CALL)
@@ -416,6 +468,8 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 		json->begin_string_value();
 		json->append_builder(&context->console_out);
 		json->end_string_value();
+
+		json->write_key_value("console_in", "%", context->console_in);
 
 		json->end_object();
 	}
@@ -623,6 +677,61 @@ static void basic_print(Interpreter *interp) {
 	}
 }
 
+static void basic_read_int(Interpreter *interp)
+{
+	Interp_Morph morph(interp);
+	morph.OffsetReturn<Kano_Int>();
+	
+	Kano_Int result = 0;
+
+	auto context = (Interp_User_Context *)interp->user_context;
+	auto input   = StrTrim(context->console_in);
+
+	if (input.data && input.length)
+	{
+		char *end = nullptr;
+		result = (Kano_Int)strtoll((char *)input.data, &end, 10);
+		input.length -= (end - (char *)input.data);
+		input.data = (uint8_t *)end;
+	}
+	else
+	{
+		Write(&context->console_out, "Failed read_int: Input buffer empty\\n");
+		printf("Failed read_int: Input buffer empty\n");
+	}
+
+	context->console_in = input;
+	morph.Return(result);
+}
+
+static void basic_read_float(Interpreter *interp)
+{
+	Interp_Morph morph(interp);
+	morph.OffsetReturn<Kano_Real>();
+	
+	Kano_Real result = 0;
+
+	auto context = (Interp_User_Context *)interp->user_context;
+	auto input   = StrTrim(context->console_in);
+
+	if (input.data && input.length)
+	{
+		char *end = nullptr;
+		result = (Kano_Real)strtod((char *)input.data, &end);
+		input.length -= (end - (char *)input.data);
+		input.data = (uint8_t *)end;
+	}
+	else
+	{
+		Write(&context->console_out, "Failed read_float: Input buffer empty\\n");
+		printf("Failed read_float: Input buffer empty\n");
+	}
+
+	context->console_in = input;
+	morph.Return(result);
+}
+
+
 static void basic_allocate(Interpreter *interp) {
 	Interp_Morph morph(interp);
 	morph.OffsetReturn<void *>();
@@ -668,6 +777,12 @@ static void include_basic(Code_Type_Resolver *resolver)
 	proc_builder_argument(&builder, "string");
 	proc_builder_variadic(&builder);
 	proc_builder_register(&builder, "print", basic_print);
+
+	proc_builder_return(&builder, "int");
+	proc_builder_register(&builder, "read_int", basic_read_int);
+
+	proc_builder_return(&builder, "float");
+	proc_builder_register(&builder, "read_float", basic_read_float);
 
 	proc_builder_argument(&builder, "int");
 	proc_builder_return(&builder, "*void");
@@ -1057,10 +1172,12 @@ void json_write_syntax_node(Json_Writer *json, Syntax_Node *root)
 	json->end_object();
 }
 
-bool GenerateDebugCodeInfo(String code, Memory_Arena *arena, String_Builder *builder)
+bool GenerateDebugCodeInfo(String code, String input, Memory_Arena *arena, String_Builder *builder)
 {
 	Interp_User_Context context;
 	context.json.builder = builder;
+
+	context.console_in = input;
 
 	context.json.begin_object();
 
@@ -1147,7 +1264,7 @@ int main()
 
 	String_Builder builder;
 
-	GenerateDebugCodeInfo(content, arena, &builder);
+	GenerateDebugCodeInfo(content, "", arena, &builder);
 
 	FILE *out = fopen("DebugInfo.json", "wb");
 
