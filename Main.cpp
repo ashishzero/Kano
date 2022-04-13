@@ -280,7 +280,7 @@ static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *
 			auto arr_count = ptr[0];
 			auto arr_data  = reinterpret_cast<uint8_t *>(*(size_t *)(ptr + 1));
 
-			json->begin_array();			
+			json->begin_array();
 			for (int64_t index = 0; index < arr_count; ++index)
 			{
 				json_write_value(json, interp, arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
