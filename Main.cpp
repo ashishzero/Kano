@@ -1205,11 +1205,46 @@ void json_write_syntax_node(Json_Writer *json, Syntax_Node *root)
 	json->end_object();
 }
 
-static void json_write_symbol_table(Json_Writer *json, const Symbol_Table &table)
+static void collect_symbols_from_block(Array<Key_Value<String, Symbol *>> &arr, Code_Node_Block *block)
+{
+	for (auto sym : block->symbols.map)
+		arr.Add(sym);
+
+	for (auto statement = block->statement_head; statement; statement = statement->next)
+	{
+		if (statement->node->kind == CODE_NODE_BLOCK)
+		{
+			auto block = (Code_Node_Block *)statement->node;
+			collect_symbols_from_block(arr, block);
+		}
+	}
+}
+
+static void json_write_symbol_table(Json_Writer *json, const Array_View<Key_Value<String, Symbol *>> table);
+
+static void json_write_symbols_from_block(Json_Writer *json, Code_Node_Block *block)
+{
+	Array<Key_Value<String, Symbol *>> symbols;
+	symbols.Reserve(block->statement_count + block->symbols.map.ElementCount());
+
+	collect_symbols_from_block(symbols, block);
+
+	qsort(symbols.data, symbols.count, sizeof(*symbols.data), [](const void *_a, const void *_b) -> int {
+		auto a = (Key_Value<String, Symbol *>*)_a;
+		auto b = (Key_Value<String, Symbol *>*)_b;
+		return (int)((int64_t)a->value->location.start_row - (int64_t)b->value->location.start_row);
+	});
+
+	json_write_symbol_table(json, symbols);
+
+	Free(&symbols);
+}
+
+static void json_write_symbol_table(Json_Writer *json, const Array_View<Key_Value<String, Symbol *>> table)
 {
 	json->begin_array();
 
-	for (const auto &sym : table.map)
+	for (const auto &sym : table)
 	{
 		if (sym.value->flags & SYMBOL_BIT_COMPILER_DEF || sym.value->address.kind == Symbol_Address::CCALL)
 			continue;
@@ -1227,17 +1262,21 @@ static void json_write_symbol_table(Json_Writer *json, const Symbol_Table &table
 		auto type = sym.value->type;
 		if (type->kind == CODE_TYPE_PROCEDURE && sym.value->address.kind == Symbol_Address::CODE)
 		{
+			json->write_key("arguments");
+			json_write_symbol_table(json, sym.value->address.code->symbols.parent->map.storage);
 			json->write_key("symbols");
-			json_write_symbol_table(json, sym.value->address.code->symbols);
+			json_write_symbols_from_block(json, sym.value->address.code);
 		}
 		else if (type->kind == CODE_TYPE_STRUCT)
 		{
 			Assert(sym.value->address.kind == Symbol_Address::CODE);
+			json->write_key_null("arguments");
 			json->write_key("symbols");
-			json_write_symbol_table(json, sym.value->address.code->symbols);
+			json_write_symbols_from_block(json, sym.value->address.code);
 		}
 		else
 		{
+			json->write_key_null("arguments");
 			json->write_key_null("symbols");
 		}
 
@@ -1334,7 +1373,7 @@ bool GenerateDebugCodeInfo(String code, String input, Memory_Arena *arena, Strin
 	context.json.write_key_value("heap_leaked", heap_allocator.total_allocated - heap_allocator.total_freed);
 
 	context.json.write_key("map");
-	json_write_symbol_table(&context.json, *interp.global_symbol_table);
+	json_write_symbol_table(&context.json, interp.global_symbol_table->map.storage);
 
 	//context.json.write_key("ast");
 	//json_write_syntax_node(&context.json, node);
