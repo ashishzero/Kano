@@ -7,6 +7,7 @@
 #include "Kr/KrString.h"
 
 #include <stdlib.h>
+#include <time.h>
 
 #include "StringBuilder.h"
 
@@ -21,6 +22,8 @@ struct Interp_User_Context {
 	String           console_in;
 	Json_Writer      json;
 	Array<Call_Info> callstack;
+	clock_t          prev_count;
+	clock_t          first_count;
 };
 
 //
@@ -402,6 +405,13 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 		json->write_key_value("intercept", "procedure_%", intercept_type);
 		json->write_key_value("line_number", "%", (int)proc->procedure_source_row);
 
+		clock_t count = clock();
+		float ms = ((count - context->prev_count) * 1000.0f) / (float)CLOCKS_PER_SEC;
+		json->write_key_value("exe_dt", "%ms", ms);
+		ms = ((count - context->first_count) * 1000.0f) / (float)CLOCKS_PER_SEC;
+		json->write_key_value("exe_time", "%ms", ms);
+		context->prev_count = count;
+
 		json->write_key("globals");
 		json->begin_array();
 		json_write_symbols(interp, json, interp->global_symbol_table, 0, 0);
@@ -446,6 +456,13 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 		
 		json->write_key_value("intercept", "statement");
 		json->write_key_value("line_number", "%", (int)statement->source_row);
+
+		clock_t count = clock();
+		float ms = ((count - context->prev_count) * 1000.0f) / (float)CLOCKS_PER_SEC;
+		json->write_key_value("exe_dt", "%ms", ms);
+		ms = ((count - context->first_count) * 1000.0f) / (float)CLOCKS_PER_SEC;
+		json->write_key_value("exe_time", "%ms", ms);
+		context->prev_count = count;
 
 		json->write_key("globals");
 		json->begin_array();
@@ -1256,10 +1273,18 @@ bool GenerateDebugCodeInfo(String code, String input, Memory_Arena *arena, Strin
 	context.json.write_key("runtime");
 	context.json.begin_array();
 
+	clock_t count = clock();
+	context.prev_count = count;
+	context.first_count = count;
+
 	interp_evaluate_procedure(&interp, main_proc);
+
+	count = clock();
+	float ms = ((count - context.first_count) * 1000.0f) / (float)CLOCKS_PER_SEC;
 
 	context.json.end_array();
 
+	context.json.write_key_value("exe_time", "%ms", ms);
 	context.json.write_key_value("bss_size", "%", code_type_resolver_bss_allocated(resolver));
 	context.json.write_key_value("stack_size", "%", stack_size);
 	context.json.write_key_value("heap_allocated", "%", heap_allocator.total_allocated);
