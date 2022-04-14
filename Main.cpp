@@ -96,7 +96,7 @@ static void json_write_type_name(Json_Writer *json, Code_Type *type)
 
 		case CODE_TYPE_PROCEDURE: {
 			auto proc = (Code_Type_Procedure *)type;
-			json->append_string_value("proc (");
+			json->append_string_value("proc(");
 			for (int64_t index = 0; index < proc->argument_count; ++index)
 			{
 				json_write_type_name(json, proc->arguments[index]);
@@ -1205,6 +1205,48 @@ void json_write_syntax_node(Json_Writer *json, Syntax_Node *root)
 	json->end_object();
 }
 
+static void json_write_symbol_table(Json_Writer *json, const Symbol_Table &table)
+{
+	json->begin_array();
+
+	for (const auto &sym : table.map)
+	{
+		if (sym.value->flags & SYMBOL_BIT_COMPILER_DEF || sym.value->address.kind == Symbol_Address::CCALL)
+			continue;
+
+		json->begin_object();
+		json->write_key_value("name", "%", sym.key);
+		json->write_key("type");
+		json->begin_string_value();
+		json_write_type_name(json, sym.value->type);
+		json->end_string_value();
+
+		size_t line = sym.value->location.start_row;
+		json->write_key_value("line", "%", line);
+
+		auto type = sym.value->type;
+		if (type->kind == CODE_TYPE_PROCEDURE && sym.value->address.kind == Symbol_Address::CODE)
+		{
+			json->write_key("symbols");
+			json_write_symbol_table(json, sym.value->address.code->symbols);
+		}
+		else if (type->kind == CODE_TYPE_STRUCT)
+		{
+			Assert(sym.value->address.kind == Symbol_Address::CODE);
+			json->write_key("symbols");
+			json_write_symbol_table(json, sym.value->address.code->symbols);
+		}
+		else
+		{
+			json->write_key_null("symbols");
+		}
+
+		json->end_object();
+	}
+
+	json->end_array();
+}
+
 bool GenerateDebugCodeInfo(String code, String input, Memory_Arena *arena, String_Builder *builder)
 {
 	Interp_User_Context context;
@@ -1290,6 +1332,9 @@ bool GenerateDebugCodeInfo(String code, String input, Memory_Arena *arena, Strin
 	context.json.write_key_value("heap_allocated", "%", heap_allocator.total_allocated);
 	context.json.write_key_value("heap_freed", "%", heap_allocator.total_freed);
 	context.json.write_key_value("heap_leaked", "%", heap_allocator.total_allocated - heap_allocator.total_freed);
+
+	context.json.write_key("map");
+	json_write_symbol_table(&context.json, *interp.global_symbol_table);
 
 	//context.json.write_key("ast");
 	//json_write_syntax_node(&context.json, node);

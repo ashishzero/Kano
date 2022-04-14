@@ -81,6 +81,12 @@ struct Json_Writer {
 		Write(builder, "\"");
 	}
 
+	void write_key_null(const char *key) {
+		next_element();
+		WriteFormatted(builder, "\"%\": ", key);
+		Write(builder, "null");
+	}
+
 	template <typename ...Args>
 	void write_key_value(const char *key, const char *fmt, Args... args) {
 		next_element();

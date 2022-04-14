@@ -2129,7 +2129,7 @@ Code_Type_Resolver *code_type_resolver_create(Json_Writer *error)
 		auto sym                = resolver->symbols_allocator.add();
 		sym->name               = "*void";
 		sym->type               = pointer_type;
-		sym->flags              = SYMBOL_BIT_CONSTANT | SYMBOL_BIT_TYPE;
+		sym->flags              = SYMBOL_BIT_CONSTANT | SYMBOL_BIT_TYPE | SYMBOL_BIT_COMPILER_DEF;
 		symbol_table_put(&resolver->symbols, sym);
 		
 		CompilerTypes[CODE_TYPE_POINTER] = pointer_type;
@@ -2139,7 +2139,7 @@ Code_Type_Resolver *code_type_resolver_create(Json_Writer *error)
 		auto sym = resolver->symbols_allocator.add();
 		sym->name = "byte";
 		sym->type = CompilerTypes[CODE_TYPE_CHARACTER];
-		sym->flags = SYMBOL_BIT_CONSTANT | SYMBOL_BIT_TYPE;
+		sym->flags = SYMBOL_BIT_CONSTANT | SYMBOL_BIT_TYPE | SYMBOL_BIT_COMPILER_DEF;
 		symbol_table_put(&resolver->symbols, sym);
 	}
 
@@ -2147,7 +2147,7 @@ Code_Type_Resolver *code_type_resolver_create(Json_Writer *error)
 		auto sym   = resolver->symbols_allocator.add();
 		sym->name  = "int";
 		sym->type  = CompilerTypes[CODE_TYPE_INTEGER];
-		sym->flags = SYMBOL_BIT_CONSTANT | SYMBOL_BIT_TYPE;
+		sym->flags = SYMBOL_BIT_CONSTANT | SYMBOL_BIT_TYPE | SYMBOL_BIT_COMPILER_DEF;
 		symbol_table_put(&resolver->symbols, sym);
 	}
 	
@@ -2155,7 +2155,7 @@ Code_Type_Resolver *code_type_resolver_create(Json_Writer *error)
 		auto sym   = resolver->symbols_allocator.add();
 		sym->name  = "float";
 		sym->type  = CompilerTypes[CODE_TYPE_REAL];
-		sym->flags = SYMBOL_BIT_CONSTANT | SYMBOL_BIT_TYPE;
+		sym->flags = SYMBOL_BIT_CONSTANT | SYMBOL_BIT_TYPE | SYMBOL_BIT_COMPILER_DEF;
 		symbol_table_put(&resolver->symbols, sym);
 	}
 	
@@ -2163,7 +2163,7 @@ Code_Type_Resolver *code_type_resolver_create(Json_Writer *error)
 		auto sym   = resolver->symbols_allocator.add();
 		sym->name  = "bool";
 		sym->type  = CompilerTypes[CODE_TYPE_BOOL];
-		sym->flags = SYMBOL_BIT_CONSTANT | SYMBOL_BIT_TYPE;
+		sym->flags = SYMBOL_BIT_CONSTANT | SYMBOL_BIT_TYPE | SYMBOL_BIT_COMPILER_DEF;
 		symbol_table_put(&resolver->symbols, sym);
 	}
 	
@@ -2205,7 +2205,7 @@ Code_Type_Resolver *code_type_resolver_create(Json_Writer *error)
 		auto sym                = resolver->symbols_allocator.add();
 		sym->name               = "string";
 		sym->type               = type;
-		sym->flags              = SYMBOL_BIT_CONSTANT | SYMBOL_BIT_TYPE;
+		sym->flags              = SYMBOL_BIT_CONSTANT | SYMBOL_BIT_TYPE | SYMBOL_BIT_COMPILER_DEF;
 		sym->address            = symbol_address_code(block);
 		symbol_table_put(&resolver->symbols, sym);
 	}
