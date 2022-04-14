@@ -701,7 +701,7 @@ static void basic_read_int(Interpreter *interp)
 		input.data = (uint8_t *)end;
 
 		Write(&context->console_out, result);
-		WriteFormatted(&context->console_out, "\n");
+		WriteFormatted(&context->console_out, "\\n");
 		printf("%d\n", (int)result);
 	}
 	else
@@ -731,7 +731,7 @@ static void basic_read_float(Interpreter *interp)
 		input.length -= (end - (char *)input.data);
 		input.data = (uint8_t *)end;
 		Write(&context->console_out, result);
-		WriteFormatted(&context->console_out, "\n");
+		WriteFormatted(&context->console_out, "\\n");
 		printf("%f\n", (double)result);
 	}
 	else
@@ -1258,8 +1258,8 @@ bool GenerateDebugCodeInfo(String code, String input, Memory_Arena *arena, Strin
 
 	context.json.end_array();
 
-	context.json.write_key("ast");
-	json_write_syntax_node(&context.json, node);
+	//context.json.write_key("ast");
+	//json_write_syntax_node(&context.json, node);
 
 	context.json.end_object();
 
