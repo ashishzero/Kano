@@ -169,7 +169,7 @@ static void json_write_type(Json_Writer *json, Code_Type *type)
 		auto arr = (Code_Type_Static_Array *)type;
 		json->write_key("static_array");
 		json->begin_object();
-		json->write_key_value("count", "%", arr->element_count);
+		json->write_key_value("count", arr->element_count);
 		json->write_key("element");
 		json_write_type(json, arr->element_type);
 		json->end_object();
@@ -232,9 +232,9 @@ static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *
 			json->begin_object();
 
 			if (raw_ptr)
-				json->write_key_value("raw", "%", raw_ptr);
+				json->write_key_value("raw", raw_ptr);
 			else
-				json->write_key_value("raw", "(null)");
+				json->write_key_null("raw");
 
 			json->write_key("base_type");
 			json->begin_string_value();
@@ -243,7 +243,7 @@ static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *
 
 			auto mem_type = interp_get_memory_type(interp, raw_ptr);
 
-			json->write_key_value("memory", "%", memory_type_string(mem_type));
+			json->write_key_value_formatted("memory", "%", memory_type_string(mem_type));
 
 			json->write_key("value");
 			if (mem_type != Memory_Type_INVALID)
@@ -313,7 +313,7 @@ static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *
 static void json_write_symbol(Json_Writer *json, Interpreter *interp, String name, Code_Type *type, void *data)
 {
 	json->begin_object();
-	json->write_key_value("name", "%", name);
+	json->write_key_value_formatted("name", "%", name);
 	
 	json->write_key("type");
 	json->begin_string_value();
@@ -321,8 +321,8 @@ static void json_write_symbol(Json_Writer *json, Interpreter *interp, String nam
 	json->end_string_value();
 	
 	auto mem_type = interp_get_memory_type(interp, data);
-	json->write_key_value("address", "%", data);
-	json->write_key_value("memory", "%", memory_type_string(mem_type));
+	json->write_key_value_formatted("address", "0x%", data);
+	json->write_key_value_formatted("memory", "%", memory_type_string(mem_type));
 	
 	json->write_key("value");
 	json_write_value(json, interp, type, data);
@@ -378,7 +378,7 @@ static void json_write_procedure_symbols(Interpreter *interp, Json_Writer *json,
 {
 	json->begin_object();
 
-	json->write_key_value("procedure", "%", procedure_name);
+	json->write_key_value_formatted("procedure", "%", procedure_name);
 	json->write_key("variables");
 	json->begin_array();
 	json_write_table_symbols(interp, json, symbol_table, stack_top, skip_stack_offset);
@@ -402,14 +402,14 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 
 		json->begin_object();
 
-		json->write_key_value("intercept", "procedure_%", intercept_type);
-		json->write_key_value("line_number", "%", (int)proc->procedure_source_row);
+		json->write_key_value_formatted("intercept", "procedure_%", intercept_type);
+		json->write_key_value("line_number", proc->procedure_source_row);
 
 		clock_t count = clock();
 		float ms = ((count - context->prev_count) * 1000.0f) / (float)CLOCKS_PER_SEC;
-		json->write_key_value("exe_dt", "%ms", ms);
+		json->write_key_value("exe_dt", ms);
 		ms = ((count - context->first_count) * 1000.0f) / (float)CLOCKS_PER_SEC;
-		json->write_key_value("exe_time", "%ms", ms);
+		json->write_key_value("exe_time", ms);
 		context->prev_count = count;
 
 		json->write_key("globals");
@@ -434,7 +434,7 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 		json->append_builder(&context->console_out);
 		json->end_string_value();
 
-		json->write_key_value("console_in", "%", context->console_in);
+		json->write_key_value_formatted("console_in", "%", context->console_in);
 
 		json->end_object();
 
@@ -454,14 +454,14 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 
 		json->begin_object();
 		
-		json->write_key_value("intercept", "statement");
-		json->write_key_value("line_number", "%", (int)statement->source_row);
+		json->write_key_value_formatted("intercept", "statement");
+		json->write_key_value("line_number", statement->source_row);
 
 		clock_t count = clock();
 		float ms = ((count - context->prev_count) * 1000.0f) / (float)CLOCKS_PER_SEC;
-		json->write_key_value("exe_dt", "%ms", ms);
+		json->write_key_value("exe_dt", ms);
 		ms = ((count - context->first_count) * 1000.0f) / (float)CLOCKS_PER_SEC;
-		json->write_key_value("exe_time", "%ms", ms);
+		json->write_key_value("exe_time", ms);
 		context->prev_count = count;
 
 		json->write_key("globals");
@@ -488,7 +488,7 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 		json->append_builder(&context->console_out);
 		json->end_string_value();
 
-		json->write_key_value("console_in", "%", context->console_in);
+		json->write_key_value_formatted("console_in", "%", context->console_in);
 
 		json->end_object();
 	}
@@ -861,7 +861,7 @@ void json_write_syntax_node(Json_Writer *json, Syntax_Node *root)
 	Assert(root->kind < ArrayCount(SyntaxNodeTypeNames));
 
 	json->begin_object();
-	json->write_key_value("id", "%", SyntaxNodeTypeNames[root->kind]);
+	json->write_key_value_formatted("id", "%", SyntaxNodeTypeNames[root->kind]);
 
 	json->write_key("payload");
 	json->begin_object();
@@ -877,15 +877,15 @@ void json_write_syntax_node(Json_Writer *json, Syntax_Node *root)
 			static const String LiteralTypes[] = { "byte", "integer", "real", "bool", "string", "null" };
 			Assert(node->value.kind < ArrayCount(LiteralTypes));
 
-			json->write_key_value("type", "%", LiteralTypes[node->value.kind]);
+			json->write_key_value_formatted("type", "%", LiteralTypes[node->value.kind]);
 			switch (node->value.kind)
 			{
-				case Literal::BYTE: json->write_key_value("value", "%", node->value.data.integer); break;
-				case Literal::INTEGER: json->write_key_value("value", "%", node->value.data.integer); break;
-				case Literal::REAL: json->write_key_value("value", "%", node->value.data.real); break;
-				case Literal::BOOL: json->write_key_value("value", "%", node->value.data.boolean ? "true" : "false"); break;
-				case Literal::STRING: json->write_key_value("value", "%", node->value.data.string.data); break;
-				case Literal::NULL_POINTER: json->write_key_value("value", "null"); break;
+				case Literal::BYTE: json->write_key_value_formatted("value", "%", node->value.data.integer); break;
+				case Literal::INTEGER: json->write_key_value_formatted("value", "%", node->value.data.integer); break;
+				case Literal::REAL: json->write_key_value_formatted("value", "%", node->value.data.real); break;
+				case Literal::BOOL: json->write_key_value_formatted("value", "%", node->value.data.boolean ? "true" : "false"); break;
+				case Literal::STRING: json->write_key_value_formatted("value", "%", node->value.data.string.data); break;
+				case Literal::NULL_POINTER: json->write_key_value_formatted("value", "null"); break;
 				NoDefaultCase();
 			}
 		} break;
@@ -893,13 +893,13 @@ void json_write_syntax_node(Json_Writer *json, Syntax_Node *root)
 		case SYNTAX_NODE_IDENTIFIER:
 		{
 			auto node = (Syntax_Node_Identifier *)root;
-			json->write_key_value("name", "%", node->name);
+			json->write_key_value_formatted("name", "%", node->name);
 		} break;
 
 		case SYNTAX_NODE_UNARY_OPERATOR:
 		{
 			auto node = (Syntax_Node_Unary_Operator *)root;
-			json->write_key_value("sym", "%", token_kind_string(node->op));
+			json->write_key_value_formatted("sym", "%", token_kind_string(node->op));
 			json->write_key("child");
 			json_write_syntax_node(json, node->child);
 		} break;
@@ -907,7 +907,7 @@ void json_write_syntax_node(Json_Writer *json, Syntax_Node *root)
 		case SYNTAX_NODE_BINARY_OPERATOR:
 		{
 			auto node = (Syntax_Node_Binary_Operator *)root;
-			json->write_key_value("sym", "%", token_kind_string(node->op));
+			json->write_key_value_formatted("sym", "%", token_kind_string(node->op));
 			json->write_key("left");
 			json_write_syntax_node(json, node->left);
 			json->write_key("right");
@@ -952,7 +952,7 @@ void json_write_syntax_node(Json_Writer *json, Syntax_Node *root)
 				"pointer", "procedure", "identifier", "type_of", "array_view", "static_array" };
 
 			Assert(node->id < ArrayCount(TypeIdNames));
-			json->write_key_value("name", "%", TypeIdNames[node->id]);
+			json->write_key_value_formatted("name", "%", TypeIdNames[node->id]);
 
 			if (node->type)
 			{
@@ -1116,8 +1116,8 @@ void json_write_syntax_node(Json_Writer *json, Syntax_Node *root)
 		case SYNTAX_NODE_DECLARATION:
 		{
 			auto node = (Syntax_Node_Declaration *)root;
-			json->write_key_value("decl_type", "%", (node->flags & SYMBOL_BIT_CONSTANT) ? "const" : "var");
-			json->write_key_value("identifier", "%", node->identifier);
+			json->write_key_value_formatted("decl_type", "%", (node->flags & SYMBOL_BIT_CONSTANT) ? "const" : "var");
+			json->write_key_value_formatted("identifier", "%", node->identifier);
 
 			if (node->type)
 			{
@@ -1171,7 +1171,7 @@ void json_write_syntax_node(Json_Writer *json, Syntax_Node *root)
 		case SYNTAX_NODE_STATEMENT:
 		{
 			auto node = (Syntax_Node_Statement *)root;
-			json->write_key_value("line", "%", (int)node->location.start_row);
+			json->write_key_value("line", node->location.start_row);
 			json->write_key("child");
 			json_write_syntax_node(json, node->node);
 		} break;
@@ -1215,14 +1215,14 @@ static void json_write_symbol_table(Json_Writer *json, const Symbol_Table &table
 			continue;
 
 		json->begin_object();
-		json->write_key_value("name", "%", sym.key);
+		json->write_key_value_formatted("name", "%", sym.key);
 		json->write_key("type");
 		json->begin_string_value();
 		json_write_type_name(json, sym.value->type);
 		json->end_string_value();
 
 		size_t line = sym.value->location.start_row;
-		json->write_key_value("line", "%", line);
+		json->write_key_value("line", line);
 
 		auto type = sym.value->type;
 		if (type->kind == CODE_TYPE_PROCEDURE && sym.value->address.kind == Symbol_Address::CODE)
@@ -1326,12 +1326,12 @@ bool GenerateDebugCodeInfo(String code, String input, Memory_Arena *arena, Strin
 
 	context.json.end_array();
 
-	context.json.write_key_value("exe_time", "%ms", ms);
-	context.json.write_key_value("bss_size", "%", code_type_resolver_bss_allocated(resolver));
-	context.json.write_key_value("stack_size", "%", stack_size);
-	context.json.write_key_value("heap_allocated", "%", heap_allocator.total_allocated);
-	context.json.write_key_value("heap_freed", "%", heap_allocator.total_freed);
-	context.json.write_key_value("heap_leaked", "%", heap_allocator.total_allocated - heap_allocator.total_freed);
+	context.json.write_key_value("exe_time", ms);
+	context.json.write_key_value("bss_size", code_type_resolver_bss_allocated(resolver));
+	context.json.write_key_value("stack_size", stack_size);
+	context.json.write_key_value("heap_allocated", heap_allocator.total_allocated);
+	context.json.write_key_value("heap_freed", heap_allocator.total_freed);
+	context.json.write_key_value("heap_leaked", heap_allocator.total_allocated - heap_allocator.total_freed);
 
 	context.json.write_key("map");
 	json_write_symbol_table(&context.json, *interp.global_symbol_table);

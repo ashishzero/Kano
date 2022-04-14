@@ -89,7 +89,7 @@ int Write(String_Builder *builder, double value) {
 
 int Write(String_Builder *builder, void *value) {
 	char buffer[128];
-	int written = snprintf(buffer, sizeof(buffer), "%p", value);
+	int written = snprintf(buffer, sizeof(buffer), "%08llx", (size_t)value);
 	return WriteBuffer(builder, &buffer, written);
 }
 
