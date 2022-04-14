@@ -1233,12 +1233,14 @@ bool GenerateDebugCodeInfo(String code, String input, Memory_Arena *arena, Strin
 
 	Heap_Allocator heap_allocator;
 
+	const uint32_t stack_size = 1024 * 1024 * 4;
+
 	Interpreter interp;
 	interp.intercept = intercept;
 	interp.user_context = &context;
 	interp.global_symbol_table = code_type_resolver_global_symbol_table(resolver);
 	interp.heap = &heap_allocator;
-	interp_init(&interp, resolver, 1024 * 1024 * 4, code_type_resolver_bss_allocated(resolver));
+	interp_init(&interp, resolver, stack_size, code_type_resolver_bss_allocated(resolver));
 
 	interp_eval_globals(&interp, exprs);
 	auto main_proc = interp_find_main(&interp);
@@ -1257,6 +1259,12 @@ bool GenerateDebugCodeInfo(String code, String input, Memory_Arena *arena, Strin
 	interp_evaluate_procedure(&interp, main_proc);
 
 	context.json.end_array();
+
+	context.json.write_key_value("bss_size", "%", code_type_resolver_bss_allocated(resolver));
+	context.json.write_key_value("stack_size", "%", stack_size);
+	context.json.write_key_value("heap_allocated", "%", heap_allocator.total_allocated);
+	context.json.write_key_value("heap_freed", "%", heap_allocator.total_freed);
+	context.json.write_key_value("heap_leaked", "%", heap_allocator.total_allocated - heap_allocator.total_freed);
 
 	//context.json.write_key("ast");
 	//json_write_syntax_node(&context.json, node);

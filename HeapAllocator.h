@@ -21,6 +21,9 @@ struct Heap_Allocator
 	Bucket *free_list = nullptr;
 
 	uint64_t allocation = 0;
+
+	uint64_t total_allocated = 0;
+	uint64_t total_freed = 0;
 	
 	Array<Memory> memories;
 };
@@ -40,16 +43,19 @@ static inline bool heap_contains_memory(Heap_Allocator *allocator, void *ptr)
 
 static inline void heap_free(Heap_Allocator *allocator, void *ptr)
 {
-	Assert(heap_contains_memory(allocator, ptr));
-	
-	auto buk = (Heap_Allocator::Bucket *)((uint8_t *)ptr - sizeof(Heap_Allocator::Bucket::size));
-	buk->next[0] = allocator->free_list;
-	allocator->free_list = buk;
+	if (heap_contains_memory(allocator, ptr))
+	{
+		auto buk = (Heap_Allocator::Bucket *)((uint8_t *)ptr - sizeof(Heap_Allocator::Bucket::size));
+		allocator->total_freed += buk->size;
+		buk->next[0] = allocator->free_list;
+		allocator->free_list = buk;
+	}
 }
 
 static inline void *heap_alloc(Heap_Allocator *allocator, uint64_t size)
 {
 	size = Maximum(size, sizeof(Heap_Allocator::Bucket::ptr));
+	allocator->total_allocated += size;
 
 	Heap_Allocator::Bucket *parent = nullptr;
 	for (auto buk = allocator->free_list; buk; buk = buk->next[0])
