@@ -23,29 +23,29 @@ struct Evaluation_Value
 		Code_Value_Procedure procedure_value;
 	} imm;
 	
-	uint8_t *  address = nullptr;
-	Code_Type *type    = nullptr;
+	uint8_t *  from_address = nullptr;
+	Code_Type *type         = nullptr;
 };
 
 template <typename T> T evaluation_value_get(Evaluation_Value &val)
 {
-	if (val.address)
-		return *(T *)val.address;
+	if (val.from_address)
+		return *(T *)val.from_address;
 	return *(T *)&val.imm;
 }
 #define EvaluationTypeValue(val, type) evaluation_value_get<type>(val)
 
 template <typename T> T *evaluation_value_pointer(Evaluation_Value &val)
 {
-	if (val.address)
-		return (T *)val.address;
+	if (val.from_address)
+		return (T *)val.from_address;
 	return (T *)&val.imm;
 }
 #define EvaluationTypePointer(val, type) evaluation_value_pointer<type>(val)
 
 static inline uint64_t interp_push_into_stack(Interpreter *interp, Evaluation_Value var, uint64_t offset)
 {
-	memcpy(interp->stack + interp->stack_top + offset, EvaluationTypePointer(var, void *), var.type->runtime_size);
+	memmove(interp->stack + interp->stack_top + offset, EvaluationTypePointer(var, void *), var.type->runtime_size);
 	offset += var.type->runtime_size;
 	return offset;
 }
@@ -53,7 +53,7 @@ static inline uint64_t interp_push_into_stack(Interpreter *interp, Evaluation_Va
 static inline uint64_t interp_push_into_stack_reduced(Interpreter *interp, Evaluation_Value var, uint64_t offset)
 {
 	offset -= var.type->runtime_size;
-	memcpy(interp->stack + interp->stack_top + offset, EvaluationTypePointer(var, void *), var.type->runtime_size);
+	memmove(interp->stack + interp->stack_top + offset, EvaluationTypePointer(var, void *), var.type->runtime_size);
 	return offset;
 }
 
@@ -102,7 +102,7 @@ static Evaluation_Value interp_eval_address(Interpreter *interp, Code_Node_Addre
 
 		Evaluation_Value type_value;
 		type_value.type = node->type;
-		type_value.address = address;
+		type_value.from_address = address;
 		return type_value;
 	}
 	else
@@ -147,7 +147,7 @@ static Evaluation_Value interp_eval_address(Interpreter *interp, Code_Node_Addre
 
 		Evaluation_Value type_value;
 		type_value.type = node->type;
-		type_value.address = memory + offset;
+		type_value.from_address = memory + offset;
 		return type_value;
 	}
 }
@@ -157,8 +157,7 @@ static Evaluation_Value interp_eval_root_expression(Interpreter *interp, Code_No
 static Evaluation_Value interp_eval_offset(Interpreter *interp, Code_Node_Offset *root)
 {
 	auto dest = interp_eval_root_expression(interp, root->expression);
-	Assert(dest.address && (size_t)dest.address != 0x20); //nocheckin
-	dest.address += root->offset;
+	dest.from_address += root->offset;
 	dest.type = root->type;
 	return dest;
 }
@@ -266,7 +265,7 @@ static void interp_eval_continue(Interpreter *interp, Code_Node_Continue *node)
 static Evaluation_Value interp_eval_literal(Interpreter *interp, Code_Node_Literal *node)
 {
 	Evaluation_Value type_value;
-	type_value.address = (uint8_t *)&node->data;
+	type_value.from_address = (uint8_t *)&node->data;
 	type_value.type    = node->type;
 	return type_value;
 }
@@ -324,19 +323,17 @@ static Evaluation_Value interp_eval_unary_operator(Interpreter *interp, Code_Nod
 		
 		case UNARY_OPERATOR_DEREFERENCE:  {
 			Evaluation_Value pointer;
+
 			if (root->child->kind == CODE_NODE_ADDRESS)
 				pointer = interp_eval_address(interp, (Code_Node_Address *)root->child);
 			else if (root->child->kind == CODE_NODE_OFFSET)
 				pointer = interp_eval_offset(interp, (Code_Node_Offset *)root->child);
 			else
 				Unreachable();
-			
+
 			Evaluation_Value type_value;
 			type_value.type    = root->type;
-			type_value.address = EvaluationTypeValue(pointer, uint8_t *);
-
-			// nocheckin
-			Assert((size_t)type_value.address != 0x20);
+			type_value.from_address = EvaluationTypeValue(pointer, uint8_t *);
 			
 			return type_value;
 		}
@@ -348,11 +345,11 @@ static Evaluation_Value interp_eval_unary_operator(Interpreter *interp, Code_Nod
 			auto address = (Code_Node_Address *)root->child;
 
 			auto pointer = interp_eval_address(interp, address);
-			Assert(pointer.address);
+			Assert(pointer.from_address);
 			
 			Evaluation_Value type_value;
 			type_value.type = root->type;
-			type_value.imm.pointer_value = pointer.address;
+			type_value.imm.pointer_value = pointer.from_address;
 			
 			return type_value;
 		}
@@ -1068,10 +1065,53 @@ static Evaluation_Value binary_cor(Evaluation_Value a, Evaluation_Value b, Code_
 	return a;
 }
 
+static Evaluation_Value binary_land(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
+{
+	Assert(type->kind == CODE_TYPE_BOOL && a.type->kind == b.type->kind);
+	Evaluation_Value r;
+	r.type = type;
+	r.from_address = nullptr;
+	if (a.type->kind == CODE_TYPE_BOOL)
+		r.imm.bool_value = (EvaluationTypeValue(a, Kano_Bool) && EvaluationTypeValue(b, Kano_Bool));
+	else if (a.type->kind == CODE_TYPE_CHARACTER)
+		r.imm.bool_value = (EvaluationTypeValue(a, Kano_Char) && EvaluationTypeValue(b, Kano_Char));
+	else if (a.type->kind == CODE_TYPE_INTEGER)
+		r.imm.bool_value = (EvaluationTypeValue(a, Kano_Int) && EvaluationTypeValue(b, Kano_Int));
+	else if (a.type->kind == CODE_TYPE_POINTER)
+		r.imm.bool_value = (EvaluationTypeValue(a, void *) && EvaluationTypeValue(b, void *));
+	else if (a.type->kind == CODE_TYPE_REAL)
+		r.imm.bool_value = (EvaluationTypeValue(a, Kano_Real) && EvaluationTypeValue(b, Kano_Real));
+	else
+		Unreachable();
+	return r;
+}
+
+static Evaluation_Value binary_lor(Evaluation_Value a, Evaluation_Value b, Code_Type *type)
+{
+	Assert(type->kind == CODE_TYPE_BOOL && a.type->kind == b.type->kind);
+	Evaluation_Value r;
+	r.type = type;
+	r.from_address = nullptr;
+	if (a.type->kind == CODE_TYPE_BOOL)
+		r.imm.bool_value = (EvaluationTypeValue(a, Kano_Bool) || EvaluationTypeValue(b, Kano_Bool));
+	else if (a.type->kind == CODE_TYPE_CHARACTER)
+		r.imm.bool_value = (EvaluationTypeValue(a, Kano_Char) || EvaluationTypeValue(b, Kano_Char));
+	else if (a.type->kind == CODE_TYPE_INTEGER)
+		r.imm.bool_value = (EvaluationTypeValue(a, Kano_Int) || EvaluationTypeValue(b, Kano_Int));
+	else if (a.type->kind == CODE_TYPE_POINTER)
+		r.imm.bool_value = (EvaluationTypeValue(a, void *) || EvaluationTypeValue(b, void *));
+	else if (a.type->kind == CODE_TYPE_REAL)
+		r.imm.bool_value = (EvaluationTypeValue(a, Kano_Real) || EvaluationTypeValue(b, Kano_Real));
+	else
+		Unreachable();
+	return r;
+}
+
 static BinaryOperatorProc BinaryOperators[] = {
 	binary_add,  binary_sub,  binary_mul,  binary_div, binary_mod, binary_rs,   binary_ls,   binary_add,  binary_xor,
 	binary_or,   binary_gt,   binary_lt,   binary_ge,  binary_le,  binary_cmp,  binary_ncmp, binary_cadd, binary_csub,
-	binary_cmul, binary_cdiv, binary_cmod, binary_crs, binary_cls, binary_cadd, binary_cxor, binary_cor};
+	binary_cmul, binary_cdiv, binary_cmod, binary_crs, binary_cls, binary_cadd, binary_cxor, binary_cor,
+	binary_land, binary_lor };
 
 static Evaluation_Value interp_eval_expression(Interpreter *interp, Code_Node *root);
 static Evaluation_Value interp_eval_root_expression(Interpreter *interp, Code_Node_Expression *root);
@@ -1081,10 +1121,10 @@ static Evaluation_Value interp_eval_binary_operator(Interpreter *interp, Code_No
 	auto b = interp_eval_expression(interp, node->right);
 
 	// Copy to imm value, so that it doesn't change changed if procedures are being called when solving for a
-	if (b.address)
+	if (b.from_address)
 	{
-		memcpy(&b.imm, b.address, b.type->runtime_size);
-		b.address = nullptr;
+		memcpy(&b.imm, b.from_address, b.type->runtime_size);
+		b.from_address = nullptr;
 	}
 
 	auto a = interp_eval_expression(interp, node->left);
@@ -1102,10 +1142,10 @@ static Evaluation_Value interp_eval_assignment(Interpreter *interp, Code_Node_As
 	
 	auto dst = interp_eval_root_expression(interp, node->destination);
 	
-	if (dst.address)
+	if (dst.from_address)
 	{
 		uint64_t *source = (uint64_t *)EvaluationTypePointer(value, void *);
-		memcpy(dst.address, source, value.type->runtime_size);
+		memcpy(dst.from_address, source, value.type->runtime_size);
 	}
 	else if (dst.type->kind == CODE_TYPE_POINTER)
 	{
@@ -1121,18 +1161,16 @@ static Evaluation_Value interp_eval_assignment(Interpreter *interp, Code_Node_As
 
 static void interp_eval_block(Interpreter *interp, Code_Node_Block *root, bool isproc);
 
-static inline void interp_recursive_push_aligned_parameter(Interpreter *interp, Code_Node_Procedure_Call *root, uint64_t prev_top, uint64_t new_top, int64_t index, uint64_t offset)
+static inline void interp_push_aligned_parameter(Interpreter *interp, Code_Node_Procedure_Call *root, uint64_t prev_top, uint64_t new_top, uint64_t offset)
 {
-	if (index < root->parameter_count)
+	for (int64_t index = 0; index < root->parameter_count; ++index)
 	{
 		auto param = root->parameters[index];
 		offset = AlignPower2Up(offset, (uint64_t)param->type->alignment);
-		interp_recursive_push_aligned_parameter(interp, root, prev_top, new_top, index + 1, offset + param->type->runtime_size);
-		
 		interp->stack_top = prev_top;
 		auto var = interp_eval_root_expression(interp, param);
 		interp->stack_top = new_top;
-		interp_push_into_stack(interp, var, offset);
+		offset = interp_push_into_stack(interp, var, offset);
 	}
 }
 
@@ -1159,6 +1197,9 @@ static Evaluation_Value interp_eval_procedure_call(Interpreter *interp, Code_Nod
 	}
 
 	{
+		// @Note: Variadics are evaluated in reverse order because we add Code_Type * as well
+		// If this were done in forward order, the result placed by a function call in the top
+		// of the stack will be erased when we push Code_Type * into the stack
 		uint64_t offset = variadics_args_size;
 		for (int64_t i = root->variadic_count - 1; i >= 0; --i)
 		{
@@ -1184,7 +1225,7 @@ static Evaluation_Value interp_eval_procedure_call(Interpreter *interp, Code_Nod
 		new_top = AlignPower2Up(new_top, (uint64_t)root->parameters[0]->type->alignment);
 	}
 
-	interp_recursive_push_aligned_parameter(interp, root, prev_top, new_top, 0, return_type_size);
+	interp_push_aligned_parameter(interp, root, prev_top, new_top, return_type_size);
 
 	interp->stack_top = prev_top;
 	auto proc_expr = interp_eval_root_expression(interp, root->procedure);
@@ -1202,12 +1243,12 @@ static Evaluation_Value interp_eval_procedure_call(Interpreter *interp, Code_Nod
 	Evaluation_Value result;
 	if (root->type)
 	{
-		result.address = (uint8_t *)(interp->stack + interp->stack_top);
+		result.from_address = (uint8_t *)(interp->stack + interp->stack_top);
 		result.type    = root->type;
 	}
 	else
 	{
-		result.address = nullptr;
+		result.from_address = nullptr;
 		result.type    = nullptr;
 	}
 

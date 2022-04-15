@@ -48,6 +48,8 @@ enum Token_Kind
 	TOKEN_KIND_BITWISE_NOT,
 
 	TOKEN_KIND_LOGICAL_NOT,
+	TOKEN_KIND_LOGICAL_AND,
+	TOKEN_KIND_LOGICAL_OR,
 
 	TOKEN_KIND_RELATIONAL_GREATER,
 	TOKEN_KIND_RELATIONAL_LESS,
@@ -155,7 +157,7 @@ static inline String token_kind_string(Token_Kind kind)
 
 	                           "~",
 
-	                           "!",
+	                           "!", "&&", "||",
 
 	                           ">",           "<",
 	                           ">=",          "<=",

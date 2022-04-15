@@ -310,6 +310,18 @@ void lexer_next(Lexer *lexer)
 			lexer_make_token(lexer, TOKEN_KIND_DOUBLE_PERDIOD);
 			return;
 		}
+		else if (a == '&' && b == '&')
+		{
+			lexer->cursor += 2;
+			lexer_make_token(lexer, TOKEN_KIND_LOGICAL_AND);
+			return;
+		}
+		else if (a == '|' && b == '|')
+		{
+			lexer->cursor += 2;
+			lexer_make_token(lexer, TOKEN_KIND_LOGICAL_OR);
+			return;
+		}
 		else if (b == '=')
 		{
 			switch (a)

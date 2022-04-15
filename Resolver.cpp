@@ -146,6 +146,10 @@ static Binary_Operator_Kind token_to_binary_operator(Token_Kind kind)
 			return BINARY_OPERATOR_COMPOUND_BITWISE_XOR;
 		case TOKEN_KIND_COMPOUND_BITWISE_OR:
 			return BINARY_OPERATOR_COMPOUND_BITWISE_OR;
+		case TOKEN_KIND_LOGICAL_AND:
+			return BINARY_OPERATOR_LOGICAL_AND;
+		case TOKEN_KIND_LOGICAL_OR:
+			return BINARY_OPERATOR_LOGICAL_OR;
 			NoDefaultCase();
 	}
 	
@@ -638,7 +642,15 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 			node->type            = proc->return_type;
 			
 			node->parameter_count = root->parameter_count;
-			node->parameters       = new Code_Node_Expression *[node->parameter_count];
+			node->parameters      = new Code_Node_Expression *[node->parameter_count];
+
+			auto stack_top        = resolver->virtual_address[Symbol_Address::STACK];
+			node->stack_top       = stack_top;
+
+			if (proc->return_type)
+			{
+				resolver->virtual_address[Symbol_Address::STACK] += proc->return_type->runtime_size;
+			}
 			
 			uint32_t param_index  = 0;
 			for (auto param = root->parameters; param; param = param->next, ++param_index)
@@ -650,7 +662,7 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 					report_error(resolver, param,
 						"Type mismatch, expected argument of type % but got void", proc->arguments[param_index]);
 				}
-				
+
 				if (!code_type_are_same(proc->arguments[param_index], code_param->type))
 				{
 					auto cast = code_type_cast(code_param->child, proc->arguments[param_index]);
@@ -665,11 +677,13 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 							proc->name, proc->arguments[param_index], code_param->type, param_index + 1);
 					}
 				}
+
+				resolver->virtual_address[Symbol_Address::STACK] += proc->arguments[param_index]->runtime_size;
 				
 				node->parameters[param_index] = code_param;
 			}
 			
-			node->stack_top = resolver->virtual_address[Symbol_Address::STACK];
+			resolver->virtual_address[Symbol_Address::STACK] = stack_top;
 			
 			return node;
 		}
@@ -681,7 +695,15 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 			node->type            = proc->return_type;
 			
 			node->parameter_count = proc->argument_count;
-			node->parameters       = new Code_Node_Expression *[node->parameter_count];
+			node->parameters      = new Code_Node_Expression *[node->parameter_count];
+
+			auto stack_top = resolver->virtual_address[Symbol_Address::STACK];
+			node->stack_top = stack_top;
+
+			if (proc->return_type)
+			{
+				resolver->virtual_address[Symbol_Address::STACK] += proc->return_type->runtime_size;
+			}
 			
 			uint32_t param_index  = 0;
 			auto     param        = root->parameters;
@@ -710,16 +732,22 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 							proc->arguments[param_index], code_param->type);
 					}
 				}
+
+				resolver->virtual_address[Symbol_Address::STACK] += proc->arguments[param_index]->runtime_size;
 				
 				node->parameters[param_index] = code_param;
+			}
+
+			resolver->virtual_address[Symbol_Address::STACK] = stack_top;
+			if (proc->return_type)
+			{
+				resolver->virtual_address[Symbol_Address::STACK] += proc->return_type->runtime_size;
 			}
 			
 			Code_Node *child = nullptr;
 			
 			if (root->parameter_count >= proc->argument_count)
 			{
-				auto stack_top       = resolver->virtual_address[Symbol_Address::STACK];
-				
 				auto address         = new Code_Node_Address;
 				address->type        = symbol_table_find(&resolver->symbols, "*void")->type;
 				address->subscript   = nullptr;
@@ -748,6 +776,8 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 							"Type mismatch, expected argument of type % but got void", proc->arguments[param_index]);
 					}
 
+					resolver->virtual_address[Symbol_Address::STACK] += code_param->type->runtime_size;
+
 					node->variadics[index] = code_param;
 				}
 			}
@@ -758,8 +788,8 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 				null_ptr->data.pointer.value = 0;
 				child                        = null_ptr;
 			}
-			
-			node->stack_top                            = resolver->virtual_address[Symbol_Address::STACK];
+
+			resolver->virtual_address[Symbol_Address::STACK] = stack_top;
 			
 			auto va_arg                                = new Code_Node_Expression;
 			va_arg->type                               = child->type;
@@ -2341,6 +2371,8 @@ Code_Type_Resolver *code_type_resolver_create(Json_Writer *error)
 		resolver->binary_operators[BINARY_OPERATOR_RELATIONAL_LESS_EQUAL].add(binary_operator_pointer);
 		resolver->binary_operators[BINARY_OPERATOR_RELATIONAL_GREATER].add(binary_operator_pointer);
 		resolver->binary_operators[BINARY_OPERATOR_RELATIONAL_GREATER_EQUAL].add(binary_operator_pointer);
+		resolver->binary_operators[BINARY_OPERATOR_LOGICAL_AND].add(binary_operator_pointer);
+		resolver->binary_operators[BINARY_OPERATOR_LOGICAL_OR].add(binary_operator_pointer);
 	}
 	
 	{
@@ -2354,6 +2386,8 @@ Code_Type_Resolver *code_type_resolver_create(Json_Writer *error)
 		resolver->binary_operators[BINARY_OPERATOR_RELATIONAL_LESS_EQUAL].add(binary_operator_char);
 		resolver->binary_operators[BINARY_OPERATOR_COMPARE_EQUAL].add(binary_operator_char);
 		resolver->binary_operators[BINARY_OPERATOR_COMPARE_NOT_EQUAL].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_LOGICAL_AND].add(binary_operator_char);
+		resolver->binary_operators[BINARY_OPERATOR_LOGICAL_OR].add(binary_operator_char);
 	}
 
 	{
@@ -2367,6 +2401,8 @@ Code_Type_Resolver *code_type_resolver_create(Json_Writer *error)
 		resolver->binary_operators[BINARY_OPERATOR_RELATIONAL_LESS_EQUAL].add(binary_operator_int);
 		resolver->binary_operators[BINARY_OPERATOR_COMPARE_EQUAL].add(binary_operator_int);
 		resolver->binary_operators[BINARY_OPERATOR_COMPARE_NOT_EQUAL].add(binary_operator_int);
+		resolver->binary_operators[BINARY_OPERATOR_LOGICAL_AND].add(binary_operator_int);
+		resolver->binary_operators[BINARY_OPERATOR_LOGICAL_OR].add(binary_operator_int);
 	}
 	
 	{
@@ -2403,6 +2439,18 @@ Code_Type_Resolver *code_type_resolver_create(Json_Writer *error)
 		resolver->binary_operators[BINARY_OPERATOR_RELATIONAL_LESS_EQUAL].add(binary_operator_real);
 		resolver->binary_operators[BINARY_OPERATOR_COMPARE_EQUAL].add(binary_operator_real);
 		resolver->binary_operators[BINARY_OPERATOR_COMPARE_NOT_EQUAL].add(binary_operator_real);
+		resolver->binary_operators[BINARY_OPERATOR_LOGICAL_AND].add(binary_operator_real);
+		resolver->binary_operators[BINARY_OPERATOR_LOGICAL_OR].add(binary_operator_real);
+	}
+
+	{
+		Binary_Operator binary_operator_bool;
+		binary_operator_bool.parameters[0] = CompilerTypes[CODE_TYPE_BOOL];
+		binary_operator_bool.parameters[1] = CompilerTypes[CODE_TYPE_BOOL];
+		binary_operator_bool.output = CompilerTypes[CODE_TYPE_BOOL];
+		binary_operator_bool.compound = false;
+		resolver->binary_operators[BINARY_OPERATOR_LOGICAL_AND].add(binary_operator_bool);
+		resolver->binary_operators[BINARY_OPERATOR_LOGICAL_OR].add(binary_operator_bool);
 	}
 
 	return resolver;

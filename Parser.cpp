@@ -54,6 +54,9 @@ static void     parser_init_precedence()
 	BinaryOperatorPrecedence[TOKEN_KIND_BITWISE_XOR]                  = 25;
 	BinaryOperatorPrecedence[TOKEN_KIND_BITWISE_OR]                   = 20;
 
+	BinaryOperatorPrecedence[TOKEN_KIND_LOGICAL_AND]                  = 17;
+	BinaryOperatorPrecedence[TOKEN_KIND_LOGICAL_OR]                   = 16;
+
 	BinaryOperatorPrecedence[TOKEN_KIND_COMPOUND_PLUS]                = 15;
 	BinaryOperatorPrecedence[TOKEN_KIND_COMPOUND_MINUS]               = 15;
 	BinaryOperatorPrecedence[TOKEN_KIND_COMPOUND_MULTIPLY]            = 15;
@@ -455,6 +458,8 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec)
                                                     TOKEN_KIND_BITWISE_AND,
                                                     TOKEN_KIND_BITWISE_XOR,
                                                     TOKEN_KIND_BITWISE_OR,
+                                                    TOKEN_KIND_LOGICAL_AND,
+                                                    TOKEN_KIND_LOGICAL_OR,
                                                     TOKEN_KIND_RELATIONAL_GREATER,
                                                     TOKEN_KIND_RELATIONAL_LESS,
                                                     TOKEN_KIND_RELATIONAL_GREATER_EQUAL,
@@ -480,6 +485,8 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec)
 			Token_Kind token = BinaryOpTokens[index];
 			if (parser_accept_token(parser, token))
 			{
+				auto err_tok = lexer_current_token(&parser->lexer);
+
 				auto node = parser_new_syntax_node<Syntax_Node_Binary_Operator>(parser);
 				parser_finish_syntax_node(parser, node);
 				node->op              = token;
@@ -487,6 +494,11 @@ Syntax_Node *parse_expression(Parser *parser, uint32_t prec)
 				node->right           = parse_expression(parser, op_prec);
 				left                  = node;
 				found_binary_operator = true;
+
+				if (!node->right) {
+					parser_error(parser, err_tok, "Expected expression after binary operator");
+				}
+
 				break;
 			}
 		}
