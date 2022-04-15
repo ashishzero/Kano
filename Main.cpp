@@ -114,7 +114,7 @@ static void json_write_type_name(Json_Writer *json, Code_Type *type)
 
 		case CODE_TYPE_STRUCT: {
 			auto strt = (Code_Type_Struct *)type;
-			json->append_string_value("struct %", strt->name); 
+			json->append_string_value("%", strt->name); 
 			return;
 		}
 
