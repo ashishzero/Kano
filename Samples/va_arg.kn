@@ -1,0 +1,36 @@
+const add := proc(var a: int, var b: int) -> int {
+	return a + b;
+}
+
+const mul := proc(var a: int, var b: int) -> int {
+	return a * b;
+}
+
+const min := proc(var a: int, var b: int) -> int {
+	if a < b then return a; else return b;
+}
+
+const max := proc(var a: int, var b: int) -> int {
+	if a > b then return a; else return b;
+}
+
+const fold := proc(var f: proc(int, int) -> int, var count: int, var args: ..) -> int {
+	var result := ?cast(*int)(va_arg(args));
+	for var i:=1; i<count; i+=1 {
+		args = va_arg_next(args);
+		var value := ?cast(*int)(va_arg(args));
+		result = f(result, value);
+	}
+	return result;
+}
+
+const main := proc() {
+	var a := fold(add, 5, 100, 20, 30, 40, 50);
+	var b := fold(mul, 5, 100, 20, 30, 40, 50);
+	var c := fold(min, 5, 100, 20, 30, 40, 50);
+	var d := fold(max, 5, 100, 20, 30, 40, 50);
+	print("Sum: %\n", a);
+	print("Mul: %\n", b);
+	print("Min: %\n", c);
+	print("Max: %\n", d);
+}

@@ -800,13 +800,21 @@ static void basic_tan(Interpreter *interp) {
 	morph.Return(y);
 }
 
-static void basic_arg_next(Interpreter *interp) {
+static void basic_va_arg(Interpreter *interp) {
 	Interp_Morph morph(interp);
 	morph.OffsetReturn<void *>();
-	auto x = morph.Arg<uint8_t **>();
-	auto y = *x;
-	*x += sizeof(Code_Type *);
-	morph.Return(y);
+	auto x = morph.Arg<uint8_t *>();
+	x += (sizeof(Code_Type *));
+	morph.Return(x);
+}
+
+static void basic_va_arg_next(Interpreter *interp) {
+	Interp_Morph morph(interp);
+	morph.OffsetReturn<void *>();
+	auto x = morph.Arg<uint8_t *>();
+	auto type = *(Code_Type **)x;
+	x += (type->runtime_size + sizeof(Code_Type *));
+	morph.Return(x);
 }
 
 static void include_basic(Code_Type_Resolver *resolver)
@@ -844,7 +852,11 @@ static void include_basic(Code_Type_Resolver *resolver)
 
 	proc_builder_argument(&builder, "*void");
 	proc_builder_return(&builder, "*void");
-	proc_builder_register(&builder, "arg_next", basic_arg_next);
+	proc_builder_register(&builder, "va_arg_next", basic_va_arg_next);
+
+	proc_builder_argument(&builder, "*void");
+	proc_builder_return(&builder, "*void");
+	proc_builder_register(&builder, "va_arg", basic_va_arg);
 
 	proc_builder_free(&builder);
 }

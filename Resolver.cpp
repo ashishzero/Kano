@@ -598,6 +598,7 @@ static Code_Node_Return *code_resolve_return(Code_Type_Resolver *resolver, Symbo
 					if (cast)
 					{
 						node->expression = cast;
+						node->type = cast->type;
 					}
 					else {
 						report_error(resolver, root, 
@@ -670,6 +671,7 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 					if (cast)
 					{
 						code_param->child = cast;
+						code_param->type = cast->type;
 					}
 					else
 					{
@@ -724,6 +726,7 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 					if (cast)
 					{
 						code_param->child = cast;
+						code_param->type = cast->type;
 					}
 					else
 					{
@@ -774,6 +777,14 @@ static Code_Node_Procedure_Call *code_resolve_procedure_call(Code_Type_Resolver 
 					{
 						report_error(resolver, param,
 							"Type mismatch, expected argument of type % but got void", proc->arguments[param_index]);
+					}
+
+					if (code_param->child->type->kind == CODE_TYPE_CHARACTER)
+					{
+						auto int_type = symbol_table_find(&resolver->symbols, "int")->type;
+						auto cast = code_type_cast(code_param->child, int_type);
+						code_param->child = cast;
+						code_param->type  = int_type;
 					}
 
 					resolver->virtual_address[Symbol_Address::STACK] += code_param->type->runtime_size;
@@ -1337,6 +1348,7 @@ static Code_Node_Assignment *code_resolve_assignment(Code_Type_Resolver *resolve
 				if (cast)
 				{
 					value->child = cast;
+					value->type  = cast->type;
 					match        = true;
 				}
 			}
@@ -1687,6 +1699,7 @@ static Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolv
 					auto cast = code_type_cast(expression->child, type);
 					Assert(cast);
 					expression->child = cast;
+					expression->type  = cast->type;
 				}
 				else
 				{
@@ -1718,6 +1731,7 @@ static Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolv
 					if (cast)
 					{
 						expression->child = cast;
+						expression->type  = cast->type;
 					}
 					else
 					{
@@ -1872,6 +1886,7 @@ static Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver,
 				if (cast)
 				{
 					condition->child = cast;
+					condition->type  = cast->type;
 				}
 				else
 				{
@@ -1918,6 +1933,7 @@ static Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver,
 				if (cast)
 				{
 					condition->child = cast;
+					condition->type  = cast->type;
 				}
 				else
 				{
@@ -1965,6 +1981,7 @@ static Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver,
 				if (cast)
 				{
 					condition->child = cast;
+					condition->type  = cast->type;
 				}
 				else
 				{
@@ -2013,6 +2030,7 @@ static Code_Node_Statement *code_resolve_statement(Code_Type_Resolver *resolver,
 				if (cast)
 				{
 					condition->child = cast;
+					condition->type  = cast->type;
 				}
 				else
 				{

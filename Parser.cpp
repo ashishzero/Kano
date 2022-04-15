@@ -540,7 +540,7 @@ Syntax_Node_Expression *parse_root_expression(Parser *parser)
 		
 		if (!expression->child) 
 		{
-			parser_error(parser, token, "Expected expression");
+			parser_error(parser, token, "Expected expression but got invalid token: %", token_kind_string(token->kind));
 			expression->child = parser_new_syntax_node<Syntax_Node>(parser);
 			parser_finish_syntax_node(parser, expression->child);
 		}
