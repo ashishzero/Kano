@@ -1,6 +1,3 @@
-
-// 0, 1, 1, 2, 3, 5, 8
-// 0, 1, 2, 3, 4, 5, 6
 const fibonacci := proc(var a: int) -> int {
 	if a <= 0 then return 0;
 	if a == 1 then return 1;
@@ -12,7 +9,7 @@ const fibonacci := proc(var a: int) -> int {
 
 const print_fibonacci := proc(var n: int) {
 	for var i:=0; i < n; i += 1 {
-		print("% : %\n", i, fibonacci(i));
+	 	print("% : %\n", i, fibonacci(i));
 	}
 }
 

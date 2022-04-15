@@ -1652,12 +1652,18 @@ static Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolv
 			else
 			{
 				Assert(root->initializer->kind == SYNTAX_NODE_EXPRESSION);
-				expression =
-					code_resolve_root_expression(resolver, symbols, (Syntax_Node_Expression *)root->initializer);
-				type = expression->type;
-				if (type->kind == CODE_TYPE_CHARACTER)
+				expression = code_resolve_root_expression(resolver, symbols, (Syntax_Node_Expression *)root->initializer);
+
+				if ((expression->flags & SYMBOL_BIT_CONST_EXPR) && expression->type->kind == CODE_TYPE_CHARACTER)
 				{
 					type = symbol_table_find(&resolver->symbols, "int", false)->type;
+					auto cast = code_type_cast(expression->child, type);
+					Assert(cast);
+					expression->child = cast;
+				}
+				else
+				{
+					type = expression->type;
 				}
 			}
 		}
@@ -1670,8 +1676,7 @@ static Code_Node_Assignment *code_resolve_declaration(Code_Type_Resolver *resolv
 			else
 			{
 				Assert(root->initializer->kind == SYNTAX_NODE_EXPRESSION);
-				expression =
-					code_resolve_root_expression(resolver, symbols, (Syntax_Node_Expression *)root->initializer);
+				expression = code_resolve_root_expression(resolver, symbols, (Syntax_Node_Expression *)root->initializer);
 				type = expression->type;
 			}
 		}
