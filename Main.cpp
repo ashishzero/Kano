@@ -232,9 +232,9 @@ static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *
 			json->begin_object();
 
 			if (raw_ptr)
-				json->write_key_value("raw", raw_ptr);
+				json->write_key_value_formatted("raw", "0x%", raw_ptr);
 			else
-				json->write_key_null("raw");
+				json->write_key_value_formatted("raw", "%", "null");
 
 			json->write_key("base_type");
 			json->begin_string_value();
