@@ -1292,9 +1292,8 @@ static void json_write_symbol_table(Json_Writer *json, const Array_View<Key_Valu
 			json->write_key("symbols");
 			json_write_symbols_from_block(json, sym.value->address.code);
 		}
-		else if (type->kind == CODE_TYPE_STRUCT)
+		else if (type->kind == CODE_TYPE_STRUCT && sym.value->address.kind == Symbol_Address::CODE)
 		{
-			Assert(sym.value->address.kind == Symbol_Address::CODE);
 			json->write_key_null("arguments");
 			json->write_key("symbols");
 			json_write_symbols_from_block(json, sym.value->address.code);

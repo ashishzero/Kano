@@ -1,0 +1,37 @@
+const mul := proc(var a: [2][2]float, var b: [2][2]float) -> [2][2]float {
+	var r: [2][2]float;
+	for var y:=0; y<2; y+=1 {
+		print("[ ");
+		for var x:=0; x<2; x+=1 {
+			var d:= 0.0;
+			for var k:=0; k<2; k+=1 {
+				if k then print("+ ");
+				print("% * % ", a[y][k], b[k][x]);
+				d += a[y][k] * b[k][x];
+			}
+			if !x then print("    ");
+			r[y][x] = d;
+		}
+		print(" ]\n");
+	}
+	return r;
+}
+
+const main := proc() {
+	var a: [2][2]float;
+	var b: [2][2]float;
+
+	a[0][0] = 1.0;
+	a[0][1] = 2.0;
+	a[1][0] = 2.0;
+	a[1][1] = 4.0;
+
+	b[0][0] = 4.0;
+	b[0][1] = 7.0;
+	b[1][0] = 3.0;
+	b[1][1] = 4.0;
+
+	print("\n% x % \n     = \n\n", a, b);
+	var r := mul(a, b);
+	print("\n    = %\n", r);
+}
