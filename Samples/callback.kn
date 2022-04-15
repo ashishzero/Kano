@@ -1,0 +1,22 @@
+const adder := proc(var x: int, var y: int) -> int {
+	return x + y;
+}
+
+const subtractor := proc(var x: int, var y: int) -> int {
+	return x - y;
+}
+
+const execute := proc(var a: int, var b: int, var op: proc(int, int) -> int) -> int {
+	return op(a, b);
+}
+
+const main := proc() {
+	var a: int;
+	var b: int;
+	print("Enter First number: ");
+	a = read_int();
+	print("Enter Second number: ");
+	b = read_int();
+	print("% + % = %\n", a, b, execute(a, b, adder));
+	print("% - % = %\n", a, b, execute(a, b, subtractor));
+}

@@ -1098,6 +1098,8 @@ static Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver 
 
 				if (child->flags & SYMBOL_BIT_CONST_EXPR)
 					node->flags |= SYMBOL_BIT_CONST_EXPR;
+				else
+					node->flags |= SYMBOL_BIT_LVALUE;
 
 				return node;
 			}

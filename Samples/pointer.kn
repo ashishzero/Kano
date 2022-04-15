@@ -1,0 +1,10 @@
+
+const change := proc(var a : *int) {
+	?a = 6;
+}
+
+const main := proc() {
+	var s:= 5;
+	change(*s);
+	print("Sum: %\n", s);
+}

@@ -322,14 +322,7 @@ static Evaluation_Value interp_eval_unary_operator(Interpreter *interp, Code_Nod
 		break;
 		
 		case UNARY_OPERATOR_DEREFERENCE:  {
-			Evaluation_Value pointer;
-
-			if (root->child->kind == CODE_NODE_ADDRESS)
-				pointer = interp_eval_address(interp, (Code_Node_Address *)root->child);
-			else if (root->child->kind == CODE_NODE_OFFSET)
-				pointer = interp_eval_offset(interp, (Code_Node_Offset *)root->child);
-			else
-				Unreachable();
+			Evaluation_Value pointer = interp_eval_expression(interp, root->child);
 
 			Evaluation_Value type_value;
 			type_value.type    = root->type;
@@ -1137,8 +1130,6 @@ static Evaluation_Value interp_eval_binary_operator(Interpreter *interp, Code_No
 static Evaluation_Value interp_eval_assignment(Interpreter *interp, Code_Node_Assignment *node)
 {
 	auto value = interp_eval_root_expression(interp, (Code_Node_Expression *)node->value);
-	
-	Assert(node->destination->child->kind == CODE_NODE_ADDRESS || node->destination->child->kind == CODE_NODE_OFFSET);
 	
 	auto dst = interp_eval_root_expression(interp, node->destination);
 	

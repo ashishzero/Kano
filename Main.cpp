@@ -800,6 +800,15 @@ static void basic_tan(Interpreter *interp) {
 	morph.Return(y);
 }
 
+static void basic_arg_next(Interpreter *interp) {
+	Interp_Morph morph(interp);
+	morph.OffsetReturn<void *>();
+	auto x = morph.Arg<uint8_t **>();
+	auto y = *x;
+	*x += sizeof(Code_Type *);
+	morph.Return(y);
+}
+
 static void include_basic(Code_Type_Resolver *resolver)
 {
 	Procedure_Builder builder(resolver);
@@ -832,6 +841,10 @@ static void include_basic(Code_Type_Resolver *resolver)
 	proc_builder_argument(&builder, "float");
 	proc_builder_return(&builder, "float");
 	proc_builder_register(&builder, "tan", basic_tan);
+
+	proc_builder_argument(&builder, "*void");
+	proc_builder_return(&builder, "*void");
+	proc_builder_register(&builder, "arg_next", basic_arg_next);
 
 	proc_builder_free(&builder);
 }
