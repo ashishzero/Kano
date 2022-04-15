@@ -1,0 +1,74 @@
+const Node := struct {
+    var value: int;
+    var next: *Node;
+}
+
+const list_add := proc(var head: *Node, var v: int) -> *Node {
+    var node: *Node = allocate(size_of(Node));
+    node.value = v;
+    node.next = head;
+    return node;
+}
+
+const list_remove_front := proc(var head: *Node) -> *Node {
+    var node := head.next;
+    free(head);
+    return node;
+}
+
+const list_remove := proc(var head: *Node, var value: int) -> *Node {
+    if head.value == value {
+        return list_remove_front(head);
+    }
+    var parent := head;
+    var node := head.next;
+    while node != null {
+        if node.value == value {
+            parent.next = node.next;
+            free(node);
+            break;
+        }
+        parent = node;
+        node = node.next;
+    }
+    return head;
+}
+
+const list_find := proc(var head: *Node, var value: int) -> *Node {
+    while head != null {
+        if head.value == value {
+            return head;
+        }
+        head = head.next;
+    }
+    return null;
+}
+
+const list_print := proc(var head: *Node) {
+    while head != null {
+        print("% -> ", head.value);
+        head = head.next;
+    }
+    print("null\n");
+}
+
+const main := proc() {
+    var list : *Node = null;
+    list = list_add(list, 5);
+    list = list_add(list, 6);
+    list = list_add(list, 7);
+
+    list_print(list);
+
+    print("Enter number to search in list: ");
+    var in := read_int();
+
+    if (list_find(list, in) != null) {
+        print("Number % is in the list\n", in);
+    } else {
+        print("Number % is NOT in the list\n", in);
+    }
+
+    list = list_remove(list, 6);
+    list_print(list);
+}

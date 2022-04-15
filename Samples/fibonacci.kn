@@ -1,0 +1,30 @@
+
+// 0, 1, 1, 2, 3, 5, 8
+// 0, 1, 2, 3, 4, 5, 6
+const fibonacci := proc(var a: int) -> int {
+	if a <= 0 then return 0;
+	if a == 1 then return 1;
+	var b:= fibonacci(a - 1);
+	var c:= fibonacci(a - 2);
+	var d:= b + c;
+	return d;
+}
+
+const print_fibonacci := proc(var n: int) {
+	for var i:=0; i < n; i += 1 {
+		print("% : %\n", i, fibonacci(i));
+	}
+}
+
+const main := proc() {
+	print("Enter N:: ");
+	var n := read_int();
+
+	if n <= 0 {
+		print("Invalid input, N must be greater than 0\n");
+		return;
+	}
+
+	print("The Fibonacci numbers are as follows:\n");
+	print_fibonacci(n);
+}

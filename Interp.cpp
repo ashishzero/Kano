@@ -242,10 +242,15 @@ static Evaluation_Value interp_eval_expression(Interpreter *interp, Code_Node *r
 
 static Evaluation_Value interp_eval_return(Interpreter *interp, Code_Node_Return *node)
 {
-	auto result = interp_eval_expression(interp, node->expression);
-	interp_push_into_stack(interp, result, 0);
+	if (node->expression)
+	{
+		auto result = interp_eval_expression(interp, node->expression);
+		interp_push_into_stack(interp, result, 0);
+		interp->return_count += 1;
+		return result;
+	}
 	interp->return_count += 1;
-	return result;
+	return Evaluation_Value{};
 }
 
 static void interp_eval_break(Interpreter *interp, Code_Node_Break *node)
@@ -1320,7 +1325,9 @@ static void interp_eval_if(Interpreter *interp, Code_Node_If *root)
 {
 	auto cond = interp_eval_root_expression(interp, (Code_Node_Expression *)root->condition);
 	if (EvaluationTypeValue(cond, bool))
+	{
 		interp_eval_statement(interp, (Code_Node_Statement *)root->true_statement, nullptr);
+	}
 	else
 	{
 		if (root->false_statement)

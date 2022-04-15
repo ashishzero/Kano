@@ -1,0 +1,11 @@
+const factorial := proc(var n: float) -> float {
+	if n <= 1 then return 1;
+	return n * factorial(n - 1);
+}
+
+const main := proc() {
+	print("Enter a number: ");
+	var number := read_float();
+	var f := factorial(number);
+	print("The factorial of % is %\n", number, f);
+}

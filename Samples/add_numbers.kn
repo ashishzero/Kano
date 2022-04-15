@@ -1,0 +1,16 @@
+const add_all := proc (var n: []int) -> int {
+    var s :int = 0;
+    for var i:= 0; i < n.count; i+=1 {
+        s += n[i];
+    }
+    return s;
+}
+
+const main := proc() {
+    var numbers: [5]int;
+    for var i:=0; i < numbers.count; i+=1 {
+        numbers[i] = read_int();
+    }
+    var sum:= add_all(numbers);
+    print("Sum of % is %\n", numbers, sum);
+}
