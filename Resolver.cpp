@@ -206,7 +206,7 @@ template <typename T, uint32_t N> struct Bucket_Array {
 
 	T *add() {
 		if (index == N) {
-			Bucket *buk = new Bucket;
+			Bucket *buk = new Bucket();
 			index = 0;
 			last->next = buk;
 			last = buk;
@@ -223,11 +223,6 @@ template <typename T, uint32_t N> struct Bucket_Array {
 	constexpr uint32_t bucket_size() {
 		return N;
 	}
-
-	Bucket *begin() { return &first; }
-	Bucket *end() { return nullptr; }
-	const Bucket *begin() const { return &first; }
-	const Bucket *end() const { return nullptr; }
 };
 
 struct Code_Type_Resolver
@@ -1003,12 +998,12 @@ static Code_Node_Unary_Operator *code_resolve_unary_operator(Code_Type_Resolver 
 	
 	auto &operators = resolver->unary_operators[op_kind];
 
-	for (const auto &bucket : operators)
+	for (auto bucket = &operators.first; bucket; bucket = bucket->next)
 	{
-		uint32_t count = ((& bucket == operators.last) ? operators.index : ArrayCount(bucket.data));
+		uint32_t count = ((bucket == operators.last) ? operators.index : ArrayCount(bucket->data));
 		for (uint32_t index = 0; index < count; ++index)
 		{
-			const auto &op = bucket.data[index];
+			const auto &op = bucket->data[index];
 
 			bool found = false;
 			if (code_type_are_same(op.parameter, child->type))
@@ -1213,11 +1208,11 @@ static Code_Node *code_resolve_binary_operator(Code_Type_Resolver *resolver, Sym
 		
 		auto &operators = resolver->binary_operators[op_kind];
 		
-		for (const auto &bucket : operators)
+		for (auto bucket = &operators.first; bucket; bucket = bucket->next)
 		{
-			uint32_t count = ((&bucket == operators.last) ? operators.index : ArrayCount(bucket.data));
+			uint32_t count = ((bucket == operators.last) ? operators.index : ArrayCount(bucket->data));
 			for (uint32_t index = 0; index < count; ++index) {
-				const auto &op = bucket.data[index];
+				const auto &op = bucket->data[index];
 				bool left_match  = false;
 				bool right_match = false;
 				

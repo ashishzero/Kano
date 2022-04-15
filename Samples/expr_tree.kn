@@ -1,0 +1,98 @@
+// TODO: Support for enums
+const OperationNil := 0;
+const OperationAdd := 1;
+const OperationSub := 2;
+const OperationMul := 3;
+const OperationDiv := 4;
+
+const TreeNode := struct {
+	var operation: int;
+	var number:    int;
+
+	var left:  *TreeNode;
+	var right: *TreeNode;
+}
+
+const operation := proc(var a: *TreeNode, var op: int, var b: *TreeNode) -> *TreeNode {
+	var n: *TreeNode = allocate(size_of(TreeNode));
+	n.operation = op;
+	n.left = a;
+	n.right = b;
+	n.number = 0;
+	return n;
+}
+
+const number := proc(var number: int) -> *TreeNode {
+	var a: *TreeNode = allocate(size_of(TreeNode));
+	a.operation = OperationNil;
+	a.number = number;
+	a.left = null;
+	a.right = null;
+	return a;
+}
+
+const expr_eval := proc(var root: *TreeNode) -> int {
+	if root.operation == OperationNil {
+		var operation := root.operation;
+		var a  := expr_eval(root.left);
+		var b  := expr_eval(root.right);
+		
+		var c: int;
+
+		if operation == OperationAdd then
+			c = a + b;
+		else if operation == OperationSub then
+			c = a - b;
+		else if operation == OperationMul then
+			c = a * b;
+		else if operation == OperationDiv then
+			c = a / b;
+		else
+			c = 0;
+
+		return c;
+	}
+
+	return root.number;
+}
+
+const expr_print := proc(var e: *TreeNode, var t: int) {
+	for var i:=0; i<t; i+=1 { print(" "); }
+
+	if e.operation == OperationNil {
+		print("%\n", e.number);
+		return;
+	}
+
+	if e.operation == OperationAdd then
+		print("+");
+	else if e.operation == OperationSub then
+		print("-");
+	else if e.operation == OperationMul then
+		print("*");
+	else if e.operation == OperationDiv then
+		print("/");
+	print("\n");
+	expr_print(e.left, t + 3);
+	expr_print(e.right, t + 3);
+}
+
+const expr_create := proc() -> *TreeNode {
+	var a : *TreeNode;
+
+	a = operation(number(5), OperationAdd, number(6));
+	a = operation(a, OperationSub, number(2));
+	a = operation(a, OperationMul, number(3));
+
+	var b : *TreeNode;
+	b = operation(number(25), OperationDiv, number(5));
+
+	return operation(a, OperationAdd, b);
+}
+
+const main := proc() {
+	var expr := expr_create();
+	print("The expression is \n");
+	expr_print(expr, 0);
+	print("\nThe evaluated result is %\n", expr_eval(expr));
+}

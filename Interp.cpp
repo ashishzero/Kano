@@ -157,7 +157,7 @@ static Evaluation_Value interp_eval_root_expression(Interpreter *interp, Code_No
 static Evaluation_Value interp_eval_offset(Interpreter *interp, Code_Node_Offset *root)
 {
 	auto dest = interp_eval_root_expression(interp, root->expression);
-	Assert(dest.address);
+	Assert(dest.address && (size_t)dest.address != 0x20); //nocheckin
 	dest.address += root->offset;
 	dest.type = root->type;
 	return dest;
@@ -334,6 +334,9 @@ static Evaluation_Value interp_eval_unary_operator(Interpreter *interp, Code_Nod
 			Evaluation_Value type_value;
 			type_value.type    = root->type;
 			type_value.address = EvaluationTypeValue(pointer, uint8_t *);
+
+			// nocheckin
+			Assert((size_t)type_value.address != 0x20);
 			
 			return type_value;
 		}
