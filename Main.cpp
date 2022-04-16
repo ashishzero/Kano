@@ -284,8 +284,9 @@ static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *
 			auto arr_data  = reinterpret_cast<uint8_t *>(*(size_t *)(ptr + 1));
 
 			json->begin_object();
-			json->write_key_value("dimension", arr_count);
+			json->write_key_value("count", arr_count);
 
+			json->write_key("data");
 			json->begin_array();
 			for (int64_t index = 0; index < arr_count; ++index)
 			{
@@ -304,8 +305,9 @@ static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *
 			auto arr_data = (uint8_t *)data;
 
 			json->begin_object();
-			json->write_key_value("dimension", arr_type->element_count);
+			json->write_key_value("count", arr_type->element_count);
 
+			json->write_key("data");
 			json->begin_array();
 			for (int64_t index = 0; index < arr_type->element_count; ++index)
 			{
