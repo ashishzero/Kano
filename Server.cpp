@@ -14,6 +14,15 @@ struct Request
 	String input;
 };
 
+struct Code_Execution
+{
+	String code;
+	String input;
+	Memory_Arena *arena;
+	String_Builder *builder;
+	bool failed;
+};
+
 static Request ParseRequest(String content)
 {
 	Request request;
@@ -61,21 +70,13 @@ static void code_type_resolver_on_error(Code_Type_Resolver *resolver) {
 	pthread_exit(NULL);
 }
 
-struct Code_Execution
-{
-	String code;
-	Memory_Arena *arena;
-	String_Builder *builder;
-	bool failed;
-};
-
 void *ExecuteCodeThreadProc(void *param)
 {
 	auto exe = (Code_Execution *)param;
 
 	InitThreadContext(0);
 
-	exe->failed = !GenerateDebugCodeInfo(exe->code, exe->arena, exe->builder);
+	exe->failed = !GenerateDebugCodeInfo(exe->code, exe->input, exe->arena, exe->builder);
 	if (exe->failed)
 	{
 		return NULL;
@@ -177,15 +178,6 @@ int main()
 #include <windows.h>
 #include <http.h>
 #pragma comment(lib, "httpapi.lib")
-
-struct Code_Execution
-{
-	String code;
-	String input;
-	Memory_Arena *arena;
-	String_Builder *builder;
-	bool failed;
-};
 
 DWORD WINAPI ExecuteCodeThreadProc(void *param)
 {
