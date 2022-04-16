@@ -77,13 +77,13 @@ int Write(String_Builder *builder, uint64_t value) {
 
 int Write(String_Builder *builder, float value) {
 	char buffer[128];
-	int written = snprintf(buffer, sizeof(buffer), "%f", value);
+	int written = snprintf(buffer, sizeof(buffer), "%.2f", value);
 	return WriteBuffer(builder, &buffer, written);
 }
 
 int Write(String_Builder *builder, double value) {
 	char buffer[128];
-	int written = snprintf(buffer, sizeof(buffer), "%f", value);
+	int written = snprintf(buffer, sizeof(buffer), "%.2f", value);
 	return WriteBuffer(builder, &buffer, written);
 }
 

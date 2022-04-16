@@ -340,7 +340,7 @@ static void basic_read_float(Interpreter *interp)
 
 	context->console_in = input;
 #else
-	double value = 0;
+	float value = 0;
 	scanf("%f", &value);
 	result = value;
 #endif
