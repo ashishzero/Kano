@@ -27,8 +27,16 @@ String read_entire_file(const char *file)
 	return String(string, (int64_t)fsize);
 }
 
-static void parser_on_error(Parser *parser) { exit(0); }
-static void code_type_resolver_on_error(Code_Type_Resolver *resolver) { exit(0); }
+static void parser_on_error(Parser *parser) {
+	String str = BuildString(parser->error);
+	fprintf(stderr, "%s\n", str.data);
+	exit(0);
+}
+static void code_type_resolver_on_error(Code_Type_Resolver *resolver) { 
+	String str = BuildString(code_type_resolver_error_stream(resolver));
+	fprintf(stderr, "%s\n", str.data);
+	exit(0);
+}
 
 int main(int argc, char **argv)
 {
