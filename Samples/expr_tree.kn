@@ -1,9 +1,9 @@
 // TODO: Support for enums
-const OperationNil := 0;
-const OperationAdd := 1;
-const OperationSub := 2;
-const OperationMul := 3;
-const OperationDiv := 4;
+const OpNil := 0;
+const OpAdd := 1;
+const OpSub := 2;
+const OpMul := 3;
+const OpDiv := 4;
 
 const TreeNode := struct {
 	var operation: int;
@@ -24,7 +24,7 @@ const operation := proc(var a: *TreeNode, var op: int, var b: *TreeNode) -> *Tre
 
 const number := proc(var number: int) -> *TreeNode {
 	var a: *TreeNode = allocate(size_of(TreeNode));
-	a.operation = OperationNil;
+	a.operation = OpNil;
 	a.number = number;
 	a.left = null;
 	a.right = null;
@@ -32,20 +32,20 @@ const number := proc(var number: int) -> *TreeNode {
 }
 
 const expr_eval := proc(var root: *TreeNode) -> int {
-	if root.operation != OperationNil {
+	if root.operation != OpNil {
 		var operation := root.operation;
 		var a  := expr_eval(root.left);
 		var b  := expr_eval(root.right);
 		
 		var c: int;
 
-		if operation == OperationAdd then
+		if operation == OpAdd then
 			c = a + b;
-		else if operation == OperationSub then
+		else if operation == OpSub then
 			c = a - b;
-		else if operation == OperationMul then
+		else if operation == OpMul then
 			c = a * b;
-		else if operation == OperationDiv then
+		else if operation == OpDiv then
 			c = a / b;
 		else
 			c = 0;
@@ -59,18 +59,18 @@ const expr_eval := proc(var root: *TreeNode) -> int {
 const expr_print := proc(var e: *TreeNode, var t: int) {
 	for var i:=0; i<t; i+=1 { print(" "); }
 
-	if e.operation == OperationNil {
+	if e.operation == OpNil {
 		print("%\n", e.number);
 		return;
 	}
 
-	if e.operation == OperationAdd then
+	if e.operation == OpAdd then
 	 	print("+");
-	else if e.operation == OperationSub then
+	else if e.operation == OpSub then
 		print("-");
-	else if e.operation == OperationMul then
+	else if e.operation == OpMul then
 		print("*");
-	else if e.operation == OperationDiv then
+	else if e.operation == OpDiv then
 		print("/");
 	print("\n");
 
@@ -81,14 +81,14 @@ const expr_print := proc(var e: *TreeNode, var t: int) {
 const expr_create := proc() -> *TreeNode {
 	var a : *TreeNode;
 
-	a = operation(number(5), OperationAdd, number(6));
-	a = operation(a, OperationSub, number(2));
-	a = operation(a, OperationMul, number(3));
+	a = operation(number(5), OpAdd, number(6));
+	a = operation(a, OpSub, number(2));
+	a = operation(a, OpMul, number(3));
 
 	var b : *TreeNode;
-	b = operation(number(25), OperationDiv, number(5));
+	b = operation(number(25), OpDiv, number(5));
 
-	return operation(a, OperationAdd, b);
+	return operation(a, OpAdd, b);
 }
 
 const main := proc() {
