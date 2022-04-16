@@ -1,3 +1,4 @@
+#pragma once
 #include "Kr/KrBasic.h"
 
 struct Heap_Allocator

@@ -1513,34 +1513,26 @@ Code_Node_Procedure_Call *interp_find_main(Interpreter *interp) {
 
 	if (!main_proc) {
 		auto error = code_type_resolver_error_stream(resolver);
-		error->begin_string_value();
-		Write(error->builder, "\'main\' procedure not defined!");
-		error->end_string_value();
+		Write(error, "\'main\' procedure not defined!");
 		return nullptr;
 	}
 
 	if (!(main_proc->flags & SYMBOL_BIT_CONSTANT) || main_proc->address.kind != Symbol_Address::CODE) {
 		auto error = code_type_resolver_error_stream(resolver);
-		error->begin_string_value();
-		Write(error->builder, "The \'main\' procedure must be constant!\n");
-		error->end_string_value();
+		Write(error, "The \'main\' procedure must be constant!\n");
 		return nullptr;
 	}
 
 	if (main_proc->type->kind != CODE_TYPE_PROCEDURE) {
 		auto error = code_type_resolver_error_stream(resolver);
-		error->begin_string_value();
-		Write(error->builder, "The \'main\' symbol must be a procedure!\n");
-		error->end_string_value();
+		Write(error, "The \'main\' symbol must be a procedure!\n");
 		return nullptr;
 	}
 
 	auto proc_type = (Code_Type_Procedure *)main_proc->type;
 	if (proc_type->argument_count != 0 || proc_type->return_type || proc_type->is_variadic) {
 		auto error = code_type_resolver_error_stream(resolver);
-		error->begin_string_value();
-		Write(error->builder, "The \"main\" procedure must not take any arguments and should return nothing!\n");
-		error->end_string_value();
+		Write(error, "The \"main\" procedure must not take any arguments and should return nothing!\n");
 		return nullptr;
 	}
 

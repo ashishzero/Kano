@@ -6,25 +6,8 @@
 #include "HeapAllocator.h"
 #include "Kr/KrString.h"
 
-#include <stdlib.h>
-#include <time.h>
-
 #include "StringBuilder.h"
-
-struct Call_Info {
-	String procedure_name;
-	uint64_t stack_top;
-	Symbol_Table *symbols;
-};
-
-struct Interp_User_Context {
-	String_Builder   console_out;
-	String           console_in;
-	Json_Writer      json;
-	Array<Call_Info> callstack;
-	clock_t          prev_count;
-	clock_t          first_count;
-};
+#include "StdLib.h"
 
 //
 //
@@ -32,23 +15,8 @@ struct Interp_User_Context {
 
 void AssertHandle(const char *reason, const char *file, int line, const char *proc)
 {
-	fprintf(stderr, "%s. File: %s(%d)\n", reason, file, line);
+	fprintf(stderr, "Internal Compiler Error %s. File: %s(%d)\n", reason, file, line);
 	DebugTriggerbreakpoint();
-}
-
-String read_entire_file(const char *file)
-{
-	FILE *f = fopen(file, "rb");
-	fseek(f, 0, SEEK_END);
-	long fsize = ftell(f);
-	fseek(f, 0, SEEK_SET);
-
-	uint8_t *string = (uint8_t *)MemoryAllocate(fsize + 1);
-	fread(string, 1, fsize, f);
-	fclose(f);
-
-	string[fsize] = 0;
-	return String(string, (int64_t)fsize);
 }
 
 //
@@ -106,7 +74,7 @@ static void json_write_type_name(Json_Writer *json, Code_Type *type)
 
 			if (proc->return_type)
 			{
-				json->append_string_value(" -> ");
+				json->append_string_value("->");
 				json_write_type_name(json, proc->return_type);
 			}
 			return;
@@ -180,32 +148,6 @@ static void json_write_type(Json_Writer *json, Code_Type *type)
 	}
 
 	json->end_object();
-}
-
-enum Memory_Type {
-	Memory_Type_INVALID,
-	Memory_Type_STACK,
-	Memory_Type_GLOBAL,
-	Memory_Type_HEAP,
-};
-
-static const char *memory_type_string(Memory_Type type) {
-	if (type == Memory_Type_INVALID) return "(invalid)";
-	if (type == Memory_Type_STACK) return "stack";
-	if (type == Memory_Type_GLOBAL) return "global";
-	if (type == Memory_Type_HEAP) return "heap";
-	return "(null)";
-}
-
-static Memory_Type interp_get_memory_type(Interpreter *interp, void *ptr)
-{
-	if (ptr >= interp->stack && ptr < interp->stack + interp->stack_size)
-		return Memory_Type_STACK;
-	if (ptr >= interp->global && ptr < interp->global + interp->global_size)
-		return Memory_Type_GLOBAL;
-	if (heap_contains_memory(interp->heap, ptr))
-		return Memory_Type_HEAP;
-	return Memory_Type_INVALID;
 }
 
 static void json_write_value(Json_Writer *json, Interpreter *interp, Code_Type *type, void *data)
@@ -492,385 +434,6 @@ static void intercept(Interpreter *interp, Intercept_Kind intercept, Code_Node *
 
 		json->end_object();
 	}
-}
-
-#include <math.h>
-
-struct Interp_Morph {
-	uint8_t *arg;
-	uint64_t offset;
-	Interp_Morph(Interpreter *interp): arg(interp->stack + interp->stack_top), offset(0) {}
-
-	template <typename T>
-	void OffsetReturn() { offset += sizeof(T); }
-
-	template <typename T>
-	void Return(const T &src) { memcpy(arg, &src, sizeof(T)); }
-
-	template <typename T>
-	T Arg(uint64_t alignment = sizeof(T))
-	{ 
-		offset = AlignPower2Up(offset, sizeof(alignment));
-		auto ptr = arg + offset;
-		offset += sizeof(T);
-		return *(T *)ptr;
-	}
-};
-
-static void stdout_value(Interpreter *interp, String_Builder *out, Code_Type *type, void *data)
-{
-	if (!data)
-	{
-		Write(out, "(null)"); printf("(null)");
-		return;
-	}
-
-	switch (type->kind)
-	{
-		case CODE_TYPE_NULL: 
-			Write(out, "(null)"); printf("(null)");
-			return;
-		case CODE_TYPE_CHARACTER: 
-			Write(out, (int)*(Kano_Char *)data); printf("%d", (int) *(Kano_Char *)data);
-			return;
-		case CODE_TYPE_INTEGER: 
-			Write(out, *(Kano_Int *)data); printf("%zd", *(Kano_Int *)data);
-			return;
-		case CODE_TYPE_REAL: 
-			Write(out, *(Kano_Real *)data); printf("%f", *(Kano_Real *)data);
-			return;
-		case CODE_TYPE_BOOL: 
-			Write(out, (*(Kano_Bool *)data)); printf("%s", (*(Kano_Bool *)data) ? "true" : "false");
-			return;
-		case CODE_TYPE_PROCEDURE: 
-			Write(out, data); printf("%p", data);
-			return;
-
-		case CODE_TYPE_POINTER: {
-			auto pointer_type = (Code_Type_Pointer *)type;
-			void *raw_ptr = *(void **)data;
-
-			Write(out, "{ "); printf("{ ");
-
-			if (raw_ptr)
-			{
-				WriteFormatted(out, "raw: %, ", raw_ptr); printf("raw: %p, ", raw_ptr);
-			}
-			else
-			{
-				Write(out, "raw: (null), "); printf("raw: (null), ");
-			}
-
-			auto mem_type = interp_get_memory_type(interp, raw_ptr);
-
-			Write(out, "value: "); printf("value: ");
-
-			if (mem_type != Memory_Type_INVALID)
-			{
-				stdout_value(interp, out, pointer_type->base_type, raw_ptr);
-				Write(out, " "); printf(" ");
-			}
-			else
-			{
-				Write(out, raw_ptr ? String("(garbage)") : String("(invalid)")); printf("%s ", raw_ptr ? "(garbage)" : "(invalid)");
-			}
-
-			Write(out, "}"); printf("}");
-			return;
-		}
-
-		case CODE_TYPE_STRUCT: {
-			auto _struct = (Code_Type_Struct *)type;
-
-			Write(out, "{ "); printf("{ ");
-
-			for (int64_t index = 0; index < _struct->member_count; ++index)
-			{
-				auto member = &_struct->members[index];
-				Write(out, member->name); printf("%.*s: ", (int)member->name.length, member->name.data);
-				stdout_value(interp, out, member->type, (uint8_t *)data + member->offset);
-
-				if (index < _struct->member_count - 1)
-				{
-					Write(out, ","); printf(",");
-				}
-
-				Write(out, " "); printf(" ");
-			}
-
-			Write(out, "}"); printf("}");
-			return;
-		}
-
-		case CODE_TYPE_ARRAY_VIEW: {
-			auto arr_type = (Code_Type_Array_View *)type;
-			
-			auto arr_count = *(Kano_Int *)data;
-			auto arr_data = (uint8_t *)data + sizeof(Kano_Int);
-
-			Write(out, "[ ");
-			printf("[ ");
-			for (int64_t index = 0; index < arr_count; ++index)
-			{
-				stdout_value(interp, out, arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
-				Write(out, " "); printf(" ");
-			}
-			Write(out, "]"); printf("]");
-
-			return;
-		}
-
-		case CODE_TYPE_STATIC_ARRAY: {
-			auto arr_type = (Code_Type_Static_Array *)type;
-
-			auto arr_data = (uint8_t *)data;
-
-			Write(out, "[ ");
-			printf("[ ");
-			for (int64_t index = 0; index < arr_type->element_count; ++index)
-			{
-				stdout_value(interp, out, arr_type->element_type, arr_data + index * arr_type->element_type->runtime_size);
-				Write(out, " "); printf(" ");
-			}
-			Write(out, "]"); printf("]");
-
-			return;
-		}
-	}
-}
-
-static void basic_print(Interpreter *interp) {
-	Interp_Morph morph(interp);
-
-	auto context = (Interp_User_Context *)interp->user_context;
-	auto con_out = &context->console_out;
-
-	auto fmt = morph.Arg<String>(sizeof(int64_t));
-	auto args = morph.Arg<uint8_t *>();
-
-	for (int64_t index = 0; index < fmt.length;)
-	{
-		if (fmt[index] == '%')
-		{
-			index += 1;
-
-			if (args) {
-				auto type = *(Code_Type **)args;
-				args += sizeof(Code_Type *);
-				auto ptr = args;
-				args += type->runtime_size;
-
-				if (ptr >= interp->stack &&
-					(ptr < interp->stack + interp->stack_top) &&
-					interp_get_memory_type(interp, ptr) != Memory_Type_INVALID) {
-					stdout_value(interp, con_out, type, ptr);
-				} else {
-					Write(con_out, '%'); printf("%%");
-				}
-			} else {
-				Write(con_out, '%'); printf("%%");
-			}
-		}
-		else if (fmt[index] == '\\')
-		{
-			index += 1;
-			if (index < fmt.length)
-			{
-				if (fmt[index] == 'n')
-				{
-					index += 1;
-					Write(con_out, "\\n"); printf("\n");
-				}
-				else if (fmt[index] == '\\')
-				{
-					Write(con_out, "\\\\"); printf("\\");
-					index += 1;
-				}
-			}
-			else
-			{
-				Write(con_out, "\\\\"); printf("\\");
-			}
-		}
-		else
-		{
-			Write(con_out, (char)fmt[index]); printf("%c", fmt[index]);
-			index += 1;
-		}
-	}
-}
-
-static void basic_read_int(Interpreter *interp)
-{
-	Interp_Morph morph(interp);
-	morph.OffsetReturn<Kano_Int>();
-	
-	Kano_Int result = 0;
-
-	auto context = (Interp_User_Context *)interp->user_context;
-	auto input   = StrTrim(context->console_in);
-
-	if (input.data && input.length)
-	{
-		char *end = nullptr;
-		result = (Kano_Int)strtoll((char *)input.data, &end, 10);
-		input.length -= (end - (char *)input.data);
-		input.data = (uint8_t *)end;
-
-		Write(&context->console_out, result);
-		WriteFormatted(&context->console_out, "\\n");
-		printf("%d\n", (int)result);
-	}
-	else
-	{
-		Write(&context->console_out, "Failed read_int: Input buffer empty\\n");
-		printf("Failed read_int: Input buffer empty\n");
-	}
-
-	context->console_in = input;
-	morph.Return(result);
-}
-
-static void basic_read_float(Interpreter *interp)
-{
-	Interp_Morph morph(interp);
-	morph.OffsetReturn<Kano_Real>();
-	
-	Kano_Real result = 0;
-
-	auto context = (Interp_User_Context *)interp->user_context;
-	auto input   = StrTrim(context->console_in);
-
-	if (input.data && input.length)
-	{
-		char *end = nullptr;
-		result = (Kano_Real)strtod((char *)input.data, &end);
-		input.length -= (end - (char *)input.data);
-		input.data = (uint8_t *)end;
-		Write(&context->console_out, result);
-		WriteFormatted(&context->console_out, "\\n");
-		printf("%f\n", (double)result);
-	}
-	else
-	{
-		Write(&context->console_out, "Failed read_float: Input buffer empty\\n");
-		printf("Failed read_float: Input buffer empty\n");
-	}
-
-	context->console_in = input;
-	morph.Return(result);
-}
-
-
-static void basic_allocate(Interpreter *interp) {
-	Interp_Morph morph(interp);
-	morph.OffsetReturn<void *>();
-	auto size = morph.Arg<Kano_Int>();
-	auto result = heap_alloc(interp->heap, size);
-	morph.Return(result);
-}
-
-static void basic_free(Interpreter *interp) {
-	Interp_Morph morph(interp);
-	auto ptr = morph.Arg<void *>();
-	heap_free(interp->heap, ptr);
-}
-
-static void basic_sin(Interpreter *interp) {
-	Interp_Morph morph(interp);
-	morph.OffsetReturn<double>();
-	auto x = morph.Arg<double>();
-	auto y = sin(x);
-	morph.Return(y);
-}
-
-static void basic_cos(Interpreter *interp) {
-	Interp_Morph morph(interp);
-	morph.OffsetReturn<double>();
-	auto x = morph.Arg<double>();
-	auto y = cos(x);
-	morph.Return(y);
-}
-
-static void basic_tan(Interpreter *interp) {
-	Interp_Morph morph(interp);
-	morph.OffsetReturn<double>();
-	auto x = morph.Arg<double>();
-	auto y = tan(x);
-	morph.Return(y);
-}
-
-static void basic_va_arg(Interpreter *interp) {
-	Interp_Morph morph(interp);
-	morph.OffsetReturn<void *>();
-	auto x = morph.Arg<uint8_t *>();
-	x += (sizeof(Code_Type *));
-	morph.Return(x);
-}
-
-static void basic_va_arg_next(Interpreter *interp) {
-	Interp_Morph morph(interp);
-	morph.OffsetReturn<void *>();
-	auto x = morph.Arg<uint8_t *>();
-	auto type = *(Code_Type **)x;
-	x += (type->runtime_size + sizeof(Code_Type *));
-	morph.Return(x);
-}
-
-static void include_basic(Code_Type_Resolver *resolver)
-{
-	Procedure_Builder builder(resolver);
-	
-	proc_builder_argument(&builder, "string");
-	proc_builder_variadic(&builder);
-	proc_builder_register(&builder, "print", basic_print);
-
-	proc_builder_return(&builder, "int");
-	proc_builder_register(&builder, "read_int", basic_read_int);
-
-	proc_builder_return(&builder, "float");
-	proc_builder_register(&builder, "read_float", basic_read_float);
-
-	proc_builder_argument(&builder, "int");
-	proc_builder_return(&builder, "*void");
-	proc_builder_register(&builder, "allocate", basic_allocate);
-
-	proc_builder_argument(&builder, "*void");
-	proc_builder_register(&builder, "free", basic_free);
-
-	proc_builder_argument(&builder, "float");
-	proc_builder_return(&builder, "float");
-	proc_builder_register(&builder, "sin", basic_sin);
-
-	proc_builder_argument(&builder, "float");
-	proc_builder_return(&builder, "float");
-	proc_builder_register(&builder, "cos", basic_cos);
-
-	proc_builder_argument(&builder, "float");
-	proc_builder_return(&builder, "float");
-	proc_builder_register(&builder, "tan", basic_tan);
-
-	proc_builder_argument(&builder, "*void");
-	proc_builder_return(&builder, "*void");
-	proc_builder_register(&builder, "va_arg_next", basic_va_arg_next);
-
-	proc_builder_argument(&builder, "*void");
-	proc_builder_return(&builder, "*void");
-	proc_builder_register(&builder, "va_arg", basic_va_arg);
-
-	proc_builder_free(&builder);
-}
-
-static void parser_on_error(Parser *parser) { 
-	parser->error->end_array();
-	parser->error->end_object();
-	exit(0); 
-}
-static void code_type_resolver_on_error(Code_Type_Resolver *resolver) {
-	auto error = code_type_resolver_error_stream(resolver);
-	error->end_array();
-	error->end_object();
-	exit(0);
 }
 
 void json_write_syntax_node(Json_Writer *json, Syntax_Node *root)
@@ -1328,27 +891,27 @@ bool GenerateDebugCodeInfo(String code, String input, Memory_Arena *arena, Strin
 	Defer{ EndTemporaryMemory(&temp); };
 
 	Parser parser;
-	parser_init(&parser, code, &context.json);
+	parser_init(&parser, code, context.json.builder);
 
-	context.json.write_key("errors");
-	context.json.begin_array();
+	context.json.write_key("error");
+	context.json.begin_string_value();
 
 	auto node = parse_global_scope(&parser);
 
 	if (parser.error_count) {
-		context.json.end_array();
+		context.json.end_string_value();
 		context.json.end_object();
 		return false;
 	}
 
-	auto resolver = code_type_resolver_create(&context.json);
+	auto resolver = code_type_resolver_create(context.json.builder);
 
 	include_basic(resolver);
 
 	auto exprs = code_type_resolve(resolver, node);
 
 	if (code_type_resolver_error_count(resolver)) {
-		context.json.end_array();
+		context.json.end_string_value();
 		context.json.end_object();
 		return false;
 	}
@@ -1368,12 +931,12 @@ bool GenerateDebugCodeInfo(String code, String input, Memory_Arena *arena, Strin
 	auto main_proc = interp_find_main(&interp);
 
 	if (!main_proc) {
-		context.json.end_array();
+		context.json.end_string_value();
 		context.json.end_object();
 		return false;
 	}
 
-	context.json.end_array();
+	context.json.end_string_value();
 
 	context.json.write_key("runtime");
 	context.json.begin_array();
@@ -1406,34 +969,3 @@ bool GenerateDebugCodeInfo(String code, String input, Memory_Arena *arena, Strin
 
 	return true;
 }
-
-#if 0
-int main()
-{
-	InitThreadContext(0);
-
-	parser_register_error_proc(parser_on_error);
-	code_type_resolver_register_error_proc(code_type_resolver_on_error);
-
-	String content = read_entire_file("Simple.kano");
-
-	auto arena = MemoryArenaCreate(MegaBytes(128));
-
-	String_Builder builder;
-
-	GenerateDebugCodeInfo(content, "", arena, &builder);
-
-	FILE *out = fopen("DebugInfo.json", "wb");
-
-	for (auto buk = &builder.head; buk; buk = buk->next)
-	{
-		fwrite(buk->data, buk->written, 1, out);
-	}
-
-	fclose(out);
-
-	FreeBuilder(&builder);
-
-	return 0;
-}
-#endif

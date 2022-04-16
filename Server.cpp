@@ -50,17 +50,15 @@ static Request ParseRequest(String content)
 
 #include <pthread.h>
 
-static void parser_on_error(Parser *parser)
-{
-	parser->error->end_array();
-	parser->error->end_object();
+static void parser_on_error(Parser *parser) {
+	Write(parser->error, "\"}");
 	pthread_exit(NULL);
 }
+
 static void code_type_resolver_on_error(Code_Type_Resolver *resolver) {
 	auto error = code_type_resolver_error_stream(resolver);
-	error->end_array();
-	error->end_object();
-	pthread_exit(NULL); 
+	Write(error, "\"}");
+	pthread_exit(NULL);
 }
 
 struct Code_Execution
@@ -428,16 +426,14 @@ void Listen(HANDLE req_queue)
 	}
 }
 
-static void parser_on_error(Parser *parser) { 
-	parser->error->end_array();
-	parser->error->end_object(); 
+static void parser_on_error(Parser *parser) {
+	Write(parser->error, "\"}");
 	ExitThread(1);
 }
 
 static void code_type_resolver_on_error(Code_Type_Resolver *resolver) {
 	auto error = code_type_resolver_error_stream(resolver);
-	error->end_array();
-	error->end_object();
+	Write(error, "\"}");
 	ExitThread(1);
 }
 

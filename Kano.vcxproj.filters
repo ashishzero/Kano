@@ -28,9 +28,7 @@
     <ClInclude Include="Kr\KrString.h" />
     <ClInclude Include="StringBuilder.h" />
     <ClInclude Include="JsonWriter.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Simple.kano" />
+    <ClInclude Include="StdLib.h" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="Kr\KrVisualizer.natvis" />

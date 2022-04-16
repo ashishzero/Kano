@@ -363,3 +363,4 @@ MigrationBackup/
 FodyWeavers.xsd
 /debug.txt
 /DebugInfo.json
+/kanoc/kanoc.vcxproj.filters
