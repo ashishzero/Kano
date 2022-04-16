@@ -97,7 +97,7 @@ void handle_request(struct http_request_s *request)
 
 	printf("Requested code::\n%s\nInput::%s\n\n", req.code.data, req.input.data);
 
-	auto arena = MemoryArenaCreate(MegaBytes(128));
+	auto arena = MemoryArenaAllocate(MegaBytes(128));
 
 	String_Builder builder;
 
@@ -112,7 +112,7 @@ void handle_request(struct http_request_s *request)
 	int result = pthread_create(&thread, NULL, ExecuteCodeThreadProc, &exe);
 	if (result != 0)
 	{
-		MemoryArenaDestroy(arena);
+		MemoryArenaFree(arena);
 		FreeBuilder(&builder);
 		return;
 	}
@@ -152,7 +152,7 @@ void handle_request(struct http_request_s *request)
 	http_response_body(response, (char *)body, length);
 	http_respond(request, response);
 
-	MemoryArenaDestroy(arena);
+	MemoryArenaFree(arena);
 	FreeBuilder(&builder);
 }
 
