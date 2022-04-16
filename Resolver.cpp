@@ -2572,7 +2572,8 @@ void proc_builder_register(Procedure_Builder *builder, String name, CCall ccall)
 	type->return_type = builder->return_type;
 	type->is_variadic = builder->is_variadic;
 	
-	Assert(code_type_resolver_register_ccall(builder->resolver, name, ccall, type));
+	bool added = code_type_resolver_register_ccall(builder->resolver, name, ccall, type);
+	Assert(added);
 
 	builder->arguments.Reset();
 	builder->return_type = nullptr;
