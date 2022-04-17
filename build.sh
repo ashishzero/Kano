@@ -15,4 +15,5 @@ fi
 
 mkdir -p bin
 
-${COMPILER} -g -std=c++17 -DASSERTION_HANDLED Main.cpp Server.cpp Lexer.cpp Parser.cpp Resolver.cpp Printer.cpp StringBuilder.cpp Interp.cpp ./Kr/KrCommon.cpp ./Kr/KrBasic.cpp -o bin/Kano -lpthread
+${COMPILER} -g -std=c++17 -DKANO_SERVER -DASSERTION_HANDLED Main.cpp Server.cpp Lexer.cpp Parser.cpp Resolver.cpp Printer.cpp StringBuilder.cpp Interp.cpp ./Kr/KrCommon.cpp ./Kr/KrBasic.cpp -o bin/Kano -lpthread
+${COMPILER} -g -std=c++17 -DASSERTION_HANDLED Compiler.cpp Lexer.cpp Parser.cpp Resolver.cpp Printer.cpp StringBuilder.cpp Interp.cpp ./Kr/KrCommon.cpp ./Kr/KrBasic.cpp -o bin/kanoc -lpthread
